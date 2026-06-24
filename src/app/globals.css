@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  transition: background-color 500ms ease, color 500ms ease;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html.dark body {
+  background-color: #111827;
+  color: white;
+}
+
+html:not(.dark) body {
+  background-color: white;
+  color: #111827;
+}
+
+main, header, footer, section, article, aside, div {
+  transition: background-color 500ms ease, border-color 500ms ease, color 500ms ease;
+}
