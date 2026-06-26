@@ -91,6 +91,12 @@ function getActivityImageUrl(activity: DiscordActivity, userId: string, isLarge:
   return `https://cdn.discordapp.com/app-assets/${appId}/${asset}.png`;
 }
 
+function getActivityKey(activity: DiscordActivity): string {
+  const start = activity.timestamps?.start || 0;
+  const appId = activity.application_id || "";
+  return `${appId}-${activity.name}-${start}`;
+}
+
 function getActivityTypeIcon(type: number): string {
   switch (type) {
     case 0: return "🕹️";
@@ -194,10 +200,10 @@ export default function DiscordUser() {
   const [loading, setLoading] = useState(true);
   const [imgError, setImgError] = useState(false);
   const [avatarColor, setAvatarColor] = useState<string | null>(null);
-  const [elapsedTimes, setElapsedTimes] = useState<Record<number, string>>({});
-  const [manualSecondsMap, setManualSecondsMap] = useState<Record<number, number>>({});
+  const [elapsedTimes, setElapsedTimes] = useState<Record<string, string>>({});
+  const [manualSecondsMap, setManualSecondsMap] = useState<Record<string, number>>({});
   const dataRef = useRef<DiscordUserData | null>(null);
-  const activityStartsRef = useRef<Record<number, number>>({});
+  const activityStartsRef = useRef<Record<string, number>>({});
   const manualTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastDisplayNameRef = useRef<string | null>(null);
   const lastAvatarUrlRef = useRef<string | null>(null);
@@ -242,10 +248,10 @@ export default function DiscordUser() {
           a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
         ) || [];
         
-        const newStarts: Record<number, number> = {};
-        newActivities.forEach((activity, idx) => {
+        const newStarts: Record<string, number> = {};
+        newActivities.forEach((activity) => {
           if (activity.timestamps?.start) {
-            const key = idx;
+            const key = getActivityKey(activity);
             const newStart = activity.timestamps.start;
             newStarts[key] = newStart;
             
@@ -261,10 +267,10 @@ export default function DiscordUser() {
         
         Object.keys(activityStartsRef.current).forEach(key => {
           if (!(key in newStarts)) {
-            delete activityStartsRef.current[Number(key)];
+            delete activityStartsRef.current[key];
             setManualSecondsMap(prev => {
               const newMap = { ...prev };
-              delete newMap[Number(key)];
+              delete newMap[key];
               return newMap;
             });
           }
@@ -285,9 +291,9 @@ export default function DiscordUser() {
     if (Object.keys(activityStartsRef.current).length > 0) {
       manualTimerRef.current = setInterval(() => {
         setManualSecondsMap(prev => {
-          const newMap: Record<number, number> = {};
+          const newMap: Record<string, number> = {};
           Object.entries(prev).forEach(([key, val]) => {
-            newMap[Number(key)] = val + 1;
+            newMap[key] = val + 1;
           });
           return newMap;
         });
@@ -306,16 +312,16 @@ export default function DiscordUser() {
   }, [data?.activities]);
 
   useEffect(() => {
-    const newElapsedTimes: Record<number, string> = {};
+    const newElapsedTimes: Record<string, string> = {};
     Object.entries(manualSecondsMap).forEach(([key, seconds]) => {
       const hours = Math.floor(seconds / 3600);
       const minutes = Math.floor((seconds % 3600) / 60);
       const secs = seconds % 60;
 
       if (hours > 0) {
-        newElapsedTimes[Number(key)] = `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        newElapsedTimes[key] = `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
       } else {
-        newElapsedTimes[Number(key)] = `${minutes}:${secs.toString().padStart(2, '0')}`;
+        newElapsedTimes[key] = `${minutes}:${secs.toString().padStart(2, '0')}`;
       }
     });
     setElapsedTimes(newElapsedTimes);
@@ -448,13 +454,14 @@ export default function DiscordUser() {
           <div className="flex items-start gap-4 flex-1 min-w-0 pb-1">
             {allActivities.length > 0 && (
               <div className="flex gap-3 flex-1 min-w-0">
-                {allActivities.map((activity, index) => {
+                {allActivities.map((activity) => {
+                  const activityKey = getActivityKey(activity);
                   const largeImageUrl = getActivityImageUrl(activity, data.id, true);
                   const smallImageUrl = getActivityImageUrl(activity, data.id, false);
-                  const activityElapsed = elapsedTimes[index];
+                  const activityElapsed = elapsedTimes[activityKey];
                   
                   return (
-                    <div key={index} className="bg-[#2b2d31] rounded-md p-2 flex items-center gap-2 flex-1 min-w-0">
+                    <div key={activityKey} className="dark:bg-[#2b2d31] bg-[#ebedef] rounded-md p-2 flex items-center gap-2 flex-1 min-w-0">
                       <div className="relative w-12 h-12 rounded flex-shrink-0">
                         {largeImageUrl ? (
                           <Image
@@ -470,7 +477,7 @@ export default function DiscordUser() {
                           </div>
                         )}
                         {smallImageUrl && (
-                          <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full overflow-hidden border border-[#2b2d31]">
+                          <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full overflow-hidden dark:border-[#2b2d31] border-white">
                             <Image
                               src={smallImageUrl}
                               alt=""
@@ -480,45 +487,45 @@ export default function DiscordUser() {
                             />
                           </div>
                         )}
-                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-[#2b2d31] rounded-full flex items-center justify-center border border-[#2b2d31]">
+                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 dark:bg-[#2b2d31] bg-white dark:border-[#2b2d31] border-white rounded-full flex items-center justify-center border">
                           <span className="text-[6px] leading-none">
                             {getActivityTypeIcon(activity.type)}
                           </span>
                         </div>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-white text-xs font-medium truncate">
+                        <p className="dark:text-white text-gray-900 text-xs font-medium truncate">
                           {activity.name}
                         </p>
                         {activity.details && (
-                          <p className="text-[#b5bac1] text-[10px] truncate">
+                          <p className="dark:text-[#b5bac1] text-gray-500 text-[10px] truncate">
                             {activity.details}
                           </p>
                         )}
                         {activity.state && (
-                          <p className="text-[#b5bac1] text-[10px] truncate">
+                          <p className="dark:text-[#b5bac1] text-gray-500 text-[10px] truncate">
                             {activity.state}
                           </p>
                         )}
                         {activity.type === 2 && activity.timestamps?.end && activity.timestamps?.start ? (
                             <div className="flex items-center gap-1 mt-0.5">
-                              <span className="text-[#b5bac1] text-[8px]">
+                              <span className="dark:text-[#b5bac1] text-gray-500 text-[8px]">
                                 {activityElapsed}
                               </span>
-                              <div className="flex-1 h-1 bg-[#1e1f22] rounded-full overflow-hidden">
-                                <div 
+                              <div className="flex-1 h-1 dark:bg-[#1e1f22] bg-gray-200 rounded-full overflow-hidden">
+                                <div
                                   className="h-full bg-[#5865F2] rounded-full"
-                                  style={{ 
-                                    width: `${Math.min(100, ((manualSecondsMap[index] || 0) / Math.floor((activity.timestamps.end - activity.timestamps.start) / 1000)) * 100)}%` 
+                                  style={{
+                                    width: `${Math.min(100, ((manualSecondsMap[activityKey] || 0) / Math.floor((activity.timestamps.end - activity.timestamps.start) / 1000)) * 100)}%`
                                   }}
                                 />
                               </div>
-                              <span className="text-[#b5bac1] text-[8px]">
+                              <span className="dark:text-[#b5bac1] text-gray-500 text-[8px]">
                                 {formatTimeRemaining(activity.timestamps.end - activity.timestamps.start)}
                               </span>
                             </div>
                           ) : activityElapsed ? (
-                            <p className="text-[#b5bac1] text-[10px]">
+                            <p className="dark:text-[#b5bac1] text-gray-500 text-[10px]">
                               {activityElapsed}
                             </p>
                           ) : null}
