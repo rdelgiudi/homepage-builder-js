@@ -8,22 +8,23 @@ const SALT = process.env.VISITOR_SALT || "default-salt";
 
 let db: import("better-sqlite3").Database | null = null;
 
-function getDb() {
+function getDb(): NonNullable<typeof db> {
   if (!db) {
     const Database = require("better-sqlite3");
-    db = new Database(DB_PATH);
-    db.exec(`
+    const database = new Database(DB_PATH);
+    database.exec(`
       CREATE TABLE IF NOT EXISTS visitors (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         visitor_id TEXT UNIQUE NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    db.exec(`
+    database.exec(`
       CREATE INDEX IF NOT EXISTS idx_visitor_id ON visitors(visitor_id)
     `);
+    db = database;
   }
-  return db;
+  return db!;
 }
 
 function generateVisitorId(): string {

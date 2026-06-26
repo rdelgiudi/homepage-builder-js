@@ -34,6 +34,7 @@ next-env.d.ts
 src/config/discord.json
 src/config/discord-user.json
 src/config/steam.json
+src/config/battle-net.json
 src/config/homepage.json
 
 # Visitor database

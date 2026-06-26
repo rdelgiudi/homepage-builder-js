@@ -30,6 +30,7 @@ interface DiscordUserData {
   activities?: DiscordActivity[];
   lastSeen?: string | null;
   lastUpdated?: string | null;
+  error?: string;
 }
 
 const statusColors: Record<string, string> = {
@@ -249,12 +250,12 @@ export default function DiscordUser() {
             lastStatusRef.current = result.status;
           }
 
-          const newActivities = result?.activities?.filter(a =>
+          const newActivities = result?.activities?.filter((a: DiscordActivity) =>
             a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
           ) || [];
 
           const newStarts: Record<string, number> = {};
-          newActivities.forEach((activity) => {
+          newActivities.forEach((activity: DiscordActivity) => {
             if (activity.timestamps?.start) {
               const key = getActivityKey(activity);
               const newStart = activity.timestamps.start;
@@ -366,12 +367,12 @@ export default function DiscordUser() {
     : (data?.username?.includes('#') ? data.username.split('#')[0] : data?.username) || lastUsernameRef.current;
 
   const bannerBackground = bannerUrl && !imgError
-    ? null
+    ? undefined
     : avatarColor
       ? adjustColor(avatarColor, 20)
-      : data.bannerColor || "#5865F2";
+      : data?.bannerColor || "#5865F2";
 
-  const allActivities = data.activities?.filter(a => 
+  const allActivities = data?.activities?.filter((a: DiscordActivity) =>
     a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
   ) || [];
   const currentActivity = allActivities[0];
@@ -404,7 +405,7 @@ export default function DiscordUser() {
               {avatarUrl ? (
                 <Image
                   src={avatarUrl}
-                  alt={data.username}
+                  alt={data?.username || "User avatar"}
                   width={80}
                   height={80}
                   className="rounded-full border-4 border-white dark:border-[#313338]"
@@ -412,7 +413,7 @@ export default function DiscordUser() {
                 />
               ) : (
                 <div className="w-20 h-20 rounded-full bg-[#5865F2] flex items-center justify-center border-4 border-white dark:border-[#313338]">
-                  <span className="text-3xl text-white font-bold">{data.username.charAt(0).toUpperCase()}</span>
+                  <span className="text-3xl text-white font-bold">{data?.username?.charAt(0).toUpperCase()}</span>
                 </div>
               )}
               <div
@@ -422,7 +423,7 @@ export default function DiscordUser() {
             </div>
             <p className="text-gray-900 dark:text-white font-bold text-lg leading-tight mt-2">{displayName}</p>
             {baseUsername && <p className="text-gray-500 dark:text-[#b5bac1] text-sm">{baseUsername}</p>}
-            {!currentActivity && data.lastSeen && data.status === "offline" && (
+            {!currentActivity && data?.lastSeen && data?.status === "offline" && (
               <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
                 Last seen {formatLastSeen(data.lastSeen)}
               </p>
@@ -434,8 +435,8 @@ export default function DiscordUser() {
               <div className="flex gap-3 flex-1 min-w-0">
                 {allActivities.map((activity) => {
                   const activityKey = getActivityKey(activity);
-                  const largeImageUrl = getActivityImageUrl(activity, data.id, true);
-                  const smallImageUrl = getActivityImageUrl(activity, data.id, false);
+                  const largeImageUrl = getActivityImageUrl(activity, data?.id || "", true);
+                  const smallImageUrl = getActivityImageUrl(activity, data?.id || "", false);
                   const startTime = activityStartsRef.current[activityKey];
                   const maxDurationSecs = activity.timestamps?.end && activity.timestamps?.start
                     ? Math.floor((activity.timestamps.end - activity.timestamps.start) / 1000)

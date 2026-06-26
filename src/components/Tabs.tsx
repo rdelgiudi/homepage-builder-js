@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import DiscordStatus from "@/components/DiscordStatus";
 import DiscordUser from "@/components/DiscordUser";
 import SteamStatus from "@/components/SteamStatus";
+import BattleStatus from "@/components/BattleStatus";
 import MarkdownWidget from "@/components/MarkdownWidget";
 import MemeWidget from "@/components/MemeWidget";
 
@@ -61,6 +62,12 @@ interface SteamSection {
   text?: string;
 }
 
+interface BattleNetSection {
+  type: "battle-net";
+  icon?: string;
+  text?: string;
+}
+
 interface MarkdownSection {
   type: "markdown";
   file: string;
@@ -75,10 +82,10 @@ interface MemeSection {
 interface TabItem {
   label: string;
   icon?: string;
-  sections: (TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | MarkdownSection | MemeSection)[];
+  sections: (TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | BattleNetSection | MarkdownSection | MemeSection)[];
 }
 
-type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | MarkdownSection | MemeSection;
+type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | BattleNetSection | MarkdownSection | MemeSection;
 
 function renderSection(section: Section, index: number) {
   switch (section.type) {
@@ -174,6 +181,19 @@ function renderSection(section: Section, index: number) {
             </p>
           )}
           <SteamStatus />
+        </div>
+      );
+
+    case "battle-net":
+      return (
+        <div key={index}>
+          {(section.icon || section.text) && (
+            <p className="text-gray-500 dark:text-gray-400 mb-2 flex items-center justify-center gap-2">
+              {section.icon && <span className="text-xl">{section.icon}</span>}
+              {section.text && <span>{section.text}</span>}
+            </p>
+          )}
+          <BattleStatus />
         </div>
       );
 

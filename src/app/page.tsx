@@ -1,7 +1,8 @@
 import Tabs from "@/components/Tabs";
-import homepageConfig from "@/config/homepage.json";
 import VisitorCounter from "@/components/VisitorCounter";
 import { Suspense } from "react";
+
+const configPromise = import("@/config/homepage.json") as Promise<{ default: { name: string; tagline: string; tabs: unknown[] } }>;
 
 function TabsFallback() {
   return (
@@ -14,8 +15,9 @@ function TabsFallback() {
   );
 }
 
-export default function Home() {
-  const { name, tagline, tabs = [] } = homepageConfig;
+export default async function Home() {
+  const config = await configPromise;
+  const { name, tagline, tabs = [] } = config.default as { name: string; tagline: string; tabs: unknown[] };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800">
@@ -28,7 +30,7 @@ export default function Home() {
 
       <div className="w-full max-w-[870px] mx-auto px-8 pb-8">
         <Suspense fallback={<TabsFallback />}>
-          <Tabs tabs={tabs} />
+          <Tabs tabs={tabs as Parameters<typeof Tabs>[0]["tabs"]} />
         </Suspense>
       </div>
 
