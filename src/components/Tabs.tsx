@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import DiscordStatus from "@/components/DiscordStatus";
 import DiscordUser from "@/components/DiscordUser";
 import SteamStatus from "@/components/SteamStatus";
+import MarkdownWidget from "@/components/MarkdownWidget";
+import MemeWidget from "@/components/MemeWidget";
 
 interface LinkItem {
   label: string;
@@ -59,13 +61,24 @@ interface SteamSection {
   text?: string;
 }
 
+interface MarkdownSection {
+  type: "markdown";
+  file: string;
+}
+
+interface MemeSection {
+  type: "meme";
+  icon?: string;
+  text?: string;
+}
+
 interface TabItem {
   label: string;
   icon?: string;
-  sections: (TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection)[];
+  sections: (TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | MarkdownSection | MemeSection)[];
 }
 
-type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection;
+type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | MarkdownSection | MemeSection;
 
 function renderSection(section: Section, index: number) {
   switch (section.type) {
@@ -164,6 +177,26 @@ function renderSection(section: Section, index: number) {
         </div>
       );
 
+    case "markdown":
+      return (
+        <div key={index}>
+          <MarkdownWidget file={section.file} />
+        </div>
+      );
+
+    case "meme":
+      return (
+        <div key={index}>
+          {(section.icon || section.text) && (
+            <p className="text-gray-500 dark:text-gray-400 mb-2 flex items-center justify-center gap-2">
+              {section.icon && <span className="text-xl">{section.icon}</span>}
+              {section.text && <span>{section.text}</span>}
+            </p>
+          )}
+          <MemeWidget />
+        </div>
+      );
+
     default:
       return null;
   }
@@ -202,25 +235,27 @@ export default function Tabs({ tabs }: TabsProps) {
 
   return (
     <div className="w-full">
-      <div className="flex gap-4 justify-center mb-6 border-b border-gray-300 dark:border-gray-700 pb-2">
-        {tabs.map((tab, index) => (
-          <button
-            key={index}
-            type="button"
-            onClick={() => handleTabClick(index)}
-            className={`flex items-center gap-2 px-4 py-2 transition-all ${
-              activeTab === index
-                ? "text-blue-600 dark:text-white border-b-2 border-blue-600 dark:border-blue-400"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white"
-            }`}
-          >
-            {tab.icon && <span>{tab.icon}</span>}
-            <span>{tab.label}</span>
-          </button>
-        ))}
+      <div className="sticky top-0 z-20 w-screen ml-[calc(50%-50vw)] bg-gradient-to-br from-gray-100/90 to-gray-200/90 dark:from-gray-900/90 dark:to-gray-800/90 backdrop-blur-sm border-b border-gray-300 dark:border-gray-700">
+        <div className="max-w-[870px] mx-auto px-8 flex gap-4 justify-center pt-2 pb-2">
+          {tabs.map((tab, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={() => handleTabClick(index)}
+              className={`flex items-center gap-2 px-4 py-2 transition-all ${
+                activeTab === index
+                  ? "text-blue-600 dark:text-white border-b-2 border-blue-600 dark:border-blue-400"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white"
+              }`}
+            >
+              {tab.icon && <span>{tab.icon}</span>}
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-8 pt-4">
         {tabs[activeTab].sections.map((section, index) => renderSection(section, index))}
       </div>
     </div>

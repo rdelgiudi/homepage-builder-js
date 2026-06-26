@@ -11,12 +11,17 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.20",
     "autoprefixer": "^10.5.1",
+    "better-sqlite3": "^12.11.1",
     "concurrently": "^10.0.3",
     "discord.js": "^14.26.4",
+    "gray-matter": "^4.0.3",
     "next": "15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "ws": "^8.21.0"
   },
   "devDependencies": {

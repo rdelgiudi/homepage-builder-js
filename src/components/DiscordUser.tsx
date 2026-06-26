@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 
 interface DiscordActivity {
@@ -28,6 +28,8 @@ interface DiscordUserData {
   globalNickname?: string;
   status?: string;
   activities?: DiscordActivity[];
+  customStatus?: { text: string | null; emoji: string | null } | null;
+  lastSeen?: string | null;
   lastUpdated?: string | null;
 }
 
@@ -64,6 +66,7 @@ function getActivityImageUrl(activity: DiscordActivity, userId: string, isLarge:
 }
 
 function formatElapsedTime(startTime: number): string {
+  if (!startTime || isNaN(startTime)) return null;
   const seconds = Math.floor((Date.now() - startTime) / 1000);
   if (seconds < 60) return "0m";
   const minutes = Math.floor(seconds / 60);
@@ -72,6 +75,19 @@ function formatElapsedTime(startTime: number): string {
   if (hours < 24) return `${hours}h ${minutes % 60}m`;
   const days = Math.floor(hours / 24);
   return `${days}d ${hours % 24}h`;
+}
+
+function formatLastSeen(isoString: string): string {
+  const seconds = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
 }
 
 function adjustColor(hex: string, percent: number): string {
@@ -141,6 +157,7 @@ export default function DiscordUser() {
   const [imgError, setImgError] = useState(false);
   const [avatarColor, setAvatarColor] = useState<string | null>(null);
   const [elapsedTime, setElapsedTime] = useState<string | null>(null);
+  const dataRef = useRef<DiscordUserData | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -148,8 +165,10 @@ export default function DiscordUser() {
         const res = await fetch("/api/discord-user");
         const result = await res.json();
         setData(result);
+        dataRef.current = result;
       } catch {
         setData(null);
+        dataRef.current = null;
       } finally {
         setLoading(false);
       }
@@ -169,13 +188,13 @@ export default function DiscordUser() {
   }, [data?.avatar, data?.banner, data?.bannerColor, data?.id]);
 
   useEffect(() => {
-    if (!data?.activities?.length) {
-      setElapsedTime(null);
-      return;
-    }
-
     const updateElapsed = () => {
-      const activity = data.activities?.find(a => a.type === 0 || a.type === 2 || a.type === 1);
+      const currentData = dataRef.current;
+      if (!currentData?.activities?.length) {
+        setElapsedTime(null);
+        return;
+      }
+      const activity = currentData.activities?.find(a => a.type === 0 || a.type === 2 || a.type === 1);
       if (activity?.timestamps?.start) {
         setElapsedTime(formatElapsedTime(activity.timestamps.start));
       } else {
@@ -186,7 +205,13 @@ export default function DiscordUser() {
     updateElapsed();
     const interval = setInterval(updateElapsed, 30000);
     return () => clearInterval(interval);
-  }, [data?.activities]);
+  }, []);
+
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (loading) {
     return (
@@ -260,6 +285,18 @@ export default function DiscordUser() {
       </div>
 
       <div className="px-4 pb-4 pt-16 relative">
+        {!currentActivity && data.customStatus && (data.customStatus.text || data.customStatus.emoji) && (
+          <div
+            className="absolute left-24 top-2 z-10 max-w-[calc(100%-6rem)]"
+          >
+            <div className="relative bg-gray-200 dark:bg-[#3f4148] rounded-2xl rounded-tl-sm px-3 py-1.5 flex items-center gap-1.5 text-gray-700 dark:text-white text-sm shadow-sm">
+              <div className="absolute -left-1 top-2 w-2 h-2 bg-gray-200 dark:bg-[#3f4148] rotate-45" />
+              {data.customStatus.emoji && <span className="text-base leading-none">{data.customStatus.emoji}</span>}
+              {data.customStatus.text && <span>{data.customStatus.text}</span>}
+            </div>
+          </div>
+        )}
+
         <div className="relative -mt-20 mb-2 w-20 h-20">
           {avatarUrl ? (
             <Image
@@ -285,43 +322,48 @@ export default function DiscordUser() {
           <div className="flex-1 min-w-0">
             <p className="text-gray-900 dark:text-white font-bold text-lg leading-tight">{displayName}</p>
             <p className="text-gray-500 dark:text-[#b5bac1] text-sm">{baseUsername}</p>
+            {!currentActivity && data.lastSeen && data.status === "offline" && (
+              <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
+                Last seen {formatLastSeen(data.lastSeen)}
+              </p>
+            )}
           </div>
-
-          {currentActivity && (
-            <div className="flex items-center gap-3">
-              <div className="relative w-12 h-12 rounded-md overflow-hidden bg-gray-200 dark:bg-[#3f4148]">
-                {activityImageUrl ? (
-                  <Image
-                    src={activityImageUrl}
-                    alt={currentActivity.name}
-                    fill
-                    className="object-cover"
-                    unoptimized={true}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-2xl">
-                    {currentActivity.type === 0 ? "🎮" : currentActivity.type === 2 ? "🎵" : "📺"}
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="text-gray-900 dark:text-white text-sm font-medium truncate max-w-[150px]">
-                  {currentActivity.name}
-                </p>
-                {currentActivity.details && (
-                  <p className="text-gray-500 dark:text-[#b5bac1] text-xs truncate max-w-[150px]">
-                    {currentActivity.details}
-                  </p>
-                )}
-                {elapsedTime && (
-                  <p className="text-gray-500 dark:text-[#b5bac1] text-xs">
-                    {elapsedTime}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
         </div>
+
+        {currentActivity && (
+          <div className="flex items-center justify-center gap-3 mt-3">
+            <div className="relative w-12 h-12 rounded-md overflow-hidden bg-gray-200 dark:bg-[#3f4148]">
+              {activityImageUrl ? (
+                <Image
+                  src={activityImageUrl}
+                  alt={currentActivity.name}
+                  fill
+                  className="object-cover"
+                  unoptimized={true}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-2xl">
+                  {currentActivity.type === 0 ? "🎮" : currentActivity.type === 2 ? "🎵" : "📺"}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 text-center">
+              <p className="text-gray-900 dark:text-white text-sm font-medium truncate max-w-[150px]">
+                {currentActivity.name}
+              </p>
+              {currentActivity.details && (
+                <p className="text-gray-500 dark:text-[#b5bac1] text-xs truncate max-w-[150px]">
+                  {currentActivity.details}
+                </p>
+              )}
+              {elapsedTime && (
+                <p className="text-gray-500 dark:text-[#b5bac1] text-xs">
+                  {elapsedTime}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

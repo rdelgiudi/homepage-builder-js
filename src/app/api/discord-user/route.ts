@@ -24,6 +24,8 @@ interface PresenceData {
     details: string | null;
     timestamps?: { start?: number; end?: number };
   }>;
+  customStatus: { text: string | null; emoji: string | null } | null;
+  lastSeen: string | null;
   lastUpdated: string | null;
   nickname: string | null;
 }
@@ -57,16 +59,23 @@ export async function GET() {
 
     const userData: DiscordUser = await userRes.json();
 
-    let presence: PresenceData = { status: "offline", activities: [], lastUpdated: null, nickname: null };
+    let presence: PresenceData = {
+      status: "offline",
+      activities: [],
+      customStatus: null,
+      lastSeen: null,
+      lastUpdated: null,
+      nickname: null,
+    };
     try {
       const presenceRes = await fetch(`${PRESENCE_SERVICE_URL}/presence`, {
-        signal: AbortSignal.timeout(2000),
+        signal: AbortSignal.timeout(5000),
       });
       if (presenceRes.ok) {
         presence = await presenceRes.json();
       }
     } catch {
-      // Presence service not running
+      // Presence service not running or timed out
     }
 
     const discriminator = userData.discriminator === "0" ? "0" : userData.discriminator;
@@ -83,6 +92,8 @@ export async function GET() {
       globalNickname: presence.nickname,
       status: presence.status,
       activities: presence.activities,
+      customStatus: presence.customStatus,
+      lastSeen: presence.lastSeen,
       lastUpdated: presence.lastUpdated,
     });
   } catch (err) {

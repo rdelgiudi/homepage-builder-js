@@ -7,14 +7,8 @@
       "icon": "👤",
       "sections": [
         {
-          "type": "header",
-          "title": "Welcome Section",
-          "icon": "👋"
-        },
-        {
-          "type": "text",
-          "content": "This is a text paragraph with an icon. Great for bios or descriptions.",
-          "icon": "📝"
+          "type": "markdown",
+          "file": "about.md"
         }
       ]
     },
@@ -79,6 +73,11 @@
           "type": "steam",
           "icon": "🎮",
           "text": "My recent and top games"
+        },
+        {
+          "type": "meme",
+          "icon": "😂",
+          "text": "Random Meme"
         }
       ]
     }

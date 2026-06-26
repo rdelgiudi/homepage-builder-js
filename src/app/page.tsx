@@ -1,5 +1,6 @@
 import Tabs from "@/components/Tabs";
 import homepageConfig from "@/config/homepage.json";
+import VisitorCounter from "@/components/VisitorCounter";
 import { Suspense } from "react";
 
 function TabsFallback() {
@@ -18,7 +19,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800">
-      <div className="sticky top-0 z-10 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800 pt-8 pb-4 backdrop-blur-sm dark:bg-opacity-80 bg-opacity-80">
+      <div className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800 pt-8 pb-4">
         <div className="w-full max-w-[870px] mx-auto text-center space-y-4">
           <h1 className="text-5xl font-bold text-gray-900 dark:text-white">{name}</h1>
           <p className="text-xl text-gray-600 dark:text-gray-300">{tagline}</p>
@@ -29,6 +30,10 @@ export default function Home() {
         <Suspense fallback={<TabsFallback />}>
           <Tabs tabs={tabs} />
         </Suspense>
+      </div>
+
+      <div className="fixed bottom-4 left-4 z-30">
+        <VisitorCounter />
       </div>
     </main>
   );

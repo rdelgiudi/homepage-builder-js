@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -33,6 +33,8 @@ const client = new Client({
 let userPresence = {
   status: 'offline',
   activities: [],
+  customStatus: null,
+  lastSeen: null,
   lastUpdated: null,
   nickname: null,
 };
@@ -42,23 +44,45 @@ async function fetchUserPresence() {
     try {
       const member = await guild.members.fetch(userId);
       if (member) {
-        const nickname = member.nickname || null;
-        userPresence.nickname = nickname;
-        console.log(`Found member, nickname: ${nickname || 'none'}`);
+        if (member.nickname) {
+          userPresence.nickname = member.nickname;
+        }
+        console.log(`Found member, nickname: ${userPresence.nickname || 'none'}`);
         if (member.presence) {
+          const customStatusActivity = member.presence.activities.find(
+            a => a.type === ActivityType.Custom
+          );
+          const filteredActivities = member.presence.activities.filter(
+            a => a.type !== ActivityType.Custom
+          );
+
+          const isOnline = member.presence.status && member.presence.status !== 'offline';
+          const lastSeenTimestamp = isOnline
+            ? userPresence.lastSeen
+            : new Date().toISOString();
+
           userPresence = {
             status: member.presence.status || 'offline',
-            activities: member.presence.activities.map(a => ({
+            activities: filteredActivities.map(a => ({
               type: a.type,
               name: a.name,
               state: a.state,
               details: a.details,
-              timestamps: a.timestamps,
+              timestamps: a.timestamps?.start
+                ? { start: a.timestamps.start.getTime(), end: a.timestamps.end?.getTime() }
+                : undefined,
             })),
+            customStatus: customStatusActivity
+              ? {
+                  text: customStatusActivity.state || null,
+                  emoji: customStatusActivity.emoji?.name || null,
+                }
+              : null,
+            lastSeen: lastSeenTimestamp,
             lastUpdated: new Date().toISOString(),
-            nickname,
+            nickname: userPresence.nickname,
           };
-          console.log(`Presence: ${userPresence.status}`);
+          console.log(`Presence: ${userPresence.status}, Custom: ${userPresence.customStatus?.text || 'none'}`);
         }
         return;
       }
@@ -83,15 +107,36 @@ client.on('presenceUpdate', (oldPresence, newPresence) => {
   if (newPresence.userId === userId) {
     const guild = client.guilds.cache.get(newPresence.guildId);
     const nickname = guild?.members.cache.get(userId)?.nickname || null;
+    const customStatusActivity = newPresence.activities.find(
+      a => a.type === ActivityType.Custom
+    );
+    const filteredActivities = newPresence.activities.filter(
+      a => a.type !== ActivityType.Custom
+    );
+
+    const isOnline = newPresence.status && newPresence.status !== 'offline';
+    const lastSeenTimestamp = isOnline
+      ? userPresence.lastSeen
+      : new Date().toISOString();
+
     userPresence = {
       status: newPresence.status || 'offline',
-      activities: newPresence.activities.map(a => ({
+      activities: filteredActivities.map(a => ({
         type: a.type,
         name: a.name,
         state: a.state,
         details: a.details,
-        timestamps: a.timestamps,
+        timestamps: a.timestamps?.start
+          ? { start: a.timestamps.start.getTime(), end: a.timestamps.end?.getTime() }
+          : undefined,
       })),
+      customStatus: customStatusActivity
+        ? {
+            text: customStatusActivity.state || null,
+            emoji: customStatusActivity.emoji?.name || null,
+          }
+        : null,
+      lastSeen: lastSeenTimestamp,
       lastUpdated: new Date().toISOString(),
       nickname,
     };
