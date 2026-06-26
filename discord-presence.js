@@ -47,7 +47,6 @@ async function fetchUserPresence() {
         if (member.nickname) {
           userPresence.nickname = member.nickname;
         }
-        console.log(`Found member, nickname: ${userPresence.nickname || 'none'}`);
         if (member.presence) {
           const customStatusActivity = member.presence.activities.find(
             a => a.type === ActivityType.Custom
@@ -68,6 +67,13 @@ async function fetchUserPresence() {
               name: a.name,
               state: a.state,
               details: a.details,
+              application_id: a.applicationId || a.application_id || null,
+              assets: a.assets ? {
+                large_image: a.assets.largeImage || a.assets.large_image || null,
+                small_image: a.assets.smallImage || a.assets.small_image || null,
+                large_text: a.assets.largeText || a.assets.large_text || null,
+                small_text: a.assets.smallText || a.assets.small_text || null,
+              } : null,
               timestamps: a.timestamps?.start
                 ? { start: a.timestamps.start.getTime(), end: a.timestamps.end?.getTime() }
                 : undefined,
@@ -82,23 +88,19 @@ async function fetchUserPresence() {
             lastUpdated: new Date().toISOString(),
             nickname: userPresence.nickname,
           };
-          console.log(`Presence: ${userPresence.status}, Custom: ${userPresence.customStatus?.text || 'none'}`);
         }
         return;
       }
     } catch (err) {
-      console.log(`Could not fetch member: ${err.message}`);
+      console.error(`Could not fetch member: ${err.message}`);
     }
   }
 }
 
 client.on('ready', async () => {
-  console.log(`Logged in as ${client.user.tag}`);
-  console.log(`Guilds: ${client.guilds.cache.size}`);
   await fetchUserPresence();
 
   setInterval(async () => {
-    console.log('Refreshing member data...');
     await fetchUserPresence();
   }, 60000);
 });
@@ -126,6 +128,13 @@ client.on('presenceUpdate', (oldPresence, newPresence) => {
         name: a.name,
         state: a.state,
         details: a.details,
+        application_id: a.applicationId || a.application_id || null,
+        assets: a.assets ? {
+          large_image: a.assets.largeImage || a.assets.large_image || null,
+          small_image: a.assets.smallImage || a.assets.small_image || null,
+          large_text: a.assets.largeText || a.assets.large_text || null,
+          small_text: a.assets.smallText || a.assets.small_text || null,
+        } : null,
         timestamps: a.timestamps?.start
           ? { start: a.timestamps.start.getTime(), end: a.timestamps.end?.getTime() }
           : undefined,

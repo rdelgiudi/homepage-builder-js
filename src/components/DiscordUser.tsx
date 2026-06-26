@@ -62,9 +62,6 @@ function getActivityImageUrl(activity: DiscordActivity, userId: string, isLarge:
 
   if (asset.startsWith("spotify:")) {
     const spotifyHash = asset.slice(8);
-    if (spotifyHash.length > 20) {
-      return `https://i.scdn.co/image/${spotifyHash}`;
-    }
     return `https://i.scdn.co/image/${spotifyHash}`;
   }
 
@@ -80,10 +77,9 @@ function getActivityImageUrl(activity: DiscordActivity, userId: string, isLarge:
     return asset;
   }
 
-  if (activity.type === 2 && activity.name === "Spotify" && isLarge) {
-    const match = asset.match(/([a-f0-9]{32})/i);
-    if (match) {
-      return `https://i.scdn.co/image/${match[1]}`;
+  if (isLarge && (activity.type === 2 || activity.name?.toLowerCase().includes("spotify") || activity.name?.toLowerCase().includes("youtube music"))) {
+    if (/^[a-f0-9]{32}$/i.test(asset)) {
+      return `https://i.scdn.co/image/${asset}`;
     }
   }
 
@@ -200,84 +196,105 @@ export default function DiscordUser() {
   const [loading, setLoading] = useState(true);
   const [imgError, setImgError] = useState(false);
   const [avatarColor, setAvatarColor] = useState<string | null>(null);
-  const [elapsedTimes, setElapsedTimes] = useState<Record<string, string>>({});
-  const [manualSecondsMap, setManualSecondsMap] = useState<Record<string, number>>({});
+  const [activityImageErrors, setActivityImageErrors] = useState<Record<string, boolean>>({});
+  const [, setTick] = useState(0);
   const dataRef = useRef<DiscordUserData | null>(null);
   const activityStartsRef = useRef<Record<string, number>>({});
-  const manualTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastDisplayNameRef = useRef<string | null>(null);
   const lastAvatarUrlRef = useRef<string | null>(null);
   const lastStatusRef = useRef<string>("offline");
+  const lastUsernameRef = useRef<string | null>(null);
   const emptyNicknameCountRef = useRef<number>(0);
+  const failedRefreshCountRef = useRef<number>(0);
 
   useEffect(() => {
     async function fetchData() {
       try {
         const res = await fetch("/api/discord-user");
         const result = await res.json();
-        const prevData = dataRef.current;
-        setData(result);
-        dataRef.current = result;
 
-        if (result.username) {
-          const rawNickname = result.globalNickname;
-          const hasValidNickname = rawNickname && rawNickname.trim() !== "";
-          
-          if (hasValidNickname) {
-            const displayName = rawNickname;
-            lastDisplayNameRef.current = displayName;
-            emptyNicknameCountRef.current = 0;
-          } else {
-            emptyNicknameCountRef.current += 1;
-            if (emptyNicknameCountRef.current >= 3) {
-              const displayName = result.username.includes('#') 
-                ? result.username.split('#')[0] 
-                : result.username;
+        if (result && result.username && result.id) {
+          failedRefreshCountRef.current = 0;
+
+          const prevData = dataRef.current;
+          setData(result);
+          dataRef.current = result;
+
+          if (result.username) {
+            lastUsernameRef.current = result.username;
+          }
+
+          if (result.username) {
+            const rawNickname = result.globalNickname;
+            const hasValidNickname = rawNickname && rawNickname.trim() !== "";
+
+            if (hasValidNickname) {
+              const displayName = rawNickname;
               lastDisplayNameRef.current = displayName;
+              emptyNicknameCountRef.current = 0;
+            } else {
+              emptyNicknameCountRef.current += 1;
+              if (emptyNicknameCountRef.current >= 3) {
+                const displayName = result.username.includes('#')
+                  ? result.username.split('#')[0]
+                  : result.username;
+                lastDisplayNameRef.current = displayName;
+              }
             }
           }
-        }
-        if (result.id && result.avatar) {
-          lastAvatarUrlRef.current = getAvatarUrl(result.id, result.avatar);
-        }
-        if (result.status) {
-          lastStatusRef.current = result.status;
-        }
+          if (result.id && result.avatar) {
+            lastAvatarUrlRef.current = getAvatarUrl(result.id, result.avatar);
+          }
+          if (result.status) {
+            lastStatusRef.current = result.status;
+          }
 
-        const newActivities = result?.activities?.filter(a => 
-          a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
-        ) || [];
-        
-        const newStarts: Record<string, number> = {};
-        newActivities.forEach((activity) => {
-          if (activity.timestamps?.start) {
-            const key = getActivityKey(activity);
-            const newStart = activity.timestamps.start;
-            newStarts[key] = newStart;
-            
-            if (activityStartsRef.current[key] !== newStart) {
-              activityStartsRef.current[key] = newStart;
-              setManualSecondsMap(prev => ({
-                ...prev,
-                [key]: Math.floor((Date.now() - newStart) / 1000)
-              }));
+          const newActivities = result?.activities?.filter(a =>
+            a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
+          ) || [];
+
+          const newStarts: Record<string, number> = {};
+          newActivities.forEach((activity) => {
+            if (activity.timestamps?.start) {
+              const key = getActivityKey(activity);
+              const newStart = activity.timestamps.start;
+              newStarts[key] = newStart;
+
+              if (activityStartsRef.current[key] !== newStart) {
+                activityStartsRef.current[key] = newStart;
+              }
             }
-          }
-        });
-        
-        Object.keys(activityStartsRef.current).forEach(key => {
-          if (!(key in newStarts)) {
-            delete activityStartsRef.current[key];
-            setManualSecondsMap(prev => {
-              const newMap = { ...prev };
-              delete newMap[key];
-              return newMap;
+          });
+
+          Object.keys(activityStartsRef.current).forEach(key => {
+            if (!(key in newStarts)) {
+              delete activityStartsRef.current[key];
+            }
+          });
+
+          setActivityImageErrors(prev => {
+            const newErrors: Record<string, boolean> = {};
+            Object.keys(prev).forEach(key => {
+              const baseKey = key.replace(/-large$|-small$/, '');
+              if (baseKey in newStarts) {
+                newErrors[key] = prev[key];
+              }
             });
+            return newErrors;
+          });
+        } else {
+          failedRefreshCountRef.current += 1;
+          if (failedRefreshCountRef.current > 3 && dataRef.current) {
+            setData(null);
+            dataRef.current = null;
           }
-        });
+        }
       } catch {
-        setData(null);
-        dataRef.current = null;
+        failedRefreshCountRef.current += 1;
+        if (failedRefreshCountRef.current > 3 && dataRef.current) {
+          setData(null);
+          dataRef.current = null;
+        }
       } finally {
         setLoading(false);
       }
@@ -288,44 +305,11 @@ export default function DiscordUser() {
   }, []);
 
   useEffect(() => {
-    if (Object.keys(activityStartsRef.current).length > 0) {
-      manualTimerRef.current = setInterval(() => {
-        setManualSecondsMap(prev => {
-          const newMap: Record<string, number> = {};
-          Object.entries(prev).forEach(([key, val]) => {
-            newMap[key] = val + 1;
-          });
-          return newMap;
-        });
-      }, 1000);
-    } else {
-      if (manualTimerRef.current) {
-        clearInterval(manualTimerRef.current);
-        manualTimerRef.current = null;
-      }
-    }
-    return () => {
-      if (manualTimerRef.current) {
-        clearInterval(manualTimerRef.current);
-      }
-    };
-  }, [data?.activities]);
-
-  useEffect(() => {
-    const newElapsedTimes: Record<string, string> = {};
-    Object.entries(manualSecondsMap).forEach(([key, seconds]) => {
-      const hours = Math.floor(seconds / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      const secs = seconds % 60;
-
-      if (hours > 0) {
-        newElapsedTimes[key] = `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-      } else {
-        newElapsedTimes[key] = `${minutes}:${secs.toString().padStart(2, '0')}`;
-      }
-    });
-    setElapsedTimes(newElapsedTimes);
-  }, [manualSecondsMap]);
+    const tickInterval = setInterval(() => {
+      setTick(t => t + 1);
+    }, 1000);
+    return () => clearInterval(tickInterval);
+  }, []);
 
   useEffect(() => {
     if (data?.avatar && !data.banner && !data.bannerColor) {
@@ -335,12 +319,6 @@ export default function DiscordUser() {
       setAvatarColor(null);
     }
   }, [data?.avatar, data?.banner, data?.bannerColor, data?.id]);
-
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => setTick(t => t + 1), 60000);
-    return () => clearInterval(interval);
-  }, []);
 
   if (loading && !lastDisplayNameRef.current) {
     return (
@@ -379,13 +357,13 @@ export default function DiscordUser() {
 
   const rawNickname = data?.globalNickname;
   const hasValidNickname = rawNickname && rawNickname.trim() !== "";
-  
+
   const displayName = hasValidNickname
     ? rawNickname
     : lastDisplayNameRef.current || "Unknown";
-  const baseUsername = hasValidNickname && data?.username
-    ? (data.username.includes('#') ? data.username.split('#')[0] : data.username)
-    : null;
+  const baseUsername = hasValidNickname
+    ? (data?.username?.includes('#') ? data.username.split('#')[0] : data?.username)
+    : (data?.username?.includes('#') ? data.username.split('#')[0] : data?.username) || lastUsernameRef.current;
 
   const bannerBackground = bannerUrl && !imgError
     ? null
@@ -458,32 +436,48 @@ export default function DiscordUser() {
                   const activityKey = getActivityKey(activity);
                   const largeImageUrl = getActivityImageUrl(activity, data.id, true);
                   const smallImageUrl = getActivityImageUrl(activity, data.id, false);
-                  const activityElapsed = elapsedTimes[activityKey];
+                  const startTime = activityStartsRef.current[activityKey];
+                  const maxDurationSecs = activity.timestamps?.end && activity.timestamps?.start
+                    ? Math.floor((activity.timestamps.end - activity.timestamps.start) / 1000)
+                    : null;
+                  const rawElapsedSeconds = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+                  const isMusicActivity = activity.type === 2 || (activity.name && activity.name.toLowerCase().includes("youtube music"));
+                  const elapsedSeconds = isMusicActivity && maxDurationSecs !== null
+                    ? Math.min(rawElapsedSeconds, maxDurationSecs)
+                    : rawElapsedSeconds;
+                  const hours = Math.floor(elapsedSeconds / 3600);
+                  const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+                  const secs = elapsedSeconds % 60;
+                  const elapsedStr = hours > 0
+                    ? `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+                    : `${minutes}:${secs.toString().padStart(2, '0')}`;
                   
                   return (
                     <div key={activityKey} className="dark:bg-[#2b2d31] bg-[#ebedef] rounded-md p-2 flex items-center gap-2 flex-1 min-w-0">
-                      <div className="relative w-12 h-12 rounded flex-shrink-0">
-                        {largeImageUrl ? (
+                      <div className="relative w-12 h-12 rounded flex-shrink-0 dark:bg-[#1e1f22] bg-white">
+                        {largeImageUrl && !activityImageErrors[`${activityKey}-large`] ? (
                           <Image
                             src={largeImageUrl}
                             alt={activity.name}
                             fill
-                            className="object-cover rounded"
+                            className="object-contain rounded p-0.5"
                             unoptimized={true}
+                            onError={() => setActivityImageErrors(prev => ({ ...prev, [`${activityKey}-large`]: true }))}
                           />
                         ) : (
                           <div className="w-full h-full bg-[#5865F2] rounded flex items-center justify-center text-xl">
                             {getActivityTypeIcon(activity.type)}
                           </div>
                         )}
-                        {smallImageUrl && (
+                        {smallImageUrl && !activityImageErrors[`${activityKey}-small`] && (
                           <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full overflow-hidden dark:border-[#2b2d31] border-white">
                             <Image
                               src={smallImageUrl}
                               alt=""
                               fill
-                              className="object-cover"
+                              className="object-contain"
                               unoptimized={true}
+                              onError={() => setActivityImageErrors(prev => ({ ...prev, [`${activityKey}-small`]: true }))}
                             />
                           </div>
                         )}
@@ -507,16 +501,16 @@ export default function DiscordUser() {
                             {activity.state}
                           </p>
                         )}
-                        {activity.type === 2 && activity.timestamps?.end && activity.timestamps?.start ? (
+                        {((activity.type === 2) || (activity.name && activity.name.toLowerCase().includes("youtube music"))) && activity.timestamps?.end && activity.timestamps?.start ? (
                             <div className="flex items-center gap-1 mt-0.5">
                               <span className="dark:text-[#b5bac1] text-gray-500 text-[8px]">
-                                {activityElapsed}
+                                {elapsedStr}
                               </span>
                               <div className="flex-1 h-1 dark:bg-[#1e1f22] bg-gray-200 rounded-full overflow-hidden">
                                 <div
                                   className="h-full bg-[#5865F2] rounded-full"
                                   style={{
-                                    width: `${Math.min(100, ((manualSecondsMap[activityKey] || 0) / Math.floor((activity.timestamps.end - activity.timestamps.start) / 1000)) * 100)}%`
+                                    width: `${Math.min(100, (elapsedSeconds / Math.floor((activity.timestamps.end - activity.timestamps.start) / 1000)) * 100)}%`
                                   }}
                                 />
                               </div>
@@ -524,9 +518,9 @@ export default function DiscordUser() {
                                 {formatTimeRemaining(activity.timestamps.end - activity.timestamps.start)}
                               </span>
                             </div>
-                          ) : activityElapsed ? (
+                          ) : startTime ? (
                             <p className="dark:text-[#b5bac1] text-gray-500 text-[10px]">
-                              {activityElapsed}
+                              {elapsedStr}
                             </p>
                           ) : null}
                       </div>
