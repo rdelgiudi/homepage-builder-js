@@ -28,7 +28,6 @@ interface DiscordUserData {
   globalNickname?: string;
   status?: string;
   activities?: DiscordActivity[];
-  customStatus?: { text: string | null; emoji: string | null } | null;
   lastSeen?: string | null;
   lastUpdated?: string | null;
 }
@@ -61,20 +60,59 @@ function getActivityImageUrl(activity: DiscordActivity, userId: string, isLarge:
     return `https://media.discordapp.net/attachments/${asset.slice(3)}`;
   }
 
+  if (asset.startsWith("spotify:")) {
+    const spotifyHash = asset.slice(8);
+    if (spotifyHash.length > 20) {
+      return `https://i.scdn.co/image/${spotifyHash}`;
+    }
+    return `https://i.scdn.co/image/${spotifyHash}`;
+  }
+
+  if (asset.startsWith("youtube:")) {
+    return `https://img.youtube.com/vi/${asset.slice(8)}/default.jpg`;
+  }
+
+  if (asset.startsWith("twitch:")) {
+    return `https://static-cdn.jtvnw.net/previews-ttv/live_user_${asset.slice(7)}-80x45.jpg`;
+  }
+
+  if (asset.startsWith("http://") || asset.startsWith("https://")) {
+    return asset;
+  }
+
+  if (activity.type === 2 && activity.name === "Spotify" && isLarge) {
+    const match = asset.match(/([a-f0-9]{32})/i);
+    if (match) {
+      return `https://i.scdn.co/image/${match[1]}`;
+    }
+  }
+
   const appId = activity.application_id || userId;
   return `https://cdn.discordapp.com/app-assets/${appId}/${asset}.png`;
 }
 
-function formatElapsedTime(startTime: number): string {
-  if (!startTime || isNaN(startTime)) return null;
-  const seconds = Math.floor((Date.now() - startTime) / 1000);
-  if (seconds < 60) return "0m";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ${minutes % 60}m`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ${hours % 24}h`;
+function getActivityTypeIcon(type: number): string {
+  switch (type) {
+    case 0: return "🕹️";
+    case 2: return "🎵";
+    case 1: return "📺";
+    case 3: return "🎵";
+    case 4: return "💬";
+    case 5: return "📺";
+    default: return "🕹️";
+  }
+}
+
+function formatTimeRemaining(durationMs: number): string {
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 function formatLastSeen(isoString: string): string {
@@ -156,16 +194,81 @@ export default function DiscordUser() {
   const [loading, setLoading] = useState(true);
   const [imgError, setImgError] = useState(false);
   const [avatarColor, setAvatarColor] = useState<string | null>(null);
-  const [elapsedTime, setElapsedTime] = useState<string | null>(null);
+  const [elapsedTimes, setElapsedTimes] = useState<Record<number, string>>({});
+  const [manualSecondsMap, setManualSecondsMap] = useState<Record<number, number>>({});
   const dataRef = useRef<DiscordUserData | null>(null);
+  const activityStartsRef = useRef<Record<number, number>>({});
+  const manualTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastDisplayNameRef = useRef<string | null>(null);
+  const lastAvatarUrlRef = useRef<string | null>(null);
+  const lastStatusRef = useRef<string>("offline");
+  const emptyNicknameCountRef = useRef<number>(0);
 
   useEffect(() => {
     async function fetchData() {
       try {
         const res = await fetch("/api/discord-user");
         const result = await res.json();
+        const prevData = dataRef.current;
         setData(result);
         dataRef.current = result;
+
+        if (result.username) {
+          const rawNickname = result.globalNickname;
+          const hasValidNickname = rawNickname && rawNickname.trim() !== "";
+          
+          if (hasValidNickname) {
+            const displayName = rawNickname;
+            lastDisplayNameRef.current = displayName;
+            emptyNicknameCountRef.current = 0;
+          } else {
+            emptyNicknameCountRef.current += 1;
+            if (emptyNicknameCountRef.current >= 3) {
+              const displayName = result.username.includes('#') 
+                ? result.username.split('#')[0] 
+                : result.username;
+              lastDisplayNameRef.current = displayName;
+            }
+          }
+        }
+        if (result.id && result.avatar) {
+          lastAvatarUrlRef.current = getAvatarUrl(result.id, result.avatar);
+        }
+        if (result.status) {
+          lastStatusRef.current = result.status;
+        }
+
+        const newActivities = result?.activities?.filter(a => 
+          a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
+        ) || [];
+        
+        const newStarts: Record<number, number> = {};
+        newActivities.forEach((activity, idx) => {
+          if (activity.timestamps?.start) {
+            const key = idx;
+            const newStart = activity.timestamps.start;
+            newStarts[key] = newStart;
+            
+            if (activityStartsRef.current[key] !== newStart) {
+              activityStartsRef.current[key] = newStart;
+              setManualSecondsMap(prev => ({
+                ...prev,
+                [key]: Math.floor((Date.now() - newStart) / 1000)
+              }));
+            }
+          }
+        });
+        
+        Object.keys(activityStartsRef.current).forEach(key => {
+          if (!(key in newStarts)) {
+            delete activityStartsRef.current[Number(key)];
+            setManualSecondsMap(prev => {
+              const newMap = { ...prev };
+              delete newMap[Number(key)];
+              return newMap;
+            });
+          }
+        });
       } catch {
         setData(null);
         dataRef.current = null;
@@ -179,6 +282,46 @@ export default function DiscordUser() {
   }, []);
 
   useEffect(() => {
+    if (Object.keys(activityStartsRef.current).length > 0) {
+      manualTimerRef.current = setInterval(() => {
+        setManualSecondsMap(prev => {
+          const newMap: Record<number, number> = {};
+          Object.entries(prev).forEach(([key, val]) => {
+            newMap[Number(key)] = val + 1;
+          });
+          return newMap;
+        });
+      }, 1000);
+    } else {
+      if (manualTimerRef.current) {
+        clearInterval(manualTimerRef.current);
+        manualTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (manualTimerRef.current) {
+        clearInterval(manualTimerRef.current);
+      }
+    };
+  }, [data?.activities]);
+
+  useEffect(() => {
+    const newElapsedTimes: Record<number, string> = {};
+    Object.entries(manualSecondsMap).forEach(([key, seconds]) => {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+
+      if (hours > 0) {
+        newElapsedTimes[Number(key)] = `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      } else {
+        newElapsedTimes[Number(key)] = `${minutes}:${secs.toString().padStart(2, '0')}`;
+      }
+    });
+    setElapsedTimes(newElapsedTimes);
+  }, [manualSecondsMap]);
+
+  useEffect(() => {
     if (data?.avatar && !data.banner && !data.bannerColor) {
       const avatarUrl = getAvatarUrl(data.id, data.avatar);
       getAverageColorFromImage(avatarUrl).then(setAvatarColor);
@@ -187,33 +330,13 @@ export default function DiscordUser() {
     }
   }, [data?.avatar, data?.banner, data?.bannerColor, data?.id]);
 
-  useEffect(() => {
-    const updateElapsed = () => {
-      const currentData = dataRef.current;
-      if (!currentData?.activities?.length) {
-        setElapsedTime(null);
-        return;
-      }
-      const activity = currentData.activities?.find(a => a.type === 0 || a.type === 2 || a.type === 1);
-      if (activity?.timestamps?.start) {
-        setElapsedTime(formatElapsedTime(activity.timestamps.start));
-      } else {
-        setElapsedTime(null);
-      }
-    };
-
-    updateElapsed();
-    const interval = setInterval(updateElapsed, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
   const [, setTick] = useState(0);
   useEffect(() => {
     const interval = setInterval(() => setTick(t => t + 1), 60000);
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) {
+  if (loading && !lastDisplayNameRef.current) {
     return (
       <div className="bg-white dark:bg-[#313338] rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="h-28 bg-gray-200 dark:bg-[#313338] animate-pulse" />
@@ -228,7 +351,7 @@ export default function DiscordUser() {
     );
   }
 
-  if (!data || data.error || !data.username) {
+  if ((!data || data.error || !data.username) && !lastDisplayNameRef.current) {
     return (
       <div className="bg-white dark:bg-[#313338] rounded-xl p-6 flex items-center gap-4 border border-gray-200 dark:border-gray-700">
         <div className="w-12 h-12 rounded-full bg-[#5865F2] flex items-center justify-center">
@@ -244,14 +367,17 @@ export default function DiscordUser() {
     );
   }
 
-  const avatarUrl = getAvatarUrl(data.id, data.avatar);
-  const bannerUrl = getBannerUrl(data.id, data.banner);
-  const statusColor = statusColors[data.status || "offline"] || statusColors.offline;
+  const avatarUrl = data?.id && data?.avatar ? getAvatarUrl(data.id, data.avatar) : lastAvatarUrlRef.current;
+  const bannerUrl = data?.id && data?.banner ? getBannerUrl(data.id, data.banner) : null;
+  const statusColor = statusColors[data?.status || lastStatusRef.current] || statusColors.offline;
 
-  const displayName = data.globalNickname
-    ? data.globalNickname
-    : (data.username.includes('#') ? data.username.split('#')[0] : data.username);
-  const baseUsername = data.globalNickname
+  const rawNickname = data?.globalNickname;
+  const hasValidNickname = rawNickname && rawNickname.trim() !== "";
+  
+  const displayName = hasValidNickname
+    ? rawNickname
+    : lastDisplayNameRef.current || "Unknown";
+  const baseUsername = hasValidNickname && data?.username
     ? (data.username.includes('#') ? data.username.split('#')[0] : data.username)
     : null;
 
@@ -261,8 +387,11 @@ export default function DiscordUser() {
       ? adjustColor(avatarColor, 20)
       : data.bannerColor || "#5865F2";
 
-  const currentActivity = data.activities?.find(a => a.type === 0 || a.type === 2 || a.type === 1);
-  const activityImageUrl = currentActivity ? getActivityImageUrl(currentActivity, data.id, true) : null;
+  const allActivities = data.activities?.filter(a => 
+    a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
+  ) || [];
+  const currentActivity = allActivities[0];
+  const otherActivities = allActivities.slice(1);
 
   return (
     <div className="bg-white dark:bg-[#313338] rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
@@ -284,86 +413,123 @@ export default function DiscordUser() {
         )}
       </div>
 
-      <div className="px-4 pb-4 pt-16 relative">
-        {!currentActivity && data.customStatus && (data.customStatus.text || data.customStatus.emoji) && (
-          <div
-            className="absolute left-24 top-2 z-10 max-w-[calc(100%-6rem)]"
-          >
-            <div className="relative bg-gray-200 dark:bg-[#3f4148] rounded-2xl rounded-tl-sm px-3 py-1.5 flex items-center gap-1.5 text-gray-700 dark:text-white text-sm shadow-sm">
-              <div className="absolute -left-1 top-2 w-2 h-2 bg-gray-200 dark:bg-[#3f4148] rotate-45" />
-              {data.customStatus.emoji && <span className="text-base leading-none">{data.customStatus.emoji}</span>}
-              {data.customStatus.text && <span>{data.customStatus.text}</span>}
+      <div className="px-4 pb-4 relative">
+        <div className="flex items-end gap-4 -mt-10">
+          <div className="relative flex-shrink-0">
+            <div className="relative w-20 h-20">
+              {avatarUrl ? (
+                <Image
+                  src={avatarUrl}
+                  alt={data.username}
+                  width={80}
+                  height={80}
+                  className="rounded-full border-4 border-white dark:border-[#313338]"
+                  unoptimized={true}
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-[#5865F2] flex items-center justify-center border-4 border-white dark:border-[#313338]">
+                  <span className="text-3xl text-white font-bold">{data.username.charAt(0).toUpperCase()}</span>
+                </div>
+              )}
+              <div
+                className="absolute bottom-0 right-0 w-6 h-6 rounded-full border-4 border-white dark:border-[#313338]"
+                style={{ backgroundColor: statusColor }}
+              />
             </div>
-          </div>
-        )}
-
-        <div className="relative -mt-20 mb-2 w-20 h-20">
-          {avatarUrl ? (
-            <Image
-              src={avatarUrl}
-              alt={data.username}
-              width={80}
-              height={80}
-              className="rounded-full border-4 border-white dark:border-[#313338]"
-              unoptimized={true}
-            />
-          ) : (
-            <div className="w-20 h-20 rounded-full bg-[#5865F2] flex items-center justify-center border-4 border-white dark:border-[#313338]">
-              <span className="text-3xl text-white font-bold">{data.username.charAt(0).toUpperCase()}</span>
-            </div>
-          )}
-          <div
-            className="absolute bottom-0 right-0 w-6 h-6 rounded-full border-4 border-white dark:border-[#313338]"
-            style={{ backgroundColor: statusColor }}
-          />
-        </div>
-
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <p className="text-gray-900 dark:text-white font-bold text-lg leading-tight">{displayName}</p>
-            <p className="text-gray-500 dark:text-[#b5bac1] text-sm">{baseUsername}</p>
+            <p className="text-gray-900 dark:text-white font-bold text-lg leading-tight mt-2">{displayName}</p>
+            {baseUsername && <p className="text-gray-500 dark:text-[#b5bac1] text-sm">{baseUsername}</p>}
             {!currentActivity && data.lastSeen && data.status === "offline" && (
               <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
                 Last seen {formatLastSeen(data.lastSeen)}
               </p>
             )}
           </div>
-        </div>
 
-        {currentActivity && (
-          <div className="flex items-center justify-center gap-3 mt-3">
-            <div className="relative w-12 h-12 rounded-md overflow-hidden bg-gray-200 dark:bg-[#3f4148]">
-              {activityImageUrl ? (
-                <Image
-                  src={activityImageUrl}
-                  alt={currentActivity.name}
-                  fill
-                  className="object-cover"
-                  unoptimized={true}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-2xl">
-                  {currentActivity.type === 0 ? "🎮" : currentActivity.type === 2 ? "🎵" : "📺"}
-                </div>
-              )}
-            </div>
-            <div className="min-w-0 text-center">
-              <p className="text-gray-900 dark:text-white text-sm font-medium truncate max-w-[150px]">
-                {currentActivity.name}
-              </p>
-              {currentActivity.details && (
-                <p className="text-gray-500 dark:text-[#b5bac1] text-xs truncate max-w-[150px]">
-                  {currentActivity.details}
-                </p>
-              )}
-              {elapsedTime && (
-                <p className="text-gray-500 dark:text-[#b5bac1] text-xs">
-                  {elapsedTime}
-                </p>
-              )}
-            </div>
+          <div className="flex items-start gap-4 flex-1 min-w-0 pb-1">
+            {allActivities.length > 0 && (
+              <div className="flex gap-3 flex-1 min-w-0">
+                {allActivities.map((activity, index) => {
+                  const largeImageUrl = getActivityImageUrl(activity, data.id, true);
+                  const smallImageUrl = getActivityImageUrl(activity, data.id, false);
+                  const activityElapsed = elapsedTimes[index];
+                  
+                  return (
+                    <div key={index} className="bg-[#2b2d31] rounded-md p-2 flex items-center gap-2 flex-1 min-w-0">
+                      <div className="relative w-12 h-12 rounded flex-shrink-0">
+                        {largeImageUrl ? (
+                          <Image
+                            src={largeImageUrl}
+                            alt={activity.name}
+                            fill
+                            className="object-cover rounded"
+                            unoptimized={true}
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-[#5865F2] rounded flex items-center justify-center text-xl">
+                            {getActivityTypeIcon(activity.type)}
+                          </div>
+                        )}
+                        {smallImageUrl && (
+                          <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full overflow-hidden border border-[#2b2d31]">
+                            <Image
+                              src={smallImageUrl}
+                              alt=""
+                              fill
+                              className="object-cover"
+                              unoptimized={true}
+                            />
+                          </div>
+                        )}
+                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-[#2b2d31] rounded-full flex items-center justify-center border border-[#2b2d31]">
+                          <span className="text-[6px] leading-none">
+                            {getActivityTypeIcon(activity.type)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-white text-xs font-medium truncate">
+                          {activity.name}
+                        </p>
+                        {activity.details && (
+                          <p className="text-[#b5bac1] text-[10px] truncate">
+                            {activity.details}
+                          </p>
+                        )}
+                        {activity.state && (
+                          <p className="text-[#b5bac1] text-[10px] truncate">
+                            {activity.state}
+                          </p>
+                        )}
+                        {activity.type === 2 && activity.timestamps?.end && activity.timestamps?.start ? (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className="text-[#b5bac1] text-[8px]">
+                                {activityElapsed}
+                              </span>
+                              <div className="flex-1 h-1 bg-[#1e1f22] rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-[#5865F2] rounded-full"
+                                  style={{ 
+                                    width: `${Math.min(100, ((manualSecondsMap[index] || 0) / Math.floor((activity.timestamps.end - activity.timestamps.start) / 1000)) * 100)}%` 
+                                  }}
+                                />
+                              </div>
+                              <span className="text-[#b5bac1] text-[8px]">
+                                {formatTimeRemaining(activity.timestamps.end - activity.timestamps.start)}
+                              </span>
+                            </div>
+                          ) : activityElapsed ? (
+                            <p className="text-[#b5bac1] text-[10px]">
+                              {activityElapsed}
+                            </p>
+                          ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
