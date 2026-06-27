@@ -164,15 +164,17 @@ async function fetchPlayerData() {
         };
       }
 
-      const heroes = statsData.heroes || {};
-      mostPlayedHeroes = Object.entries(heroes)
-        .map(([key, data]: [string, {
-          games_played: number;
-          winrate: number;
-          time_played: number;
-          kda: number;
-          average: { eliminations: number; deaths: number; damage: number; healing: number };
-        }]) => ({
+      type HeroData = {
+        games_played: number;
+        winrate: number;
+        time_played: number;
+        kda: number;
+        average: { eliminations: number; deaths: number; damage: number; healing: number };
+      };
+
+      const heroes = (statsData.heroes || {}) as Record<string, HeroData>;
+      mostPlayedHeroes = (Object.entries(heroes) as [string, HeroData][])
+        .map(([key, data]) => ({
           hero: key.charAt(0).toUpperCase() + key.slice(1).replace(/-/g, " "),
           key,
           icon: heroPortraits[key] || "",
