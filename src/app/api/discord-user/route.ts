@@ -223,12 +223,18 @@ async function fetchAlbumCoverFromMusicBrainz(track: string, artist: string): Pr
   return null;
 }
 
-async function fetchAlbumCover(track: string, artist: string): Promise<string | null> {
-  const sources = [
-    () => fetchAlbumCoverFromItunes(track, artist),
-    () => fetchAlbumCoverFromDeezer(track, artist),
-    () => fetchAlbumCoverFromMusicBrainz(track, artist),
-  ];
+async function fetchAlbumCover(track: string, artist: string, preferSpotify: boolean = true): Promise<string | null> {
+  const sources = preferSpotify
+    ? [
+        () => fetchAlbumCoverFromItunes(track, artist),
+        () => fetchAlbumCoverFromDeezer(track, artist),
+        () => fetchAlbumCoverFromMusicBrainz(track, artist),
+      ]
+    : [
+        () => fetchAlbumCoverFromDeezer(track, artist),
+        () => fetchAlbumCoverFromItunes(track, artist),
+        () => fetchAlbumCoverFromMusicBrainz(track, artist),
+      ];
 
   for (const source of sources) {
     try {
@@ -307,13 +313,15 @@ async function fetchDiscordData() {
 
         if (activity.name) {
           if (activity.type === 0) {
-            fallbackLarge = await fetchGameIcon(activity.name);
+            if (!hasLargeImage?.startsWith("http")) {
+              fallbackLarge = await fetchGameIcon(activity.name);
+            }
           } else if (isMusic) {
             const track = activity.details || activity.assets?.large_text || "";
             const artist = activity.state || "";
 
             if (track) {
-              fallbackLarge = await fetchAlbumCover(track, artist);
+              fallbackLarge = await fetchAlbumCover(track, artist, !isYouTubeMusic);
             }
             if (!fallbackLarge && isYouTubeMusic && isExternalAvatar) {
               const videoIdMatch = activity.assets?.large_image?.match(/\/vi\/([^/]+)\//);

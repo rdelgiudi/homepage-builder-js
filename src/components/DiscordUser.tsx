@@ -124,6 +124,10 @@ function getActivityImageUrl(activity: DiscordActivity, userId: string, isLarge:
   const asset = isLarge ? activity.assets?.large_image : activity.assets?.small_image;
   if (!asset) return null;
 
+  const activityName = activity.name?.toLowerCase() || "";
+  const isSpotify = activityName.includes("spotify");
+  const isYouTubeMusic = activityName.includes("youtube music") || (activityName.includes("youtube") && activity.type === 2);
+
   if (asset.startsWith("mp:")) {
     return `https://media.discordapp.net/attachments/${asset.slice(3)}`;
   }
@@ -145,7 +149,7 @@ function getActivityImageUrl(activity: DiscordActivity, userId: string, isLarge:
     return asset;
   }
 
-  if (isLarge && (activity.type === 2 || activity.name?.toLowerCase().includes("spotify") || activity.name?.toLowerCase().includes("youtube music"))) {
+  if (isLarge && (activity.type === 2 || isSpotify)) {
     if (/^[a-f0-9]{32}$/i.test(asset)) {
       return `https://i.scdn.co/image/${asset}`;
     }
@@ -548,9 +552,9 @@ export default function DiscordUser() {
       ? desaturate(avatarColor, 12, 2)
       : data?.bannerColor || "#5865F2";
 
-  const allActivities = data?.activities?.filter((a: DiscordActivity) =>
+  const allActivities = (data?.activities?.filter((a: DiscordActivity) =>
     a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
-  ) || [];
+  ) || []).reverse();
   const currentActivity = allActivities[0];
   const otherActivities = allActivities.slice(1);
 
@@ -642,13 +646,13 @@ export default function DiscordUser() {
                   
                   return (
                     <div key={activityKey} className="dark:bg-[#2b2d31] bg-[#ebedef] rounded-md p-2 flex items-stretch gap-2 flex-1 min-w-0">
-                      <div className="relative w-14 h-full rounded flex-shrink-0 dark:bg-[#1e1f22] bg-white">
+                      <div className="relative w-14 aspect-square rounded flex-shrink-0 dark:bg-[#1e1f22] bg-white">
                         {largeImageUrl && !activityImageErrors[`${activityKey}-large`] ? (
                           <Image
                             src={largeImageUrl}
                             alt={activity.name}
                             fill
-                            className="object-contain rounded p-0.5"
+                            className="object-contain rounded"
                             unoptimized={true}
                             onError={() => setActivityImageErrors(prev => ({ ...prev, [`${activityKey}-large`]: true }))}
                           />
@@ -669,8 +673,8 @@ export default function DiscordUser() {
                             />
                           </div>
                         )}
-                        <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 dark:bg-[#2b2d31] bg-white dark:border-[#2b2d31] border-white rounded-full flex items-center justify-center border">
-                          <span className="text-[7px] leading-none">
+                        <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 dark:bg-[#2b2d31] bg-white dark:border-[#2b2d31] border-white rounded-full flex items-center justify-center border">
+                          <span className="text-sm leading-none">
                             {getActivityTypeIcon(activity.type)}
                           </span>
                         </div>
