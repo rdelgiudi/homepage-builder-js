@@ -8,6 +8,7 @@ const CACHE_TTL = 10000;
 interface CacheData {
   data: object;
   cachedAt: number;
+  userId: string;
 }
 
 let cache: CacheData | null = null;
@@ -15,6 +16,7 @@ let cache: CacheData | null = null;
 interface DiscordUser {
   id: string;
   username: string;
+  global_name?: string | null;
   avatar: string | null;
   discriminator: string;
   banner?: string | null;
@@ -344,11 +346,12 @@ async function fetchDiscordData() {
       username: discriminator === "0"
         ? userData.username
         : `${userData.username}#${discriminator}`,
+      globalName: userData.global_name || null,
       avatar: userData.avatar,
       banner: userData.banner || null,
       bannerColor: userData.banner_color || null,
       accentColor: userData.accent_color || null,
-      globalNickname: presence.nickname,
+      globalNickname: null,
       status: presence.status,
       activities: activitiesWithImages,
       customStatus: presence.customStatus,
@@ -362,6 +365,12 @@ async function fetchDiscordData() {
 }
 
 export async function GET() {
+  const currentUserId = discordUserConfig.userId;
+
+  if (cache && cache.userId !== currentUserId) {
+    cache = null;
+  }
+
   if (cache && Date.now() - cache.cachedAt < CACHE_TTL) {
     return NextResponse.json(cache.data, {
       headers: {
@@ -372,7 +381,7 @@ export async function GET() {
   }
 
   const data = await fetchDiscordData();
-  cache = { data, cachedAt: Date.now() };
+  cache = { data, cachedAt: Date.now(), userId: currentUserId };
 
   return NextResponse.json(data, {
     headers: {

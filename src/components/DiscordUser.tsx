@@ -21,11 +21,12 @@ interface DiscordActivity {
 interface DiscordUserData {
   id: string;
   username: string;
+  globalName?: string | null;
   avatar: string | null;
   banner: string | null;
   bannerColor: string | null;
   accentColor: number | null;
-  globalNickname?: string;
+  globalNickname?: string | null;
   status?: string;
   activities?: DiscordActivity[];
   lastSeen?: string | null;
@@ -58,7 +59,7 @@ function StatusIcon({ status }: { status: string }) {
     case "online":
       return (
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" r="10" fill={color} />
+          <circle cx="12" cy="12" r="8.5" fill={color} />
         </svg>
       );
     case "idle":
@@ -205,7 +206,114 @@ function adjustColor(hex: string, percent: number): string {
   return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
 }
 
-async function getAverageColorFromImage(url: string): Promise<string | null> {
+function desaturate(hex: string, satPercent: number, lightPercent: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = (num >> 16) & 0xff;
+  const g = (num >> 8) & 0xff;
+  const b = num & 0xff;
+
+  const rN = r / 255, gN = g / 255, bN = b / 255;
+  const max = Math.max(rN, gN, bN);
+  const min = Math.min(rN, gN, bN);
+  const l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === rN) h = (gN - bN) / d + (gN < bN ? 6 : 0);
+    else if (max === gN) h = (bN - rN) / d + 2;
+    else h = (rN - gN) / d + 4;
+    h /= 6;
+  }
+
+  const newS = Math.max(0, s - satPercent / 100);
+  const newL = Math.max(0, Math.min(1, l - lightPercent / 100));
+
+  const hue2rgb = (p: number, q: number, t: number) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+  };
+
+  let r2: number, g2: number, b2: number;
+  if (newS === 0) {
+    r2 = g2 = b2 = newL;
+  } else {
+    const q = newL < 0.5 ? newL * (1 + newS) : newL + newS - newL * newS;
+    const p = 2 * newL - q;
+    r2 = hue2rgb(p, q, h + 1/3);
+    g2 = hue2rgb(p, q, h);
+    b2 = hue2rgb(p, q, h - 1/3);
+  }
+
+  const R = Math.round(r2 * 255);
+  const G = Math.round(g2 * 255);
+  const B = Math.round(b2 * 255);
+  return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
+}
+
+type RGB = { r: number; g: number; b: number };
+type Swatch = RGB & { population: number };
+
+function rgbToHsl({ r, g, b }: RGB) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return { h, s, l };
+}
+
+function quantizeColors(pixels: RGB[]): Swatch[] {
+  const buckets = new Map<string, Swatch>();
+  for (const p of pixels) {
+    const key = `${p.r >> 4},${p.g >> 4},${p.b >> 4}`;
+    const existing = buckets.get(key);
+    if (existing) {
+      existing.r += p.r;
+      existing.g += p.g;
+      existing.b += p.b;
+      existing.population += 1;
+    } else {
+      buckets.set(key, { r: p.r, g: p.g, b: p.b, population: 1 });
+    }
+  }
+  return Array.from(buckets.values()).map((s) => ({
+    r: Math.round(s.r / s.population),
+    g: Math.round(s.g / s.population),
+    b: Math.round(s.b / s.population),
+    population: s.population,
+  }));
+}
+
+function pickVibrant(swatches: Swatch[]): Swatch | null {
+  const candidates = swatches.filter((s) => {
+    const { s: sat, l } = rgbToHsl(s);
+    return sat > 0.25 && l > 0.15 && l < 0.85;
+  });
+  const pool = candidates.length > 0 ? candidates : swatches;
+  if (pool.length === 0) return null;
+  return pool.reduce((best, cur) => {
+    const curScore = rgbToHsl(cur).s * Math.log(cur.population + 1);
+    const bestScore = rgbToHsl(best).s * Math.log(best.population + 1);
+    return curScore > bestScore ? cur : best;
+  });
+}
+
+async function getVibrantColorFromImage(url: string): Promise<string | null> {
   return new Promise((resolve) => {
     if (!url) {
       resolve(null);
@@ -222,34 +330,39 @@ async function getAverageColorFromImage(url: string): Promise<string | null> {
         return;
       }
 
-      const size = 50;
+      const size = 64;
       canvas.width = size;
       canvas.height = size;
       ctx.drawImage(img, 0, 0, size, size);
 
       const imageData = ctx.getImageData(0, 0, size, size).data;
-      let r = 0, g = 0, b = 0, count = 0;
+      const pixels: RGB[] = [];
 
       for (let i = 0; i < imageData.length; i += 4) {
         const alpha = imageData[i + 3];
-        if (alpha > 128) {
-          r += imageData[i];
-          g += imageData[i + 1];
-          b += imageData[i + 2];
-          count++;
-        }
+        if (alpha < 200) continue;
+        const r = imageData[i];
+        const g = imageData[i + 1];
+        const b = imageData[i + 2];
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        if (max - min < 12) continue;
+        pixels.push({ r, g, b });
       }
 
-      if (count === 0) {
+      if (pixels.length === 0) {
         resolve(null);
         return;
       }
 
-      r = Math.round(r / count);
-      g = Math.round(g / count);
-      b = Math.round(b / count);
+      const swatches = quantizeColors(pixels);
+      const best = pickVibrant(swatches);
+      if (!best) {
+        resolve(null);
+        return;
+      }
 
-      const hex = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+      const hex = `#${((1 << 24) + (best.r << 16) + (best.g << 8) + best.b).toString(16).slice(1)}`;
       resolve(hex);
     };
     img.onerror = () => resolve(null);
@@ -283,6 +396,15 @@ export default function DiscordUser() {
           failedRefreshCountRef.current = 0;
 
           const prevData = dataRef.current;
+          if (prevData && prevData.id && result.id && prevData.id !== result.id) {
+            lastDisplayNameRef.current = null;
+            lastAvatarUrlRef.current = null;
+            lastStatusRef.current = "offline";
+            lastUsernameRef.current = null;
+            emptyNicknameCountRef.current = 0;
+            setAvatarColor(null);
+            setImgError(false);
+          }
           setData(result);
           dataRef.current = result;
 
@@ -291,22 +413,11 @@ export default function DiscordUser() {
           }
 
           if (result.username) {
-            const rawNickname = result.globalNickname;
-            const hasValidNickname = rawNickname && rawNickname.trim() !== "";
-
-            if (hasValidNickname) {
-              const displayName = rawNickname;
-              lastDisplayNameRef.current = displayName;
-              emptyNicknameCountRef.current = 0;
-            } else {
-              emptyNicknameCountRef.current += 1;
-              if (emptyNicknameCountRef.current >= 3) {
-                const displayName = result.username.includes('#')
-                  ? result.username.split('#')[0]
-                  : result.username;
-                lastDisplayNameRef.current = displayName;
-              }
-            }
+            const globalName = result.globalName?.trim();
+            const displayName = globalName
+              ? globalName
+              : (result.username.includes('#') ? result.username.split('#')[0] : result.username);
+            lastDisplayNameRef.current = displayName;
           }
           if (result.id && result.avatar) {
             lastAvatarUrlRef.current = getAvatarUrl(result.id, result.avatar);
@@ -380,7 +491,7 @@ export default function DiscordUser() {
   useEffect(() => {
     if (data?.avatar && !data.banner && !data.bannerColor) {
       const avatarUrl = getAvatarUrl(data.id, data.avatar);
-      getAverageColorFromImage(avatarUrl).then(setAvatarColor);
+      getVibrantColorFromImage(avatarUrl).then(setAvatarColor);
     } else {
       setAvatarColor(null);
     }
@@ -421,20 +532,19 @@ export default function DiscordUser() {
   const bannerUrl = data?.id && data?.banner ? getBannerUrl(data.id, data.banner) : null;
   const statusColor = statusColors[data?.status || lastStatusRef.current] || statusColors.offline;
 
-  const rawNickname = data?.globalNickname;
-  const hasValidNickname = rawNickname && rawNickname.trim() !== "";
+  const globalName = data?.globalName?.trim();
+  const usernameOnly = data?.username?.includes('#') ? data.username.split('#')[0] : data?.username;
 
-  const displayName = hasValidNickname
-    ? rawNickname
-    : lastDisplayNameRef.current || "Unknown";
-  const baseUsername = hasValidNickname
-    ? (data?.username?.includes('#') ? data.username.split('#')[0] : data?.username)
-    : (data?.username?.includes('#') ? data.username.split('#')[0] : data?.username) || lastUsernameRef.current;
+  const displayName = globalName
+    || lastDisplayNameRef.current
+    || usernameOnly
+    || "Unknown";
+  const baseUsername = usernameOnly || lastUsernameRef.current;
 
   const bannerBackground = bannerUrl && !imgError
     ? undefined
     : avatarColor
-      ? adjustColor(avatarColor, 20)
+      ? desaturate(avatarColor, 12, 2)
       : data?.bannerColor || "#5865F2";
 
   const allActivities = data?.activities?.filter((a: DiscordActivity) =>
@@ -490,7 +600,7 @@ export default function DiscordUser() {
             {!currentActivity && data?.status && (
               <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
                 {statusText[data.status] || data.status}
-                {data.status === "offline" && data?.lastSeen ? ` - Last seen ${formatLastSeen(data.lastSeen)}` : ""}
+                {data.status === "offline" && data?.lastSeen ? ` · Last seen ${formatLastSeen(data.lastSeen)}` : ""}
               </p>
             )}
           </div>

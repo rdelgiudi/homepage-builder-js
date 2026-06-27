@@ -15,7 +15,8 @@ try {
   process.exit(1);
 }
 
-const { userId, botToken } = config;
+let userId = config.userId;
+const botToken = config.botToken;
 
 if (!userId || !botToken || userId === 'YOUR_DISCORD_USER_ID') {
   console.error('Invalid config: userId and botToken are required');
@@ -30,71 +31,77 @@ const client = new Client({
   ],
 });
 
-let userPresence = {
-  status: 'offline',
-  activities: [],
-  customStatus: null,
-  lastSeen: null,
-  lastUpdated: null,
-  nickname: null,
-};
+function emptyPresence() {
+  return {
+    status: 'offline',
+    activities: [],
+    customStatus: null,
+    lastSeen: null,
+    lastUpdated: null,
+    nickname: null,
+    trackedUserId: userId,
+  };
+}
+
+let userPresence = emptyPresence();
+
+function buildPresenceFromMember(member, previousNickname) {
+  const customStatusActivity = member.presence?.activities.find(
+    a => a.type === ActivityType.Custom
+  );
+  const filteredActivities = (member.presence?.activities || []).filter(
+    a => a.type !== ActivityType.Custom
+  );
+
+  const isOnline = member.presence?.status && member.presence.status !== 'offline';
+  const lastSeenTimestamp = isOnline || userPresence.lastSeen
+    ? userPresence.lastSeen
+    : new Date().toISOString();
+
+  return {
+    status: member.presence?.status || 'offline',
+    activities: filteredActivities.map(a => ({
+      type: a.type,
+      name: a.name,
+      state: a.state,
+      details: a.details,
+      application_id: a.applicationId || a.application_id || null,
+      assets: a.assets ? {
+        large_image: a.assets.largeImage || a.assets.large_image || null,
+        small_image: a.assets.smallImage || a.assets.small_image || null,
+        large_text: a.assets.largeText || a.assets.large_text || null,
+        small_text: a.assets.smallText || a.assets.small_text || null,
+      } : null,
+      timestamps: a.timestamps?.start
+        ? { start: a.timestamps.start.getTime(), end: a.timestamps.end?.getTime() }
+        : undefined,
+    })),
+    customStatus: customStatusActivity
+      ? {
+          text: customStatusActivity.state || null,
+          emoji: customStatusActivity.emoji?.name || null,
+        }
+      : null,
+    lastSeen: lastSeenTimestamp,
+    lastUpdated: new Date().toISOString(),
+    nickname: member.nickname || previousNickname || null,
+    trackedUserId: userId,
+  };
+}
 
 async function fetchUserPresence() {
   for (const guild of client.guilds.cache.values()) {
     try {
       const member = await guild.members.fetch(userId);
       if (member) {
-        if (member.nickname) {
-          userPresence.nickname = member.nickname;
-        }
-        if (member.presence) {
-          const customStatusActivity = member.presence.activities.find(
-            a => a.type === ActivityType.Custom
-          );
-          const filteredActivities = member.presence.activities.filter(
-            a => a.type !== ActivityType.Custom
-          );
-
-          const isOnline = member.presence.status && member.presence.status !== 'offline';
-          const lastSeenTimestamp = isOnline
-            ? userPresence.lastSeen
-            : new Date().toISOString();
-
-          userPresence = {
-            status: member.presence.status || 'offline',
-            activities: filteredActivities.map(a => ({
-              type: a.type,
-              name: a.name,
-              state: a.state,
-              details: a.details,
-              application_id: a.applicationId || a.application_id || null,
-              assets: a.assets ? {
-                large_image: a.assets.largeImage || a.assets.large_image || null,
-                small_image: a.assets.smallImage || a.assets.small_image || null,
-                large_text: a.assets.largeText || a.assets.large_text || null,
-                small_text: a.assets.smallText || a.assets.small_text || null,
-              } : null,
-              timestamps: a.timestamps?.start
-                ? { start: a.timestamps.start.getTime(), end: a.timestamps.end?.getTime() }
-                : undefined,
-            })),
-            customStatus: customStatusActivity
-              ? {
-                  text: customStatusActivity.state || null,
-                  emoji: customStatusActivity.emoji?.name || null,
-                }
-              : null,
-            lastSeen: lastSeenTimestamp,
-            lastUpdated: new Date().toISOString(),
-            nickname: userPresence.nickname,
-          };
-        }
+        userPresence = buildPresenceFromMember(member, userPresence.nickname);
         return;
       }
     } catch (err) {
       console.error(`Could not fetch member: ${err.message}`);
     }
   }
+  console.warn(`User ${userId} not found in any shared guild`);
 }
 
 client.on('ready', async () => {
@@ -108,47 +115,10 @@ client.on('ready', async () => {
 client.on('presenceUpdate', (oldPresence, newPresence) => {
   if (newPresence.userId === userId) {
     const guild = client.guilds.cache.get(newPresence.guildId);
-    const nickname = guild?.members.cache.get(userId)?.nickname || null;
-    const customStatusActivity = newPresence.activities.find(
-      a => a.type === ActivityType.Custom
-    );
-    const filteredActivities = newPresence.activities.filter(
-      a => a.type !== ActivityType.Custom
-    );
-
-    const isOnline = newPresence.status && newPresence.status !== 'offline';
-    const lastSeenTimestamp = isOnline
-      ? userPresence.lastSeen
-      : new Date().toISOString();
-
-    userPresence = {
-      status: newPresence.status || 'offline',
-      activities: filteredActivities.map(a => ({
-        type: a.type,
-        name: a.name,
-        state: a.state,
-        details: a.details,
-        application_id: a.applicationId || a.application_id || null,
-        assets: a.assets ? {
-          large_image: a.assets.largeImage || a.assets.large_image || null,
-          small_image: a.assets.smallImage || a.assets.small_image || null,
-          large_text: a.assets.largeText || a.assets.large_text || null,
-          small_text: a.assets.smallText || a.assets.small_text || null,
-        } : null,
-        timestamps: a.timestamps?.start
-          ? { start: a.timestamps.start.getTime(), end: a.timestamps.end?.getTime() }
-          : undefined,
-      })),
-      customStatus: customStatusActivity
-        ? {
-            text: customStatusActivity.state || null,
-            emoji: customStatusActivity.emoji?.name || null,
-          }
-        : null,
-      lastSeen: lastSeenTimestamp,
-      lastUpdated: new Date().toISOString(),
-      nickname,
-    };
+    const member = guild?.members.cache.get(userId);
+    if (member) {
+      userPresence = buildPresenceFromMember(member, userPresence.nickname);
+    }
   }
 });
 
@@ -161,6 +131,28 @@ client.on('guildMemberUpdate', (oldMember, newMember) => {
 client.on('error', (error) => {
   console.error('Discord client error:', error);
 });
+
+function watchConfig() {
+  try {
+    fs.watch(configPath, { persistent: false }, async (eventType) => {
+      if (eventType === 'change') {
+        try {
+          const newConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (newConfig.userId && newConfig.userId !== userId) {
+            console.log(`userId changed: ${userId} -> ${newConfig.userId}`);
+            userId = newConfig.userId;
+            userPresence = emptyPresence();
+            await fetchUserPresence();
+          }
+        } catch (err) {
+          console.error('Error reading updated config:', err.message);
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Could not watch config file:', err.message);
+  }
+}
 
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -176,6 +168,7 @@ const server = http.createServer((req, res) => {
       status: 'ok',
       connected: client.ws.status === 0,
       guilds: client.guilds.cache.size,
+      trackedUserId: userId,
     }));
   } else if (req.url === '/debug' && req.method === 'GET') {
     res.writeHead(200);
@@ -192,6 +185,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Presence server running on http://localhost:${PORT}`);
+  watchConfig();
 });
 
 client.login(botToken).catch(console.error);
