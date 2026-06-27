@@ -600,9 +600,9 @@ export default function DiscordUser() {
                 <StatusIcon status={data?.status || "offline"} />
               </div>
               {data?.customStatus && (data.customStatus.text || data.customStatus.emoji) && (
-                <div className="absolute top-1 left-full ml-2 w-40 max-w-[160px]">
+                <div className="absolute bottom-8 left-full ml-2 w-40 max-w-[160px]">
                   <div className="relative bg-[#f2f3f5] dark:bg-[#2b2d31] rounded-md px-2 py-1 shadow-sm">
-                    <div className="absolute bottom-3 -left-1 w-2 h-2 bg-[#f2f3f5] dark:bg-[#2b2d31] rotate-45" />
+                    <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-[#f2f3f5] dark:bg-[#2b2d31] rotate-45" />
                     <div className="relative text-xs text-gray-700 dark:text-gray-200 pt-1">
                       {data.customStatus.emoji && <span className="flex-shrink-0">{data.customStatus.emoji}</span>}
                       {data.customStatus.text && <span className="break-words">{data.customStatus.text}</span>}
@@ -613,7 +613,7 @@ export default function DiscordUser() {
             </div>
             <p className="text-gray-900 dark:text-white font-bold text-lg leading-tight mt-2">{displayName}</p>
             {baseUsername && <p className="text-gray-500 dark:text-[#b5bac1] text-sm">{baseUsername}</p>}
-            {!currentActivity && data?.status && (
+            {data?.status && (
               <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
                 {statusText[data.status] || data.status}
                 {data.status === "offline" && data?.lastSeen ? ` · Last seen ${formatLastSeen(data.lastSeen)}` : ""}
