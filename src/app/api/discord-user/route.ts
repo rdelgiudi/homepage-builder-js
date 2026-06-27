@@ -2,8 +2,15 @@ import { NextResponse } from "next/server";
 import discordUserConfig from "@/config/discord-user.json";
 
 const PRESENCE_SERVICE_URL = "http://localhost:3001";
-
 const DISCORD_API = "https://discord.com/api/v10";
+const CACHE_TTL = 10000;
+
+interface CacheData {
+  data: object;
+  cachedAt: number;
+}
+
+let cache: CacheData | null = null;
 
 interface DiscordUser {
   id: string;
@@ -40,21 +47,21 @@ interface PresenceData {
 async function fetchGameIconFromSteam(item: { id: number; name: string }): Promise<string | null> {
   const iconUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${item.id}/icon.jpg`;
   const logoUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${item.id}/logo.png`;
-  
+
   try {
     const iconRes = await fetch(iconUrl, { signal: AbortSignal.timeout(2000) });
     if (iconRes.ok) {
       return iconUrl;
     }
   } catch {}
-  
+
   try {
     const logoRes = await fetch(logoUrl, { signal: AbortSignal.timeout(2000) });
     if (logoRes.ok) {
       return logoUrl;
     }
   } catch {}
-  
+
   return logoUrl;
 }
 
@@ -67,7 +74,7 @@ async function fetchGameIconFromRawg(name: string): Promise<string | null> {
     if (!res.ok) return null;
     const data = await res.json();
     const results = data?.results || [];
-    
+
     for (const game of results) {
       if (game.background_image) {
         return game.background_image;
@@ -77,7 +84,7 @@ async function fetchGameIconFromRawg(name: string): Promise<string | null> {
         return game.background_image;
       }
     }
-    
+
     if (results.length > 0 && results[0].background_image) {
       return results[0].background_image;
     }
@@ -95,15 +102,15 @@ async function fetchGameIcon(name: string): Promise<string | null> {
     if (!res.ok) return null;
     const data = await res.json();
     const items: Array<{ id: number; name: string; types?: string[] }> = data?.items || [];
-    
+
     if (items.length === 0) {
       return await fetchGameIconFromRawg(name);
     }
 
-    let scored = items.filter((item) => 
+    let scored = items.filter((item) =>
       !item.types || item.types.includes("game")
     );
-    
+
     if (scored.length === 0) {
       scored = items;
     }
@@ -120,7 +127,7 @@ async function fetchGameIcon(name: string): Promise<string | null> {
       if (steamIcon) return steamIcon;
     }
   } catch {}
-  
+
   return await fetchGameIconFromRawg(name);
 }
 
@@ -230,11 +237,11 @@ async function fetchAlbumCover(track: string, artist: string): Promise<string | 
   return null;
 }
 
-export async function GET() {
+async function fetchDiscordData() {
   const { userId, botToken } = discordUserConfig;
 
   if (!userId || !botToken || userId === "YOUR_DISCORD_USER_ID") {
-    return NextResponse.json({ error: "Not configured" }, { status: 400 });
+    return { error: "Not configured" };
   }
 
   try {
@@ -251,10 +258,10 @@ export async function GET() {
         errorMsg = errData.message || errorMsg;
       } catch {}
 
-      return NextResponse.json({
+      return {
         error: `Discord API error: ${errorMsg}`,
         status: userRes.status,
-      });
+      };
     }
 
     const userData: DiscordUser = await userRes.json();
@@ -332,7 +339,7 @@ export async function GET() {
 
     const discriminator = userData.discriminator === "0" ? "0" : userData.discriminator;
 
-    return NextResponse.json({
+    return {
       id: userData.id,
       username: discriminator === "0"
         ? userData.username
@@ -347,9 +354,30 @@ export async function GET() {
       customStatus: presence.customStatus,
       lastSeen: presence.lastSeen,
       lastUpdated: presence.lastUpdated,
-    });
+    };
   } catch (err) {
     console.error("Discord user fetch error:", err);
-    return NextResponse.json({ error: "Server error", details: String(err) }, { status: 500 });
+    return { error: "Server error", details: String(err) };
   }
+}
+
+export async function GET() {
+  if (cache && Date.now() - cache.cachedAt < CACHE_TTL) {
+    return NextResponse.json(cache.data, {
+      headers: {
+        "X-Cache": "HIT",
+        "Cache-Control": "private, max-age=10",
+      },
+    });
+  }
+
+  const data = await fetchDiscordData();
+  cache = { data, cachedAt: Date.now() };
+
+  return NextResponse.json(data, {
+    headers: {
+      "X-Cache": "MISS",
+      "Cache-Control": "private, max-age=10",
+    },
+  });
 }

@@ -1,27 +1,14 @@
 import { NextResponse } from "next/server";
 import steamConfig from "@/config/steam.json";
 
-const RATE_LIMIT = 30;
-const RATE_LIMIT_WINDOW = 60000;
+const CACHE_TTL = 10000;
 
-const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const record = rateLimitMap.get(ip);
-
-  if (!record || now - record.timestamp > RATE_LIMIT_WINDOW) {
-    rateLimitMap.set(ip, { count: 1, timestamp: now });
-    return false;
-  }
-
-  if (record.count >= RATE_LIMIT) {
-    return true;
-  }
-
-  record.count++;
-  return false;
+interface CacheData {
+  data: object;
+  cachedAt: number;
 }
+
+let cache: CacheData | null = null;
 
 async function getGameName(appid: number): Promise<string> {
   try {
@@ -33,23 +20,16 @@ async function getGameName(appid: number): Promise<string> {
   }
 }
 
-export async function GET(request: Request) {
-  const ip = request.headers.get("x-forwarded-for") || "unknown";
-
-  if (isRateLimited(ip)) {
-    return NextResponse.json({ error: "Rate limited" }, { status: 429 });
-  }
-
+async function fetchSteamData() {
   try {
     const { apiKey, steamId } = steamConfig;
 
     const playerRes = await fetch(
-      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${apiKey}&steamids=${steamId}`,
-      { next: { revalidate: 10 } }
+      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${apiKey}&steamids=${steamId}`
     );
 
     if (!playerRes.ok) {
-      return NextResponse.json({ player: null, recentGames: [], ownedGames: [], error: "Steam API error" }, { status: 200 });
+      return { player: null, recentGames: [], ownedGames: [], error: "Steam API error" };
     }
 
     const playerData = await playerRes.json();
@@ -60,8 +40,7 @@ export async function GET(request: Request) {
 
     try {
       const gamesRes = await fetch(
-        `https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/?key=${apiKey}&steamid=${steamId}&format=json&count=100`,
-        { next: { revalidate: 10 } }
+        `https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/?key=${apiKey}&steamid=${steamId}&format=json&count=100`
       );
       const gamesData = await gamesRes.json();
       recentGames = gamesData.response?.games || [];
@@ -71,8 +50,7 @@ export async function GET(request: Request) {
 
     try {
       const ownedRes = await fetch(
-        `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${apiKey}&steamid=${steamId}&format=json&include_played_free_games=true`,
-        { next: { revalidate: 3600 } }
+        `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${apiKey}&steamid=${steamId}&format=json&include_played_free_games=true`
       );
       const ownedData = await ownedRes.json();
       const allOwned = ownedData.response?.games || [];
@@ -93,7 +71,7 @@ export async function GET(request: Request) {
       ownedGames = [];
     }
 
-    return NextResponse.json({
+    return {
       player: player ? {
         steamid: player.steamid,
         personaname: player.personaname,
@@ -102,9 +80,30 @@ export async function GET(request: Request) {
         gameextrainfo: player.gameextrainfo,
       } : null,
       recentGames,
-      ownedGames
-    });
+      ownedGames,
+    };
   } catch {
-    return NextResponse.json({ player: null, recentGames: [], ownedGames: [], error: "Server error" }, { status: 500 });
+    return { player: null, recentGames: [], ownedGames: [], error: "Server error" };
   }
+}
+
+export async function GET() {
+  if (cache && Date.now() - cache.cachedAt < CACHE_TTL) {
+    return NextResponse.json(cache.data, {
+      headers: {
+        "X-Cache": "HIT",
+        "Cache-Control": "private, max-age=10",
+      },
+    });
+  }
+
+  const data = await fetchSteamData();
+  cache = { data, cachedAt: Date.now() };
+
+  return NextResponse.json(data, {
+    headers: {
+      "X-Cache": "MISS",
+      "Cache-Control": "private, max-age=10",
+    },
+  });
 }
