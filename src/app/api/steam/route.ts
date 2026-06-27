@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import steamConfig from "@/config/steam.json";
 
-const CACHE_TTL = 10000;
+const CACHE_TTL = 5000;
 
 interface CacheData {
   data: object;

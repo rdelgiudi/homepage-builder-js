@@ -257,7 +257,7 @@ export default function OverwatchStatus() {
     }
     fetchData();
 
-    const pollInterval = data?.available ? 24 * 60 * 60 * 1000 : 30000;
+    const pollInterval = 30000;
     console.log("[OverwatchStatus] Poll interval:", pollInterval);
     const interval = setInterval(fetchData, pollInterval);
     return () => clearInterval(interval);

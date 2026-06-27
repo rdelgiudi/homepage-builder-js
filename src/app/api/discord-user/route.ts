@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import discordUserConfig from "@/config/discord-user.json";
+import { lastPresenceUpdate } from "@/lib/discord-cache";
 
 const PRESENCE_SERVICE_URL = "http://localhost:3001";
 const DISCORD_API = "https://discord.com/api/v10";
@@ -373,7 +374,7 @@ export async function GET() {
     cache = null;
   }
 
-  if (cache && Date.now() - cache.cachedAt < CACHE_TTL) {
+  if (cache && Date.now() - cache.cachedAt < CACHE_TTL && lastPresenceUpdate < cache.cachedAt) {
     console.log(`[Discord] Cache HIT for user ${currentUserId}`);
     return NextResponse.json(cache.data, {
       headers: {

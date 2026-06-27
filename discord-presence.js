@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 3001;
+const HOMEPAGE_URL = 'http://localhost:3000';
 
 const configPath = path.join(__dirname, 'src/config/discord-user.json');
 let config;
@@ -95,6 +96,7 @@ async function fetchUserPresence() {
       const member = await guild.members.fetch(userId);
       if (member) {
         userPresence = buildPresenceFromMember(member, userPresence.nickname);
+        invalidateHomepageCache();
         return;
       }
     } catch (err) {
@@ -104,12 +106,24 @@ async function fetchUserPresence() {
   console.warn(`User ${userId} not found in any shared guild`);
 }
 
+function invalidateHomepageCache() {
+  const req = http.request(`${HOMEPAGE_URL}/api/discord-user/invalidate`, { method: 'POST' }, (res) => {
+    if (res.statusCode !== 200) {
+      console.error('Failed to invalidate homepage cache:', res.statusCode);
+    }
+  });
+  req.on('error', (err) => {
+    console.error('Failed to invalidate homepage cache:', err.message);
+  });
+  req.end();
+}
+
 client.on('ready', async () => {
   await fetchUserPresence();
 
   setInterval(async () => {
     await fetchUserPresence();
-  }, 60000);
+  }, 10000);
 });
 
 client.on('presenceUpdate', (oldPresence, newPresence) => {
