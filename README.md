@@ -122,32 +122,221 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 | `markdown` | Renders a markdown file from `content/` directory |
 | `meme` | Shows a random meme |
 
+## Components Reference
+
+### DiscordStatus (`discord`)
+
+Displays a Discord server widget showing member count and online presence.
+
+**Config file:** `src/config/discord.json`
+
+```json
+{
+  "serverId": "YOUR_DISCORD_SERVER_ID"
+}
+```
+
+**Setup:**
+1. Open Discord and go to your server
+2. Go to **Server Settings > Widget** (or Engagement)
+3. Enable "Enable Server Widget"
+4. Copy the **Server ID**
+
+**Features:**
+- Member count display
+- Online/Offline member counts
+- Server name and icon
+- Invite link button
+
+---
+
+### DiscordUser (`discord-user`)
+
+Displays detailed Discord user presence including online status, current activity, custom status, and elapsed time.
+
+**Config file:** `src/config/discord-user.json`
+
+```json
+{
+  "userId": "123456789012345678",
+  "botToken": "YOUR_BOT_TOKEN"
+}
+```
+
+**Setup:**
+1. Enable **Developer Mode** in Discord (User Settings > Advanced > Developer Mode)
+2. Right-click your username and select **Copy User ID**
+3. Create a Discord bot and get its token:
+   - Go to https://discord.com/developers/applications
+   - Create a new application
+   - Go to **Bot** section
+   - Enable **Presence Intent** and **Server Members Intent**
+   - Click **Reset Token** and copy the token
+4. The bot must be a member of a shared server with your user
+
+**Features:**
+- Avatar with Discord-style status dot (online, idle, DND, offline)
+- Banner background (from avatar color extraction or user banner)
+- Current activity display (game, music, streaming)
+- Custom status with emoji
+- Elapsed time for current activity
+- "Last seen" timestamp when offline
+- Music track info with album art (Spotify, YouTube Music)
+
+**Caching:**
+- API caches data for 10 seconds
+- Changing `userId` in config automatically clears cached data
+- The presence bot watches for config changes and re-initializes automatically
+
+**Banner color extraction:**
+- Extracts a "vibrant" color from the user's avatar
+- Applies -12% saturation and -2% lightness adjustment to match Discord's style
+- Falls back to Discord's `banner_color` API value or default blurple `#5865F2`
+
+---
+
+### SteamStatus (`steam`)
+
+Displays Steam profile, recently played games, and top games by playtime.
+
+**Config file:** `src/config/steam.json`
+
+```json
+{
+  "apiKey": "YOUR_STEAM_API_KEY",
+  "steamId": "YOUR_STEAM_64_BIT_ID"
+}
+```
+
+**Setup:**
+1. Get a Steam API key: https://steamcommunity.com/dev/apikey
+   - Sign in with Steam
+   - Register a domain (any domain works for personal use, e.g., `localhost`)
+   - Copy the API key
+2. Find your Steam 64-bit ID:
+   - Go to https://steamcommunity.com/
+   - Find your profile name, expand options and copy click **View my profile**
+   - Copy the **SteamID64** (64-bit ID) from the URL: https<nolink>://steamcommunity.com/profiles/<Your SteamID64\>/
+
+**Features:**
+- Steam profile with avatar and display name
+- Online status indicator (Online, In Game, Away, Offline)
+- Recently played games (last 2 weeks)
+- Top games by total playtime
+- Game cards with box art, playtime, and direct Steam store links
+- Current game being played with elapsed time
+
+**Caching:**
+- API caches data for 10 seconds
+- Game box art is fetched from Steam CDN
+
+---
+
+### BattleStatus (`battle-net` / Overwatch)
+
+Displays Overwatch 2 competitive ranks, hero statistics, and performance metrics.
+
+**Config file:** `src/config/battle-net.json`
+
+```json
+{
+  "battleTag": "Username-12345",
+  "platform": "pc",
+  "region": "us"
+}
+```
+
+**Setup:**
+1. Enter your BattleTag in format `Username-12345` (case-sensitive)
+2. Set `platform` to `pc`, `console`, or `switch`
+3. Set `region` to `us`, `eu`, `asia`, or `kr`
+4. Your Overwatch profile must be set to **Public** to display stats
+
+**Features:**
+- Competitive ranks for all three roles (Tank, Damage, Support)
+- Rank icons with division badges
+- Most played heroes (12 heroes by default)
+- Per-hero statistics: playtime, winrate, KDA, damage, healing
+- Hero portraits and role icons
+- General stats summary with eliminations, deaths, healing, damage
+- Win/Loss record and overall winrate
+- Last updated timestamp
+
+**Role Colors:**
+- Tank: `#4785ff` (blue)
+- Damage: `#fa9c1e` (orange)
+- Support: `#2daf3f` (green)
+
+**Rank Colors:**
+- Bronze, Silver, Gold, Platinum, Diamond, Master, Grandmaster, Champion
+
+**Caching:**
+- API caches data for **24 hours**
+- Refreshes automatically around 6 AM local time
+- Stats older than 24 hours are considered stale
+
+**API Source:**
+- Uses the OverFast API (https://overfast-api.tekrop.fr)
+
+---
+
+### MemeWidget (`meme`)
+
+Displays a random meme from a SQLite database.
+
+**Features:**
+- Random meme selection
+- Image display with caption
+- Reaction buttons (optional)
+
+**Database:**
+- Meme data stored in a SQLite database
+- Requires `better-sqlite3` package
+
+---
+
+## API Caching
+
+| API | Cache Duration | Notes |
+|-----|---------------|-------|
+| Discord User | 10 seconds | Clears automatically on userId change |
+| Steam | 10 seconds | Game data cached briefly |
+| Overwatch | 24 hours | Stats refresh around 6 AM local time |
+
+---
+
+## Customization
+
 ## Project Structure
 
 ```
 ├── src/
 │   ├── config/
-│   │   ├── discord.json      # Discord Server ID
-│   │   ├── homepage.json     # Homepage content
+│   │   ├── discord.json          # Discord Server ID (for widget)
+│   │   ├── discord-user.json     # Discord User ID & Bot Token (for presence)
+│   │   ├── homepage.json         # Homepage content
 │   │   ├── homepage.example.json
-│   │   ├── steam.json        # Steam API key & ID
-│   │   └── battle-net.json   # BattleTag for Overwatch
+│   │   ├── steam.json            # Steam API key & ID
+│   │   ├── battle-net.json       # BattleTag for Overwatch
+│   │   └── *.example.json        # Example configs for reference
 │   ├── content/
-│   │   └── about.md          # Example markdown file
+│   │   └── about.md              # Example markdown file
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── discord-user/  # Discord presence API
-│   │   │   ├── steam/         # Steam stats API
-│   │   │   └── battle-net/    # Overwatch stats API
+│   │   │   ├── discord-user/     # Discord presence API (uses presence bot)
+│   │   │   ├── discord-server/   # Discord server widget API
+│   │   │   ├── steam/            # Steam stats API
+│   │   │   └── battle-net/       # Overwatch stats API
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   └── page.tsx
 │   └── components/
-│       ├── DiscordStatus.tsx
-│       ├── DiscordUser.tsx
-│       ├── SteamStatus.tsx
-│       ├── BattleStatus.tsx
-│       └── Tabs.tsx
+│       ├── DiscordStatus.tsx      # Discord server widget
+│       ├── DiscordUser.tsx        # Discord user presence
+│       ├── SteamStatus.tsx        # Steam profile & games
+│       ├── BattleStatus.tsx       # Overwatch stats
+│       ├── MemeWidget.tsx         # Random meme display
+│       └── Tabs.tsx               # Tab navigation
 ├── discord-presence.js        # Discord bot for presence updates
 ├── next.config.ts
 ├── package.json
@@ -164,7 +353,24 @@ For Discord user status tracking, run the presence bot:
 npm run presence
 ```
 
-This starts a local server on port 3001 that tracks Discord presence and activity.
+Or run both homepage and presence bot together:
+
+```bash
+npm run dev:full
+```
+
+The bot:
+- Tracks Discord presence (online, idle, DND, offline)
+- Monitors current activity and custom status
+- Records "last seen" timestamp when you go offline
+- Watches `src/config/discord-user.json` for user ID changes and automatically re-initializes
+- Serves data on `http://localhost:3001/presence`
+
+**Hot Reload:**
+When you change the `userId` in `discord-user.json`, the bot detects the change and:
+1. Resets all cached presence data
+2. Immediately starts tracking the new user
+3. No restart required
 
 ## Customization
 
