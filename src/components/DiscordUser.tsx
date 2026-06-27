@@ -596,7 +596,7 @@ export default function DiscordUser() {
                 <StatusIcon status={data?.status || "offline"} />
               </div>
               {data?.customStatus && (data.customStatus.text || data.customStatus.emoji) && (
-                <div className="absolute bottom-4 left-full ml-2 w-40 max-w-[160px]">
+                <div className="absolute top-1 left-full ml-2 w-40 max-w-[160px]">
                   <div className="relative bg-[#f2f3f5] dark:bg-[#2b2d31] rounded-md px-2 py-1 shadow-sm">
                     <div className="absolute bottom-3 -left-1 w-2 h-2 bg-[#f2f3f5] dark:bg-[#2b2d31] rotate-45" />
                     <div className="relative text-xs text-gray-700 dark:text-gray-200 pt-1">

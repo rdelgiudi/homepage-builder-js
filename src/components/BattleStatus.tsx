@@ -238,21 +238,30 @@ export default function BattleStatus() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log("[BattleStatus] Effect running, data available:", data?.available);
+
     async function fetchData() {
+      console.log("[BattleStatus] Fetching battle-net data...");
       try {
-        const res = await fetch("/api/battle-net");
+        const res = await fetch("/api/battle-net", { cache: "no-store" });
+        console.log("[BattleStatus] Response status:", res.status);
         const result = await res.json();
+        console.log("[BattleStatus] Result:", JSON.stringify(result));
         setData(result);
-      } catch {
+      } catch (err) {
+        console.log("[BattleStatus] Fetch error:", err);
         setData({ available: false, error: "Failed to fetch" });
       } finally {
         setLoading(false);
       }
     }
     fetchData();
-    const interval = setInterval(fetchData, 60000);
+
+    const pollInterval = data?.available ? 24 * 60 * 60 * 1000 : 30000;
+    console.log("[BattleStatus] Poll interval:", pollInterval);
+    const interval = setInterval(fetchData, pollInterval);
     return () => clearInterval(interval);
-  }, []);
+  }, [data?.available]);
 
   if (loading) {
     return (

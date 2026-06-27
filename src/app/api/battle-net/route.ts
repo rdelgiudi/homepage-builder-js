@@ -10,23 +10,22 @@ interface CacheData {
 
 let cache: CacheData | null = null;
 
+const THIRTY_SECONDS = 30 * 1000;
+const ONE_DAY = 24 * 60 * 60 * 1000;
+
 function isCacheValid(): boolean {
   if (!cache) return false;
 
   const now = Date.now();
   const cacheAge = now - cache.cachedAt;
-  const oneDayMs = 24 * 60 * 60 * 1000;
+  const data = cache.data as { available?: boolean; error?: string; lastUpdated?: number };
 
-  if (cacheAge > oneDayMs) return false;
+  if (data.available === true && data.lastUpdated) {
+    const dataAge = now - data.lastUpdated;
+    return dataAge < ONE_DAY;
+  }
 
-  const lastUpdated = (cache.data as { lastUpdated?: number }).lastUpdated;
-  if (lastUpdated && (now - lastUpdated) > oneDayMs) return false;
-
-  const cacheTime = new Date(cache.cachedAt);
-  const hour = cacheTime.getHours();
-  if (hour >= 5 && hour < 7 && cacheAge > 60 * 60 * 1000) return false;
-
-  return true;
+  return cacheAge < THIRTY_SECONDS;
 }
 
 interface RankInfo {
@@ -216,22 +215,28 @@ async function fetchPlayerData() {
 }
 
 export async function GET() {
+  const battleTag = battleNetConfig.battleTag || "unknown";
+
+  console.log(`[BattleNet] Request received for ${battleTag}`);
+
   if (isCacheValid() && cache) {
+    console.log(`[BattleNet] Cache HIT for ${battleTag}`);
     return NextResponse.json(cache.data, {
       headers: {
         "X-Cache": "HIT",
-        "Cache-Control": "private, max-age=86400",
+        "Cache-Control": "no-store",
       },
     });
   }
 
+  console.log(`[BattleNet] Cache MISS for ${battleTag}, fetching...`);
   const data = await fetchPlayerData();
   cache = { data, cachedAt: Date.now() };
 
   return NextResponse.json(data, {
     headers: {
       "X-Cache": "MISS",
-      "Cache-Control": "private, max-age=86400",
+      "Cache-Control": "no-store",
     },
   });
 }

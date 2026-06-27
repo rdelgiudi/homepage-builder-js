@@ -367,26 +367,30 @@ async function fetchDiscordData() {
 export async function GET() {
   const currentUserId = discordUserConfig.userId;
 
+  console.log(`[Discord] Request received for user ${currentUserId}`);
+
   if (cache && cache.userId !== currentUserId) {
     cache = null;
   }
 
   if (cache && Date.now() - cache.cachedAt < CACHE_TTL) {
+    console.log(`[Discord] Cache HIT for user ${currentUserId}`);
     return NextResponse.json(cache.data, {
       headers: {
         "X-Cache": "HIT",
-        "Cache-Control": "private, max-age=10",
+        "Cache-Control": "no-store",
       },
     });
   }
 
+  console.log(`[Discord] Cache MISS for user ${currentUserId}, fetching...`);
   const data = await fetchDiscordData();
   cache = { data, cachedAt: Date.now(), userId: currentUserId };
 
   return NextResponse.json(data, {
     headers: {
       "X-Cache": "MISS",
-      "Cache-Control": "private, max-age=10",
+      "Cache-Control": "no-store",
     },
   });
 }

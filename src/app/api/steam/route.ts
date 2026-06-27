@@ -88,22 +88,28 @@ async function fetchSteamData() {
 }
 
 export async function GET() {
+  const steamId = steamConfig.steamId || "unknown";
+
+  console.log(`[Steam] Request received for ${steamId}`);
+
   if (cache && Date.now() - cache.cachedAt < CACHE_TTL) {
+    console.log(`[Steam] Cache HIT for ${steamId}`);
     return NextResponse.json(cache.data, {
       headers: {
         "X-Cache": "HIT",
-        "Cache-Control": "private, max-age=10",
+        "Cache-Control": "no-store",
       },
     });
   }
 
+  console.log(`[Steam] Cache MISS for ${steamId}, fetching...`);
   const data = await fetchSteamData();
   cache = { data, cachedAt: Date.now() };
 
   return NextResponse.json(data, {
     headers: {
       "X-Cache": "MISS",
-      "Cache-Control": "private, max-age=10",
+      "Cache-Control": "no-store",
     },
   });
 }
