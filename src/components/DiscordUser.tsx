@@ -41,6 +41,71 @@ const statusColors: Record<string, string> = {
   streaming: "#5865f2",
 };
 
+const statusText: Record<string, string> = {
+  online: "Online",
+  idle: "Idle",
+  dnd: "Do Not Disturb",
+  offline: "Offline",
+  streaming: "Streaming",
+};
+
+function StatusIcon({ status }: { status: string }) {
+  const size = 24;
+  const color = statusColors[status] || statusColors.offline;
+  const borderColor = "#ffffff";
+
+  switch (status) {
+    case "online":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" fill={color} />
+        </svg>
+      );
+    case "idle":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <mask id={`idleMask-${color}`}>
+              <rect width="24" height="24" fill="white" />
+              <circle cx="7" cy="7" r="7" fill="black" />
+            </mask>
+          </defs>
+          <circle cx="12" cy="12" r="10" fill={color} mask={`url(#idleMask-${color})`} />
+        </svg>
+      );
+    case "dnd":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <mask id={`dndMask-${color}`}>
+              <rect width="24" height="24" fill="white" />
+              <rect x="5" y="9.5" width="14" height="5" rx="2.5" fill="black" />
+            </mask>
+          </defs>
+          <circle cx="12" cy="12" r="10" fill={color} mask={`url(#dndMask-${color})`} />
+        </svg>
+      );
+    case "offline":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="6" stroke={color} strokeWidth="3.5" fill="none" />
+        </svg>
+      );
+    case "streaming":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" fill={color} />
+        </svg>
+      );
+    default:
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="6" stroke={color} strokeWidth="3.5" fill="none" />
+        </svg>
+      );
+  }
+}
+
 function getAvatarUrl(userId: string, avatarHash: string | null): string {
   if (!avatarHash) return "";
   const ext = avatarHash.startsWith("a_") ? "gif" : "png";
@@ -416,16 +481,16 @@ export default function DiscordUser() {
                   <span className="text-3xl text-white font-bold">{data?.username?.charAt(0).toUpperCase()}</span>
                 </div>
               )}
-              <div
-                className="absolute bottom-0 right-0 w-6 h-6 rounded-full border-4 border-white dark:border-[#313338]"
-                style={{ backgroundColor: statusColor }}
-              />
+              <div className="absolute bottom-0 right-0 bg-white dark:bg-[#313338] rounded-full p-0.5">
+                <StatusIcon status={data?.status || "offline"} />
+              </div>
             </div>
             <p className="text-gray-900 dark:text-white font-bold text-lg leading-tight mt-2">{displayName}</p>
             {baseUsername && <p className="text-gray-500 dark:text-[#b5bac1] text-sm">{baseUsername}</p>}
-            {!currentActivity && data?.lastSeen && data?.status === "offline" && (
+            {!currentActivity && data?.status && (
               <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
-                Last seen {formatLastSeen(data.lastSeen)}
+                {statusText[data.status] || data.status}
+                {data.status === "offline" && data?.lastSeen ? ` - Last seen ${formatLastSeen(data.lastSeen)}` : ""}
               </p>
             )}
           </div>
