@@ -80,32 +80,8 @@ async function fetchPlayerData() {
   }
 
   try {
-    const searchRes = await fetch(
-      `${OVERFAST_API}/players?name=${encodeURIComponent(battleTag)}`
-    );
-
-    if (!searchRes.ok) {
-      throw new Error(`Search failed: ${searchRes.status}`);
-    }
-
-    const searchData = await searchRes.json();
-
-    if (!searchData.results || searchData.results.length === 0) {
-      return {
-        available: false,
-        error: "Player not found",
-        battleTag,
-      };
-    }
-
-    const player = searchData.results[0];
-    const playerId = player.player_id;
-
-    const [profileRes, statsRes, heroesListRes] = await Promise.all([
-      fetch(`${OVERFAST_API}/players/${playerId}`),
-      fetch(`${OVERFAST_API}/players/${playerId}/stats/summary?platform=pc`),
-      fetch(`${OVERFAST_API}/heroes`),
-    ]);
+    const encodedBattleTag = battleTag.replace('#', '-');
+    const profileRes = await fetch(`${OVERFAST_API}/players/${encodeURIComponent(encodedBattleTag)}`);
 
     if (!profileRes.ok) {
       throw new Error(`Profile fetch failed: ${profileRes.status}`);
@@ -116,11 +92,17 @@ async function fetchPlayerData() {
     if (profileData.private || !profileData.summary) {
       return {
         available: false,
-        error: "Overwatch 2 profile is private",
+        error: "Overwatch profile is private",
         battleTag,
-        suggestion: "Set your Overwatch 2 profile to public to display stats",
+        suggestion: "Set your Overwatch profile to public to display stats",
       };
     }
+
+    const playerId = encodedBattleTag;
+    const [statsRes, heroesListRes] = await Promise.all([
+      fetch(`${OVERFAST_API}/players/${encodeURIComponent(encodedBattleTag)}/stats/summary?platform=pc`),
+      fetch(`${OVERFAST_API}/heroes`),
+    ]);
 
     const summary = profileData.summary;
     const pcCompetitive = summary.competitive?.pc;
