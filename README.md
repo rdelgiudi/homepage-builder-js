@@ -25,7 +25,7 @@ A customizable Next.js homepage with Discord, Steam, and Overwatch integration.
 
 ```bash
 npm install
-npm run dev:full
+npm run dev:full  #or "npm run dev" if discord presence bot is not needed
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view your homepage.
