@@ -637,7 +637,11 @@ export default function DiscordUser() {
                               setAlbumServiceIdx(prev => ({ ...prev, [activityKey]: nextIdx }));
                             }}
                           />
-                        ) : null}
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xl">
+                            🎵
+                          </div>
+                        )}
                         {smallImageUrl && !activityImageErrors[`${activityKey}-small`] && (
                           <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full overflow-hidden dark:border-[#2b2d31] border-white">
                             <Image
