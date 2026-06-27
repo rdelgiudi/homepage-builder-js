@@ -45,7 +45,7 @@ interface GeneralStats {
   playtime: number;
 }
 
-interface BattleNetData {
+interface OverwatchData {
   available: boolean;
   error?: string;
   battleTag?: string;
@@ -233,23 +233,23 @@ function StatBar({ label, value, maxValue, color }: { label: string; value: numb
   );
 }
 
-export default function BattleStatus() {
-  const [data, setData] = useState<BattleNetData | null>(null);
+export default function OverwatchStatus() {
+  const [data, setData] = useState<OverwatchData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log("[BattleStatus] Effect running, data available:", data?.available);
+    console.log("[OverwatchStatus] Effect running, data available:", data?.available);
 
     async function fetchData() {
-      console.log("[BattleStatus] Fetching battle-net data...");
+      console.log("[OverwatchStatus] Fetching overwatch data...");
       try {
-        const res = await fetch("/api/battle-net", { cache: "no-store" });
-        console.log("[BattleStatus] Response status:", res.status);
+        const res = await fetch("/api/overwatch", { cache: "no-store" });
+        console.log("[OverwatchStatus] Response status:", res.status);
         const result = await res.json();
-        console.log("[BattleStatus] Result:", JSON.stringify(result));
+        console.log("[OverwatchStatus] Result:", JSON.stringify(result));
         setData(result);
       } catch (err) {
-        console.log("[BattleStatus] Fetch error:", err);
+        console.log("[OverwatchStatus] Fetch error:", err);
         setData({ available: false, error: "Failed to fetch" });
       } finally {
         setLoading(false);
@@ -258,7 +258,7 @@ export default function BattleStatus() {
     fetchData();
 
     const pollInterval = data?.available ? 24 * 60 * 60 * 1000 : 30000;
-    console.log("[BattleStatus] Poll interval:", pollInterval);
+    console.log("[OverwatchStatus] Poll interval:", pollInterval);
     const interval = setInterval(fetchData, pollInterval);
     return () => clearInterval(interval);
   }, [data?.available]);

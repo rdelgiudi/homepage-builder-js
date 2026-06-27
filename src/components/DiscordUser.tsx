@@ -641,8 +641,8 @@ export default function DiscordUser() {
                     : `${minutes}:${secs.toString().padStart(2, '0')}`;
                   
                   return (
-                    <div key={activityKey} className="dark:bg-[#2b2d31] bg-[#ebedef] rounded-md p-2 flex items-center gap-2 flex-1 min-w-0">
-                      <div className="relative w-12 h-12 rounded flex-shrink-0 dark:bg-[#1e1f22] bg-white">
+                    <div key={activityKey} className="dark:bg-[#2b2d31] bg-[#ebedef] rounded-md p-2 flex items-stretch gap-2 flex-1 min-w-0">
+                      <div className="relative w-14 h-full rounded flex-shrink-0 dark:bg-[#1e1f22] bg-white">
                         {largeImageUrl && !activityImageErrors[`${activityKey}-large`] ? (
                           <Image
                             src={largeImageUrl}
@@ -658,7 +658,7 @@ export default function DiscordUser() {
                           </div>
                         )}
                         {smallImageUrl && !activityImageErrors[`${activityKey}-small`] && (
-                          <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full overflow-hidden dark:border-[#2b2d31] border-white">
+                          <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full overflow-hidden dark:border-[#2b2d31] border-white">
                             <Image
                               src={smallImageUrl}
                               alt=""
@@ -669,8 +669,8 @@ export default function DiscordUser() {
                             />
                           </div>
                         )}
-                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 dark:bg-[#2b2d31] bg-white dark:border-[#2b2d31] border-white rounded-full flex items-center justify-center border">
-                          <span className="text-[6px] leading-none">
+                        <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 dark:bg-[#2b2d31] bg-white dark:border-[#2b2d31] border-white rounded-full flex items-center justify-center border">
+                          <span className="text-[7px] leading-none">
                             {getActivityTypeIcon(activity.type)}
                           </span>
                         </div>

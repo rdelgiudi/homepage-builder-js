@@ -53,7 +53,7 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
       "sections": [
         { "type": "steam", "icon": "🎮", "text": "Find me on Steam!" },
         { "type": "discord-user", "icon": "👤", "text": "My Discord Status" },
-        { "type": "battle-net", "icon": "🎮", "text": "My Overwatch Stats" }
+        { "type": "overwatch", "icon": "🎮", "text": "My Overwatch Stats" }
       ]
     },
     {
@@ -93,7 +93,7 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 }
 ```
 
-### Overwatch Settings (`src/config/battle-net.json`)
+### Overwatch Settings (`src/config/overwatch.json`)
 
 1. Enter your BattleTag in format `Username-1234`
 
@@ -118,7 +118,7 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 | `discord` | Discord server widget |
 | `discord-user` | Discord user presence with activity, status, custom status, and elapsed time |
 | `steam` | Steam profile, recently played, and top games |
-| `battle-net` | Overwatch 2 stats with competitive ranks, hero stats, and performance metrics |
+| `overwatch` | Overwatch 2 stats with competitive ranks, hero stats, and performance metrics |
 | `markdown` | Renders a markdown file from `content/` directory |
 | `meme` | Shows a random meme |
 
@@ -232,11 +232,11 @@ Displays Steam profile, recently played games, and top games by playtime.
 
 ---
 
-### BattleStatus (`battle-net` / Overwatch)
+### OverwatchStatus (`overwatch`)
 
-Displays Overwatch 2 competitive ranks, hero statistics, and performance metrics.
+Displays Overwatch competitive ranks, hero statistics, and performance metrics.
 
-**Config file:** `src/config/battle-net.json`
+**Config file:** `src/config/overwatch.json`
 
 ```json
 {
@@ -317,7 +317,7 @@ Displays a random meme from a SQLite database.
 │   │   ├── homepage.json         # Homepage content
 │   │   ├── homepage.example.json
 │   │   ├── steam.json            # Steam API key & ID
-│   │   ├── battle-net.json       # BattleTag for Overwatch
+│   │   ├── overwatch.json       # BattleTag for Overwatch
 │   │   └── *.example.json        # Example configs for reference
 │   ├── content/
 │   │   └── about.md              # Example markdown file
@@ -326,7 +326,7 @@ Displays a random meme from a SQLite database.
 │   │   │   ├── discord-user/     # Discord presence API (uses presence bot)
 │   │   │   ├── discord-server/   # Discord server widget API
 │   │   │   ├── steam/            # Steam stats API
-│   │   │   └── battle-net/       # Overwatch stats API
+│   │   │   └── overwatch/        # Overwatch stats API
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   └── page.tsx
@@ -334,7 +334,7 @@ Displays a random meme from a SQLite database.
 │       ├── DiscordStatus.tsx      # Discord server widget
 │       ├── DiscordUser.tsx        # Discord user presence
 │       ├── SteamStatus.tsx        # Steam profile & games
-│       ├── BattleStatus.tsx       # Overwatch stats
+│       ├── OverwatchStatus.tsx       # Overwatch stats
 │       ├── MemeWidget.tsx         # Random meme display
 │       └── Tabs.tsx               # Tab navigation
 ├── discord-presence.js        # Discord bot for presence updates

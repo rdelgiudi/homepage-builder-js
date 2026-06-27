@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import DiscordStatus from "@/components/DiscordStatus";
 import DiscordUser from "@/components/DiscordUser";
 import SteamStatus from "@/components/SteamStatus";
-import BattleStatus from "@/components/BattleStatus";
+import OverwatchStatus from "@/components/OverwatchStatus";
 import MarkdownWidget from "@/components/MarkdownWidget";
 import MemeWidget from "@/components/MemeWidget";
 
@@ -62,8 +62,8 @@ interface SteamSection {
   text?: string;
 }
 
-interface BattleNetSection {
-  type: "battle-net";
+interface OverwatchSection {
+  type: "overwatch";
   icon?: string;
   text?: string;
 }
@@ -82,10 +82,10 @@ interface MemeSection {
 interface TabItem {
   label: string;
   icon?: string;
-  sections: (TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | BattleNetSection | MarkdownSection | MemeSection)[];
+  sections: (TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection)[];
 }
 
-type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | BattleNetSection | MarkdownSection | MemeSection;
+type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection;
 
 function renderSection(section: Section, index: number) {
   switch (section.type) {
@@ -184,7 +184,7 @@ function renderSection(section: Section, index: number) {
         </div>
       );
 
-    case "battle-net":
+    case "overwatch":
       return (
         <div key={index}>
           {(section.icon || section.text) && (
@@ -193,7 +193,7 @@ function renderSection(section: Section, index: number) {
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          <BattleStatus />
+          <OverwatchStatus />
         </div>
       );
 

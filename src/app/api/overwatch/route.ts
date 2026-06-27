@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import battleNetConfig from "@/config/battle-net.json";
+import overwatchConfig from "@/config/overwatch.json";
 
 const OVERFAST_API = "https://overfast-api.tekrop.fr";
 
@@ -70,12 +70,12 @@ interface GeneralStats {
 }
 
 async function fetchPlayerData() {
-  const { battleTag } = battleNetConfig;
+  const { battleTag } = overwatchConfig;
 
   if (!battleTag || battleTag === "YourTag-12345") {
     return {
       available: false,
-      error: "Configure your BattleTag in src/config/battle-net.json",
+      error: "Configure your BattleTag in src/config/overwatch.json",
     };
   }
 
@@ -215,12 +215,12 @@ async function fetchPlayerData() {
 }
 
 export async function GET() {
-  const battleTag = battleNetConfig.battleTag || "unknown";
+  const battleTag = overwatchConfig.battleTag || "unknown";
 
-  console.log(`[BattleNet] Request received for ${battleTag}`);
+  console.log(`[Overwatch] Request received for ${battleTag}`);
 
   if (isCacheValid() && cache) {
-    console.log(`[BattleNet] Cache HIT for ${battleTag}`);
+    console.log(`[Overwatch] Cache HIT for ${battleTag}`);
     return NextResponse.json(cache.data, {
       headers: {
         "X-Cache": "HIT",
@@ -229,7 +229,7 @@ export async function GET() {
     });
   }
 
-  console.log(`[BattleNet] Cache MISS for ${battleTag}, fetching...`);
+  console.log(`[Overwatch] Cache MISS for ${battleTag}, fetching...`);
   const data = await fetchPlayerData();
   cache = { data, cachedAt: Date.now() };
 
