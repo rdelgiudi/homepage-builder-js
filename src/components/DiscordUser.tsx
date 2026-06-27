@@ -387,7 +387,6 @@ export default function DiscordUser() {
           }
           setData(result);
           dataRef.current = result;
-          setAlbumServiceIdx({});
 
           if (result.username) {
             lastUsernameRef.current = result.username;

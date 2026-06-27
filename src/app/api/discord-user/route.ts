@@ -144,6 +144,10 @@ function normalize(s: string): string {
   return s.toLowerCase().trim();
 }
 
+function containsJapanese(text: string): boolean {
+  return /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(text);
+}
+
 function matchScore(resultTrack: string, resultArtist: string, targetTrack: string, targetArtist: string): number {
   const normTrack = normalize(targetTrack);
   const normArtist = normalize(targetArtist);
@@ -181,18 +185,22 @@ async function fetchAlbumCoverFromItunes(track: string, artist: string): Promise
     const results = data?.results || [];
 
     let best: { url: string; trackName: string; artistName: string; score: number } | null = null;
+    let looseFallback: AlbumCoverResult | null = null;
 
     for (const r of results) {
       const url = r.artworkUrl100?.replace("100x100bb", "600x600bb");
       if (!url) continue;
       const resultTrack = r.trackName || "";
       const resultArtist = r.artistName || "";
+      if (!looseFallback) looseFallback = { url, trackName: resultTrack, artistName: resultArtist };
       const score = matchScore(resultTrack, resultArtist, track, artist);
       if (score === 200) return { url, trackName: resultTrack, artistName: resultArtist };
       if (score > (best?.score || 0)) best = { url, trackName: resultTrack, artistName: resultArtist, score };
     }
 
-    return best && best.score >= 50 ? best : null;
+    if (best && best.score >= 50) return best;
+    if (looseFallback && (containsJapanese(track) || containsJapanese(artist))) return looseFallback;
+    return null;
   } catch {}
   return null;
 }
@@ -209,6 +217,7 @@ async function fetchAlbumCoverFromDeezer(track: string, artist: string): Promise
     const items = data?.data || [];
 
     let best: { url: string; trackName: string; artistName: string; score: number } | null = null;
+    let looseFallback: AlbumCoverResult | null = null;
 
     for (const item of items) {
       const sizes = [
@@ -221,12 +230,15 @@ async function fetchAlbumCoverFromDeezer(track: string, artist: string): Promise
       sizes.sort((a, b) => b.width - a.width);
       const resultTrack = item.title || "";
       const resultArtist = item.artist?.name || "";
+      if (!looseFallback) looseFallback = { url: sizes[0].url, trackName: resultTrack, artistName: resultArtist };
       const score = matchScore(resultTrack, resultArtist, track, artist);
       if (score === 200) return { url: sizes[0].url, trackName: resultTrack, artistName: resultArtist };
       if (score > (best?.score || 0)) best = { url: sizes[0].url, trackName: resultTrack, artistName: resultArtist, score };
     }
 
-    return best && best.score >= 50 ? best : null;
+    if (best && best.score >= 50) return best;
+    if (looseFallback && (containsJapanese(track) || containsJapanese(artist))) return looseFallback;
+    return null;
   } catch {}
   return null;
 }
@@ -248,6 +260,7 @@ async function fetchAlbumCoverFromMusicBrainz(track: string, artist: string): Pr
     const recordings = data?.recordings || [];
 
     let best: { url: string; trackName: string; artistName: string; score: number } | null = null;
+    let looseFallback: AlbumCoverResult | null = null;
 
     for (const rec of recordings) {
       const releaseId = rec?.releases?.[0]?.id;
@@ -257,18 +270,27 @@ async function fetchAlbumCoverFromMusicBrainz(track: string, artist: string): Pr
       const resultArtist = Array.isArray(artistCredit) && artistCredit.length > 0
         ? (artistCredit[0].name || artistCredit[0].artist?.name || "")
         : "";
-      const score = matchScore(resultTrack, resultArtist, track, artist);
       const url = `https://coverartarchive.org/release/${releaseId}/front-500`;
+      if (!looseFallback) looseFallback = { url, trackName: resultTrack, artistName: resultArtist };
+      const score = matchScore(resultTrack, resultArtist, track, artist);
       if (score === 200) return { url, trackName: resultTrack, artistName: resultArtist };
       if (score > (best?.score || 0)) best = { url, trackName: resultTrack, artistName: resultArtist, score };
     }
 
-    return best && best.score >= 50 ? best : null;
+    if (best && best.score >= 50) return best;
+    if (looseFallback && (containsJapanese(track) || containsJapanese(artist))) return looseFallback;
+    return null;
   } catch {}
   return null;
 }
 
+const albumCoverCache = new Map<string, string[]>();
+
 async function fetchAlbumCover(track: string, artist: string, preferSpotify: boolean = true): Promise<string[]> {
+  const cacheKey = `${track}|${artist}|${preferSpotify}`;
+  const cached = albumCoverCache.get(cacheKey);
+  if (cached) return cached;
+
   const urls: string[] = [];
   const sources = preferSpotify
     ? [
@@ -289,6 +311,7 @@ async function fetchAlbumCover(track: string, artist: string, preferSpotify: boo
     } catch {}
   }
 
+  albumCoverCache.set(cacheKey, urls);
   return urls;
 }
 
