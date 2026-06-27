@@ -1,15 +1,18 @@
-# Custom Homepage with Discord & Steam Status
+# Custom Homepage with Discord, Steam & Overwatch Status
 
-A customizable Next.js homepage with Discord server widget and Steam integration.
+A customizable Next.js homepage with Discord, Steam, and Overwatch integration.
 
 ## Features
 
 - Tab-based navigation
 - Discord server widget showing member count
-- Steam integration showing recently played games
+- Discord user presence (activity, status, custom status)
+- Steam integration showing recently played games and game library
+- Overwatch 2 stats integration (ranks, hero stats, performance metrics)
 - Fully customizable sections (text, links, buttons, headers)
 - Icon support using emoji
 - Responsive design with Tailwind CSS
+- Light/dark mode support
 - Easy to customize via JSON config files
 
 ## Getting Started
@@ -28,6 +31,42 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 
 ## Configuration
+
+### Homepage Settings (`src/config/homepage.json`)
+
+```json
+{
+  "name": "Your Name",
+  "tagline": "Your tagline or bio goes here",
+  "tabs": [
+    {
+      "label": "Home",
+      "icon": "🏠",
+      "sections": [
+        { "type": "header", "title": "Welcome", "icon": "👋" },
+        { "type": "text", "content": "Your bio here.", "icon": "📝" }
+      ]
+    },
+    {
+      "label": "Gaming",
+      "icon": "🎮",
+      "sections": [
+        { "type": "steam", "icon": "🎮", "text": "Find me on Steam!" },
+        { "type": "discord-user", "icon": "👤", "text": "My Discord Status" },
+        { "type": "battle-net", "icon": "🎮", "text": "My Overwatch Stats" }
+      ]
+    },
+    {
+      "label": "Links",
+      "icon": "🔗",
+      "sections": [
+        { "type": "links", "items": [{ "label": "GitHub", "url": "https://github.com/user", "icon": "🐙" }] },
+        { "type": "buttons", "items": [{ "label": "Download", "url": "https://file.pdf", "icon": "📄", "style": "primary" }] }
+      ]
+    }
+  ]
+}
+```
 
 ### Discord Settings (`src/config/discord.json`)
 
@@ -54,40 +93,19 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 }
 ```
 
-### Homepage Settings (`src/config/homepage.json`)
+### Overwatch Settings (`src/config/battle-net.json`)
+
+1. Enter your BattleTag in format `Username-1234`
 
 ```json
 {
-  "name": "Your Name",
-  "tagline": "Your tagline or bio goes here",
-  "tabs": [
-    {
-      "label": "Home",
-      "icon": "🏠",
-      "sections": [
-        { "type": "header", "title": "Welcome", "icon": "👋" },
-        { "type": "text", "content": "Your bio here.", "icon": "📝" }
-      ]
-    },
-    {
-      "label": "Gaming",
-      "icon": "🎮",
-      "sections": [
-        { "type": "discord", "icon": "💬" },
-        { "type": "steam", "icon": "🎮" }
-      ]
-    },
-    {
-      "label": "Links",
-      "icon": "🔗",
-      "sections": [
-        { "type": "links", "items": [{ "label": "GitHub", "url": "https://github.com/user", "icon": "🐙" }] },
-        { "type": "buttons", "items": [{ "label": "Download", "url": "https://file.pdf", "icon": "📄", "style": "primary" }] }
-      ]
-    }
-  ]
+  "battleTag": "YourTag-12345",
+  "platform": "pc",
+  "region": "us"
 }
 ```
+
+**Note:** Your Overwatch profile must be set to public to display stats.
 
 ### Section Types
 
@@ -98,7 +116,11 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 | `links` | Row of link cards |
 | `buttons` | Action buttons (primary/secondary) |
 | `discord` | Discord server widget |
-| `steam` | Steam profile & recently played games |
+| `discord-user` | Discord user presence with activity, status, custom status, and elapsed time |
+| `steam` | Steam profile, recently played, and top games |
+| `battle-net` | Overwatch 2 stats with competitive ranks, hero stats, and performance metrics |
+| `markdown` | Renders a markdown file from `content/` directory |
+| `meme` | Shows a random meme |
 
 ## Project Structure
 
@@ -108,19 +130,41 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 │   │   ├── discord.json      # Discord Server ID
 │   │   ├── homepage.json     # Homepage content
 │   │   ├── homepage.example.json
-│   │   └── steam.json        # Steam API key & ID
+│   │   ├── steam.json        # Steam API key & ID
+│   │   └── battle-net.json   # BattleTag for Overwatch
+│   ├── content/
+│   │   └── about.md          # Example markdown file
 │   ├── app/
+│   │   ├── api/
+│   │   │   ├── discord-user/  # Discord presence API
+│   │   │   ├── steam/         # Steam stats API
+│   │   │   └── battle-net/    # Overwatch stats API
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   └── page.tsx
 │   └── components/
 │       ├── DiscordStatus.tsx
+│       ├── DiscordUser.tsx
 │       ├── SteamStatus.tsx
+│       ├── BattleStatus.tsx
 │       └── Tabs.tsx
+├── discord-presence.js        # Discord bot for presence updates
 ├── next.config.ts
 ├── package.json
 └── tsconfig.json
 ```
+
+## Background Services
+
+### Discord Presence Bot
+
+For Discord user status tracking, run the presence bot:
+
+```bash
+npm run presence
+```
+
+This starts a local server on port 3001 that tracks Discord presence and activity.
 
 ## Customization
 
@@ -143,6 +187,7 @@ Add more entries to the `tabs` array in `homepage.json`.
 - **Tailwind CSS** - Styling
 - **Discord Widget API** - Server info
 - **Steam API** - Game library
+- **OverFast API** - Overwatch 2 stats
 
 ## License
 

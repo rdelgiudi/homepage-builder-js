@@ -65,19 +65,19 @@
       "icon": "🎮",
       "sections": [
         {
-          "type": "discord",
-          "icon": "💬",
-          "text": "Join my Discord server!"
-        },
-        {
           "type": "steam",
           "icon": "🎮",
-          "text": "My recent and top games"
+          "text": "My Steam Profile"
         },
         {
-          "type": "meme",
-          "icon": "😂",
-          "text": "Random Meme"
+          "type": "discord-user",
+          "icon": "👤",
+          "text": "My Discord Status"
+        },
+        {
+          "type": "battle-net",
+          "icon": "🎮",
+          "text": "My Overwatch Stats"
         }
       ]
     }
