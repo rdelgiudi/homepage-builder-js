@@ -68,43 +68,6 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 }
 ```
 
-### Discord Settings (`src/config/discord.json`)
-
-1. Open Discord
-2. Go to **Server Settings > Widget** (or Engagement)
-3. Enable "Enable Server Widget"
-4. Copy the **Server ID**
-
-```json
-{
-  "serverId": "YOUR_DISCORD_SERVER_ID"
-}
-```
-
-### Steam Settings (`src/config/steam.json`)
-
-1. Get a free Steam API key: https://steamcommunity.com/dev/apikey
-2. Find your Steam 64-bit ID: https://steamid.io/ (enter your profile URL)
-
-```json
-{
-  "apiKey": "YOUR_STEAM_API_KEY",
-  "steamId": "YOUR_STEAM_64_BIT_ID"
-}
-```
-
-### Overwatch Settings (`src/config/overwatch.json`)
-
-1. Enter your BattleTag in format `Username-1234`
-
-```json
-{
-  "battleTag": "YourTag-12345"
-}
-```
-
-**Note:** Your Overwatch profile must be set to public to display stats.
-
 ### Section Types
 
 | Type | Description |
@@ -187,8 +150,8 @@ Displays detailed Discord user presence including online status, current activit
 - The presence bot watches for config changes and re-initializes automatically
 
 **Banner color extraction:**
-- Extracts a "vibrant" color from the user's avatar
-- Applies -12% saturation and -2% lightness adjustment to match Discord's style
+- Extracts the dominant color using Discord's own algorithm (reverse-engineered by [Vendicated](https://gist.github.com/Vendicated/ad803e9341e9c1110639361f17b58b5b))
+- Full-resolution sampling with MMCQ median-cut quantization to 5 colors
 - Falls back to Discord's `banner_color` API value or default blurple `#5865F2`
 
 ---

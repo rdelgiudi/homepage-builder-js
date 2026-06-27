@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import quantize from "quantize";
 
 interface DiscordActivity {
   type: number;
@@ -260,63 +261,7 @@ function desaturate(hex: string, satPercent: number, lightPercent: number): stri
   return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
 }
 
-type RGB = { r: number; g: number; b: number };
-type Swatch = RGB & { population: number };
 
-function rgbToHsl({ r, g, b }: RGB) {
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  let h = 0, s = 0;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
-    }
-    h /= 6;
-  }
-  return { h, s, l };
-}
-
-function quantizeColors(pixels: RGB[]): Swatch[] {
-  const buckets = new Map<string, Swatch>();
-  for (const p of pixels) {
-    const key = `${p.r >> 4},${p.g >> 4},${p.b >> 4}`;
-    const existing = buckets.get(key);
-    if (existing) {
-      existing.r += p.r;
-      existing.g += p.g;
-      existing.b += p.b;
-      existing.population += 1;
-    } else {
-      buckets.set(key, { r: p.r, g: p.g, b: p.b, population: 1 });
-    }
-  }
-  return Array.from(buckets.values()).map((s) => ({
-    r: Math.round(s.r / s.population),
-    g: Math.round(s.g / s.population),
-    b: Math.round(s.b / s.population),
-    population: s.population,
-  }));
-}
-
-function pickVibrant(swatches: Swatch[]): Swatch | null {
-  const candidates = swatches.filter((s) => {
-    const { s: sat, l } = rgbToHsl(s);
-    return sat > 0.25 && l > 0.15 && l < 0.85;
-  });
-  const pool = candidates.length > 0 ? candidates : swatches;
-  if (pool.length === 0) return null;
-  return pool.reduce((best, cur) => {
-    const curScore = rgbToHsl(cur).s * Math.log(cur.population + 1);
-    const bestScore = rgbToHsl(best).s * Math.log(best.population + 1);
-    return curScore > bestScore ? cur : best;
-  });
-}
 
 async function getVibrantColorFromImage(url: string): Promise<string | null> {
   return new Promise((resolve) => {
@@ -335,24 +280,27 @@ async function getVibrantColorFromImage(url: string): Promise<string | null> {
         return;
       }
 
-      const size = 64;
-      canvas.width = size;
-      canvas.height = size;
-      ctx.drawImage(img, 0, 0, size, size);
+      const w = img.width;
+      const h = img.height;
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(img, 0, 0, w, h);
 
-      const imageData = ctx.getImageData(0, 0, size, size).data;
-      const pixels: RGB[] = [];
+      const imageData = ctx.getImageData(0, 0, w, h).data;
+      const pixelCount = w * h;
+      const quality = 10;
+      const pixels: number[][] = [];
 
-      for (let i = 0; i < imageData.length; i += 4) {
-        const alpha = imageData[i + 3];
-        if (alpha < 200) continue;
-        const r = imageData[i];
-        const g = imageData[i + 1];
-        const b = imageData[i + 2];
-        const max = Math.max(r, g, b);
-        const min = Math.min(r, g, b);
-        if (max - min < 12) continue;
-        pixels.push({ r, g, b });
+      for (let i = 0; i < pixelCount; i += quality) {
+        const offset = i * 4;
+        const r = imageData[offset];
+        const g = imageData[offset + 1];
+        const b = imageData[offset + 2];
+        const a = imageData[offset + 3];
+
+        if (a >= 125 && !(r > 250 && g > 250 && b > 250)) {
+          pixels.push([r, g, b]);
+        }
       }
 
       if (pixels.length === 0) {
@@ -360,14 +308,20 @@ async function getVibrantColorFromImage(url: string): Promise<string | null> {
         return;
       }
 
-      const swatches = quantizeColors(pixels);
-      const best = pickVibrant(swatches);
-      if (!best) {
+      const cmap = quantize(pixels, 5);
+      if (!cmap) {
         resolve(null);
         return;
       }
 
-      const hex = `#${((1 << 24) + (best.r << 16) + (best.g << 8) + best.b).toString(16).slice(1)}`;
+      const palette = cmap.palette();
+      const color = palette[0];
+      if (!color) {
+        resolve(null);
+        return;
+      }
+
+      const hex = `#${((1 << 24) + (color[0] << 16) + (color[1] << 8) + color[2]).toString(16).slice(1)}`;
       resolve(hex);
     };
     img.onerror = () => resolve(null);
@@ -495,7 +449,7 @@ export default function DiscordUser() {
 
   useEffect(() => {
     if (data?.avatar && !data.banner && !data.bannerColor) {
-      const avatarUrl = getAvatarUrl(data.id, data.avatar);
+      const avatarUrl = `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.webp?size=512`;
       getVibrantColorFromImage(avatarUrl).then(setAvatarColor);
     } else {
       setAvatarColor(null);

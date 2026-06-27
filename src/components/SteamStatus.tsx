@@ -127,7 +127,6 @@ function GameSection({ title, games }: { title: string; games: SteamGame[] }) {
 export default function SteamStatus() {
   const [data, setData] = useState<SteamData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -178,9 +177,7 @@ export default function SteamStatus() {
   const { player, recentGames, ownedGames } = data;
   const status = getStatus(player);
 
-  const avatarUrl = imgError
-    ? player.avatarfull
-    : player.avatarfull.replace("_full.jpg", "_animated.gif");
+  const avatarUrl = player.avatarfull;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm dark:shadow-none border border-gray-200 dark:border-0">
@@ -192,7 +189,6 @@ export default function SteamStatus() {
             width={64}
             height={64}
             className="rounded-full"
-            onError={() => setImgError(true)}
             unoptimized={true}
           />
           <div
