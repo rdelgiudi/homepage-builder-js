@@ -29,6 +29,7 @@ interface DiscordUserData {
   globalNickname?: string | null;
   status?: string;
   activities?: DiscordActivity[];
+  customStatus?: { text: string | null; emoji: string | null } | null;
   lastSeen?: string | null;
   lastUpdated?: string | null;
   error?: string;
@@ -594,6 +595,17 @@ export default function DiscordUser() {
               <div className="absolute bottom-0 right-0 bg-white dark:bg-[#313338] rounded-full p-0.5">
                 <StatusIcon status={data?.status || "offline"} />
               </div>
+              {data?.customStatus && (data.customStatus.text || data.customStatus.emoji) && (
+                <div className="absolute top-1/2 left-full -translate-y-1/2 ml-2 max-w-[140px]">
+                  <div className="relative bg-[#f2f3f5] dark:bg-[#2b2d31] rounded-md px-2 py-1 shadow-sm">
+                    <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-[#f2f3f5] dark:bg-[#2b2d31] rotate-45" />
+                    <div className="relative flex items-center gap-1 text-xs text-gray-700 dark:text-gray-200 whitespace-nowrap overflow-hidden text-ellipsis">
+                      {data.customStatus.emoji && <span>{data.customStatus.emoji}</span>}
+                      {data.customStatus.text && <span className="truncate">{data.customStatus.text}</span>}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             <p className="text-gray-900 dark:text-white font-bold text-lg leading-tight mt-2">{displayName}</p>
             {baseUsername && <p className="text-gray-500 dark:text-[#b5bac1] text-sm">{baseUsername}</p>}
