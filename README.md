@@ -99,9 +99,7 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 
 ```json
 {
-  "battleTag": "YourTag-12345",
-  "platform": "pc",
-  "region": "us"
+  "battleTag": "YourTag-12345"
 }
 ```
 
@@ -240,17 +238,13 @@ Displays Overwatch competitive ranks, hero statistics, and performance metrics.
 
 ```json
 {
-  "battleTag": "Username-12345",
-  "platform": "pc",
-  "region": "us"
+  "battleTag": "Username-12345"
 }
 ```
 
 **Setup:**
 1. Enter your BattleTag in format `Username-12345` (case-sensitive)
-2. Set `platform` to `pc`, `console`, or `switch`
-3. Set `region` to `us`, `eu`, `asia`, or `kr`
-4. Your Overwatch profile must be set to **Public** to display stats
+2. Your Overwatch profile must be set to **Public** to display stats
 
 **Features:**
 - Competitive ranks for all three roles (Tank, Damage, Support)
