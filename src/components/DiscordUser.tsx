@@ -596,12 +596,12 @@ export default function DiscordUser() {
                 <StatusIcon status={data?.status || "offline"} />
               </div>
               {data?.customStatus && (data.customStatus.text || data.customStatus.emoji) && (
-                <div className="absolute top-1/2 left-full -translate-y-1/2 ml-2 max-w-[140px]">
+                <div className="absolute bottom-4 left-full ml-2 w-40 max-w-[160px]">
                   <div className="relative bg-[#f2f3f5] dark:bg-[#2b2d31] rounded-md px-2 py-1 shadow-sm">
-                    <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-[#f2f3f5] dark:bg-[#2b2d31] rotate-45" />
-                    <div className="relative flex items-center gap-1 text-xs text-gray-700 dark:text-gray-200 whitespace-nowrap overflow-hidden text-ellipsis">
-                      {data.customStatus.emoji && <span>{data.customStatus.emoji}</span>}
-                      {data.customStatus.text && <span className="truncate">{data.customStatus.text}</span>}
+                    <div className="absolute bottom-3 -left-1 w-2 h-2 bg-[#f2f3f5] dark:bg-[#2b2d31] rotate-45" />
+                    <div className="relative text-xs text-gray-700 dark:text-gray-200 pt-1">
+                      {data.customStatus.emoji && <span className="flex-shrink-0">{data.customStatus.emoji}</span>}
+                      {data.customStatus.text && <span className="break-words">{data.customStatus.text}</span>}
                     </div>
                   </div>
                 </div>
