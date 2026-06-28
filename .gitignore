@@ -37,5 +37,9 @@ src/config/steam.json
 src/config/overwatch.json
 src/config/homepage.json
 
+# Markdown files
+!/src/content/about-example.md
+/src/content/
+
 # Visitor database
 visitors.db
