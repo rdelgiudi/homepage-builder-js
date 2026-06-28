@@ -8,7 +8,7 @@ const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOST || 'localhost';
 const port = parseInt(process.env.PORT, 10) || 3000;
 const presencePort = parseInt(process.env.PRESENCE_PORT, 10) || 3001;
-const PRESENCE_WS = `ws://${hostname}:${presencePort}`;
+const PRESENCE_WS = `ws://localhost:${presencePort}`;
 const DISCORD_API = 'https://discord.com/api/v10';
 const PROFILE_CACHE_TTL = 300000;
 
@@ -760,14 +760,14 @@ app.prepare().then(() => {
     const ws = new (require('ws'))(PRESENCE_WS);
 
     ws.on('open', async () => {
-      console.log(`[${new Date().toISOString()}] [Discord Presence] Connected to presence service`);
+      console.log(`[${new Date().toISOString()}] [Discord User] Connected to presence service`);
       presenceWs = ws;
       const initialPresence = await fetchProfile().then(() => null);
       // Send cached data if available after reconnect
       if (enrichedData) {
         const count = broadcast(enrichedData);
         if (count > 0) {
-          console.log(`[${new Date().toISOString()}] [Discord Presence] Sent cached data to ${count} browser client(s)`);
+          console.log(`[${new Date().toISOString()}] [Discord User] Sent cached data to ${count} browser client(s)`);
         }
       }
     });
@@ -781,22 +781,22 @@ app.prepare().then(() => {
           const enriched = enrichedData;
           if (enriched) {
             const count = broadcast(enriched);
-            console.log(`[${new Date().toISOString()}] [Discord Presence] Relayed to ${count} browser client(s) in ${Date.now() - t0}ms`);
+            console.log(`[${new Date().toISOString()}] [Discord User] Relayed to ${count} browser client(s) in ${Date.now() - t0}ms`);
           }
         }
       } catch (e) {
-        console.error(`[${new Date().toISOString()}] [Discord Presence] WS message error:`, e);
+        console.error(`[${new Date().toISOString()}] [Discord User] WS message error:`, e);
       }
     });
 
     ws.on('close', () => {
-      console.log(`[${new Date().toISOString()}] [Discord Presence] Disconnected, reconnecting in 5s...`);
+      console.log(`[${new Date().toISOString()}] [Discord User] Disconnected, reconnecting in 5s...`);
       presenceWs = null;
       reconnectTimer = setTimeout(connectPresence, 5000);
     });
 
     ws.on('error', (err) => {
-      console.error(`[${new Date().toISOString()}] [Discord Presence] WS error:`, err.message);
+      console.error(`[${new Date().toISOString()}] [Discord User] WS error:`, err.message);
       ws.close();
     });
   }
