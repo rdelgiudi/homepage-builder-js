@@ -1,5 +1,4 @@
 const { createServer } = require('http');
-const { parse } = require('url');
 const next = require('next');
 const { WebSocketServer } = require('ws');
 const fs = require('fs');
@@ -722,8 +721,7 @@ async function refreshOverwatch() {
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {
-    const parsedUrl = parse(req.url, true);
-    handle(req, res, parsedUrl);
+    handle(req, res);
   });
 
   wss = new WebSocketServer({ noServer: true });
@@ -747,7 +745,7 @@ app.prepare().then(() => {
   const handleUpgrade = app.getUpgradeHandler();
 
   server.on('upgrade', (req, socket, head) => {
-    const { pathname } = parse(req.url, true);
+    const { pathname } = new URL(req.url, 'http://localhost');
     if (pathname === '/ws') {
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit('connection', ws, req);

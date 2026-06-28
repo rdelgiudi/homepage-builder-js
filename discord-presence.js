@@ -117,10 +117,10 @@ function broadcastPresence() {
       count++;
     }
   });
-  console.log(`[${new Date().toISOString()}] [Discord Presence] Relayed to ${count} browser client(s)`);
+  console.log(`[${new Date().toISOString()}] [Discord Presence] Relayed to ${count} server(s)`);
 }
 
-client.on('ready', async () => {
+client.on('clientReady', async () => {
   console.log(`[${new Date().toISOString()}] Discord bot logged in as ${client.user.tag}`);
 
   wss = new WebSocketServer({ port: PORT });
