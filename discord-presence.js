@@ -1,10 +1,9 @@
 const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
-const http = require('http');
+const { WebSocketServer } = require('ws');
 const fs = require('fs');
 const path = require('path');
 
 const PORT = 3001;
-const HOMEPAGE_URL = 'http://localhost:3000';
 
 const configPath = path.join(__dirname, 'src/config/discord-user.json');
 let config;
@@ -12,7 +11,7 @@ let config;
 try {
   config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 } catch {
-  console.error('Could not read config at src/config/discord-user.json');
+  console.error(`[${new Date().toISOString()}] Could not read config at src/config/discord-user.json`);
   process.exit(1);
 }
 
@@ -20,7 +19,7 @@ let userId = config.userId;
 const botToken = config.botToken;
 
 if (!userId || !botToken || userId === 'YOUR_DISCORD_USER_ID') {
-  console.error('Invalid config: userId and botToken are required');
+  console.error(`[${new Date().toISOString()}] Invalid config: userId and botToken are required`);
   process.exit(1);
 }
 
@@ -45,6 +44,7 @@ function emptyPresence() {
 }
 
 let userPresence = emptyPresence();
+let wss = null;
 
 function buildPresenceFromMember(member, previousNickname) {
   const customStatusActivity = member.presence?.activities.find(
@@ -96,42 +96,61 @@ async function fetchUserPresence() {
       const member = await guild.members.fetch(userId);
       if (member) {
         userPresence = buildPresenceFromMember(member, userPresence.nickname);
-        invalidateHomepageCache();
+        console.log(`[${new Date().toISOString()}] [Discord Presence] Fetched initial presence (status: ${userPresence.status})`);
+        broadcastPresence();
         return;
       }
     } catch (err) {
-      console.error(`Could not fetch member: ${err.message}`);
+      console.error(`[${new Date().toISOString()}] Could not fetch member: ${err.message}`);
     }
   }
-  console.warn(`User ${userId} not found in any shared guild`);
+  console.warn(`[${new Date().toISOString()}] User ${userId} not found in any shared guild`);
 }
 
-function invalidateHomepageCache() {
-  const req = http.request(`${HOMEPAGE_URL}/api/discord-user/invalidate`, { method: 'POST' }, (res) => {
-    if (res.statusCode !== 200) {
-      console.error('Failed to invalidate homepage cache:', res.statusCode);
+function broadcastPresence() {
+  if (!wss) return;
+  const status = userPresence.status || 'unknown';
+  const activity = userPresence.activities?.[0]?.name || 'none';
+  const message = JSON.stringify({ type: 'presence', data: userPresence });
+  let count = 0;
+  wss.clients.forEach((ws) => {
+    if (ws.readyState === 1) {
+      ws.send(message);
+      count++;
     }
   });
-  req.on('error', (err) => {
-    console.error('Failed to invalidate homepage cache:', err.message);
-  });
-  req.end();
+  console.log(`[${new Date().toISOString()}] [Discord Presence] Broadcast (status: ${status}, activity: "${activity}") to ${count} client(s)`);
 }
 
 client.on('ready', async () => {
+  console.log(`[${new Date().toISOString()}] Discord bot logged in as ${client.user.tag}`);
+
+  wss = new WebSocketServer({ port: PORT });
+  console.log(`[${new Date().toISOString()}] Presence WebSocket server running on ws://localhost:${PORT}`);
+
+  wss.on('connection', (ws) => {
+    console.log(`[${new Date().toISOString()}] [Discord Presence] Server connected (${wss.clients.size} total)`);
+    if (userPresence.lastUpdated) {
+      ws.send(JSON.stringify({ type: 'presence', data: userPresence }));
+    }
+    ws.on('close', () => {
+      console.log(`[${new Date().toISOString()}] [Discord Presence] Server disconnected (${wss.clients.size} remaining)`);
+    });
+  });
+
   await fetchUserPresence();
 
   setInterval(async () => {
     await fetchUserPresence();
-  }, 10000);
+  }, 30000);
 });
 
 client.on('presenceUpdate', (oldPresence, newPresence) => {
   if (newPresence.userId === userId) {
-    const guild = client.guilds.cache.get(newPresence.guildId);
-    const member = guild?.members.cache.get(userId);
+    const member = newPresence.member;
     if (member) {
       userPresence = buildPresenceFromMember(member, userPresence.nickname);
+      broadcastPresence();
     }
   }
 });
@@ -139,11 +158,12 @@ client.on('presenceUpdate', (oldPresence, newPresence) => {
 client.on('guildMemberUpdate', (oldMember, newMember) => {
   if (newMember.userId === userId) {
     userPresence.nickname = newMember.nickname || null;
+    broadcastPresence();
   }
 });
 
 client.on('error', (error) => {
-  console.error('Discord client error:', error);
+  console.error(`[${new Date().toISOString()}] Discord client error:`, error);
 });
 
 function watchConfig() {
@@ -153,53 +173,20 @@ function watchConfig() {
         try {
           const newConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
           if (newConfig.userId && newConfig.userId !== userId) {
-            console.log(`userId changed: ${userId} -> ${newConfig.userId}`);
+            console.log(`[${new Date().toISOString()}] userId changed: ${userId} -> ${newConfig.userId}`);
             userId = newConfig.userId;
             userPresence = emptyPresence();
             await fetchUserPresence();
           }
         } catch (err) {
-          console.error('Error reading updated config:', err.message);
+          console.error(`[${new Date().toISOString()}] Error reading updated config:`, err.message);
         }
       }
     });
   } catch (err) {
-    console.error('Could not watch config file:', err.message);
+    console.error(`[${new Date().toISOString()}] Could not watch config file:`, err.message);
   }
 }
 
-const server = http.createServer((req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET');
-  res.setHeader('Content-Type', 'application/json');
-
-  if (req.url === '/presence' && req.method === 'GET') {
-    res.writeHead(200);
-    res.end(JSON.stringify(userPresence));
-  } else if (req.url === '/health' && req.method === 'GET') {
-    res.writeHead(200);
-    res.end(JSON.stringify({
-      status: 'ok',
-      connected: client.ws.status === 0,
-      guilds: client.guilds.cache.size,
-      trackedUserId: userId,
-    }));
-  } else if (req.url === '/debug' && req.method === 'GET') {
-    res.writeHead(200);
-    res.end(JSON.stringify({
-      clientStatus: client.ws.status,
-      guilds: client.guilds.cache.map(g => ({ id: g.id, name: g.name, memberCount: g.memberCount })),
-      userPresence,
-    }));
-  } else {
-    res.writeHead(404);
-    res.end(JSON.stringify({ error: 'Not found' }));
-  }
-});
-
-server.listen(PORT, () => {
-  console.log(`Presence server running on http://localhost:${PORT}`);
-  watchConfig();
-});
-
+watchConfig();
 client.login(botToken).catch(console.error);

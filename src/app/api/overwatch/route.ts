@@ -1,32 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import overwatchConfig from "@/config/overwatch.json";
+import crypto from "crypto";
 
 const OVERFAST_API = "https://overfast-api.tekrop.fr";
+const REFRESH_INTERVAL = 30000;
 
 interface CacheData {
   data: object;
-  cachedAt: number;
+  hash: string;
 }
 
 let cache: CacheData | null = null;
+let refreshPromise: Promise<void> | null = null;
 
-const THIRTY_SECONDS = 30 * 1000;
 const ONE_DAY = 24 * 60 * 60 * 1000;
-
-function isCacheValid(): boolean {
-  if (!cache) return false;
-
-  const now = Date.now();
-  const cacheAge = now - cache.cachedAt;
-  const data = cache.data as { available?: boolean; error?: string; lastUpdated?: number };
-
-  if (data.available === true && data.lastUpdated) {
-    const dataAge = now - data.lastUpdated;
-    return dataAge < ONE_DAY;
-  }
-
-  return cacheAge < THIRTY_SECONDS;
-}
 
 interface RankInfo {
   division: string;
@@ -187,7 +174,7 @@ async function fetchPlayerData() {
       lastUpdated: summary.last_updated_at * 1000,
     };
   } catch (error) {
-    console.error("OverFast API error:", error);
+    console.error(`[${new Date().toISOString()}] OverFast API error:`, error);
     return {
       available: false,
       error: "Failed to fetch Overwatch data",
@@ -196,29 +183,46 @@ async function fetchPlayerData() {
   }
 }
 
-export async function GET() {
+async function refreshCache() {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const data = await fetchPlayerData();
+      const hash = crypto.createHash("sha256").update(JSON.stringify(data)).digest("hex").slice(0, 16);
+      cache = { data, hash };
+      console.log(`[${new Date().toISOString()}] [Overwatch] Background refresh complete`);
+    } catch (e) {
+      console.error(`[${new Date().toISOString()}] [Overwatch] Background refresh failed:`, e);
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
+if (!(global as any).__overwatchRefreshInitialized) {
+  (global as any).__overwatchRefreshInitialized = true;
+  refreshCache();
+  setInterval(refreshCache, REFRESH_INTERVAL);
+}
+
+export async function GET(request: NextRequest) {
   const battleTag = overwatchConfig.battleTag || "unknown";
 
-  console.log(`[Overwatch] Request received for ${battleTag}`);
+  if (!cache) {
+    console.log(`[${new Date().toISOString()}] [Overwatch] No cache yet for ${battleTag}, fetching...`);
+    await refreshCache();
+  }
 
-  if (isCacheValid() && cache) {
-    console.log(`[Overwatch] Cache HIT for ${battleTag}`);
-    return NextResponse.json(cache.data, {
-      headers: {
-        "X-Cache": "HIT",
-        "Cache-Control": "no-store",
-      },
+  const clientHash = request.nextUrl.searchParams.get("hash");
+
+  if (clientHash && clientHash === cache!.hash) {
+    return NextResponse.json({ changed: false, hash: cache!.hash }, {
+      headers: { "Cache-Control": "no-store" },
     });
   }
 
-  console.log(`[Overwatch] Cache MISS for ${battleTag}, fetching...`);
-  const data = await fetchPlayerData();
-  cache = { data, cachedAt: Date.now() };
-
-  return NextResponse.json(data, {
-    headers: {
-      "X-Cache": "MISS",
-      "Cache-Control": "no-store",
-    },
+  return NextResponse.json({ ...cache!.data, hash: cache!.hash, changed: true }, {
+    headers: { "Cache-Control": "no-store" },
   });
 }

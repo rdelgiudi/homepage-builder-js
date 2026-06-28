@@ -1,18 +1,7 @@
 import { NextResponse } from "next/server";
 import discordUserConfig from "@/config/discord-user.json";
-import { lastPresenceUpdate } from "@/lib/discord-cache";
 
-const PRESENCE_SERVICE_URL = "http://localhost:3001";
 const DISCORD_API = "https://discord.com/api/v10";
-const CACHE_TTL = 10000;
-
-interface CacheData {
-  data: object;
-  cachedAt: number;
-  userId: string;
-}
-
-let cache: CacheData | null = null;
 
 interface DiscordUser {
   id: string;
@@ -46,6 +35,9 @@ interface PresenceData {
   lastUpdated: string | null;
   nickname: string | null;
 }
+
+let profileCache: { data: DiscordUser; cachedAt: number } | null = null;
+const PROFILE_CACHE_TTL = 300000;
 
 async function fetchGameIconFromSteam(item: { id: number; name: string }): Promise<string | null> {
   const iconUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${item.id}/icon.jpg`;
@@ -284,35 +276,39 @@ async function fetchAlbumCoverFromMusicBrainz(track: string, artist: string): Pr
   return null;
 }
 
-const albumCoverCache = new Map<string, string[]>();
+const albumCoverCache = new Map<string, Promise<string[]>>();
 
 async function fetchAlbumCover(track: string, artist: string, preferSpotify: boolean = true): Promise<string[]> {
   const cacheKey = `${track}|${artist}|${preferSpotify}`;
   const cached = albumCoverCache.get(cacheKey);
   if (cached) return cached;
 
-  const urls: string[] = [];
-  const sources = preferSpotify
-    ? [
-        () => fetchAlbumCoverFromItunes(track, artist),
-        () => fetchAlbumCoverFromDeezer(track, artist),
-        () => fetchAlbumCoverFromMusicBrainz(track, artist),
-      ]
-    : [
-        () => fetchAlbumCoverFromDeezer(track, artist),
-        () => fetchAlbumCoverFromItunes(track, artist),
-        () => fetchAlbumCoverFromMusicBrainz(track, artist),
-      ];
+  const promise = (async () => {
+    const urls: string[] = [];
+    const sources = preferSpotify
+      ? [
+          () => fetchAlbumCoverFromItunes(track, artist),
+          () => fetchAlbumCoverFromDeezer(track, artist),
+          () => fetchAlbumCoverFromMusicBrainz(track, artist),
+        ]
+      : [
+          () => fetchAlbumCoverFromDeezer(track, artist),
+          () => fetchAlbumCoverFromItunes(track, artist),
+          () => fetchAlbumCoverFromMusicBrainz(track, artist),
+        ];
 
-  for (const source of sources) {
-    try {
-      const result = await source();
-      if (result?.url && !urls.includes(result.url)) urls.push(result.url);
-    } catch {}
-  }
+    for (const source of sources) {
+      try {
+        const result = await source();
+        if (result?.url && !urls.includes(result.url)) urls.push(result.url);
+      } catch {}
+    }
 
-  albumCoverCache.set(cacheKey, urls);
-  return urls;
+    return urls;
+  })();
+
+  albumCoverCache.set(cacheKey, promise);
+  return promise;
 }
 
 async function fetchDiscordData() {
@@ -323,27 +319,26 @@ async function fetchDiscordData() {
   }
 
   try {
-    const userRes = await fetch(`${DISCORD_API}/users/${userId}`, {
-      headers: {
-        Authorization: `Bot ${botToken}`,
-      },
-    });
+    if (!profileCache || Date.now() - profileCache.cachedAt > PROFILE_CACHE_TTL) {
+      const userRes = await fetch(`${DISCORD_API}/users/${userId}`, {
+        headers: { Authorization: `Bot ${botToken}` },
+      });
 
-    if (!userRes.ok) {
-      let errorMsg = `HTTP ${userRes.status}`;
-      try {
-        const errData = await userRes.json();
-        errorMsg = errData.message || errorMsg;
-      } catch {}
+      if (!userRes.ok) {
+        let errorMsg = `HTTP ${userRes.status}`;
+        try {
+          const errData = await userRes.json();
+          errorMsg = errData.message || errorMsg;
+        } catch {}
+        return { error: `Discord API error: ${errorMsg}`, status: userRes.status };
+      }
 
-      return {
-        error: `Discord API error: ${errorMsg}`,
-        status: userRes.status,
-      };
+      profileCache = { data: await userRes.json(), cachedAt: Date.now() };
     }
 
-    const userData: DiscordUser = await userRes.json();
+    const userData = profileCache.data;
 
+    const wsData = (global as any).__wsData as { presence: PresenceData | null } | undefined;
     let presence: PresenceData = {
       status: "offline",
       activities: [],
@@ -352,15 +347,8 @@ async function fetchDiscordData() {
       lastUpdated: null,
       nickname: null,
     };
-    try {
-      const presenceRes = await fetch(`${PRESENCE_SERVICE_URL}/presence`, {
-        signal: AbortSignal.timeout(5000),
-      });
-      if (presenceRes.ok) {
-        presence = await presenceRes.json();
-      }
-    } catch {
-      // Presence service not running or timed out
+    if (wsData?.presence) {
+      presence = wsData.presence;
     }
 
     const activitiesWithImages = await Promise.all(
@@ -455,32 +443,11 @@ async function fetchDiscordData() {
 }
 
 export async function GET() {
-  const currentUserId = discordUserConfig.userId;
-
-  console.log(`[Discord] Request received for user ${currentUserId}`);
-
-  if (cache && cache.userId !== currentUserId) {
-    cache = null;
-  }
-
-  if (cache && Date.now() - cache.cachedAt < CACHE_TTL && lastPresenceUpdate < cache.cachedAt) {
-    console.log(`[Discord] Cache HIT for user ${currentUserId}`);
-    return NextResponse.json(cache.data, {
-      headers: {
-        "X-Cache": "HIT",
-        "Cache-Control": "no-store",
-      },
-    });
-  }
-
-  console.log(`[Discord] Cache MISS for user ${currentUserId}, fetching...`);
   const data = await fetchDiscordData();
-  cache = { data, cachedAt: Date.now(), userId: currentUserId };
-
   return NextResponse.json(data, {
     headers: {
-      "X-Cache": "MISS",
       "Cache-Control": "no-store",
+      "X-Cache": profileCache ? "HIT" : "MISS",
     },
   });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 
 interface RankInfo {
@@ -236,20 +236,18 @@ function StatBar({ label, value, maxValue, color }: { label: string; value: numb
 export default function OverwatchStatus() {
   const [data, setData] = useState<OverwatchData | null>(null);
   const [loading, setLoading] = useState(true);
+  const hashRef = useRef<string | null>(null);
 
   useEffect(() => {
-    console.log("[OverwatchStatus] Effect running, data available:", data?.available);
-
     async function fetchData() {
-      console.log("[OverwatchStatus] Fetching overwatch data...");
       try {
-        const res = await fetch("/api/overwatch", { cache: "no-store" });
-        console.log("[OverwatchStatus] Response status:", res.status);
+        const url = hashRef.current ? `/api/overwatch?hash=${hashRef.current}` : "/api/overwatch";
+        const res = await fetch(url, { cache: "no-store" });
         const result = await res.json();
-        console.log("[OverwatchStatus] Result:", JSON.stringify(result));
+        if (result.changed === false) return;
+        hashRef.current = result.hash;
         setData(result);
-      } catch (err) {
-        console.log("[OverwatchStatus] Fetch error:", err);
+      } catch {
         setData({ available: false, error: "Failed to fetch" });
       } finally {
         setLoading(false);
@@ -258,10 +256,9 @@ export default function OverwatchStatus() {
     fetchData();
 
     const pollInterval = 30000;
-    console.log("[OverwatchStatus] Poll interval:", pollInterval);
     const interval = setInterval(fetchData, pollInterval);
     return () => clearInterval(interval);
-  }, [data?.available]);
+  }, []);
 
   if (loading) {
     return (

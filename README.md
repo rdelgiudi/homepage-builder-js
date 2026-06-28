@@ -6,7 +6,7 @@ A customizable Next.js homepage with Discord, Steam, and Overwatch integration.
 
 - Tab-based navigation
 - Discord server widget showing member count
-- Discord user presence (activity, status, custom status)
+- Discord user presence via WebSocket (instant updates, no polling)
 - Steam integration showing recently played games and game library
 - Overwatch 2 stats integration (ranks, hero stats, performance metrics)
 - Fully customizable sections (text, links, buttons, headers)
@@ -144,10 +144,10 @@ Displays detailed Discord user presence including online status, current activit
 - "Last seen" timestamp when offline
 - Music track info with album art (Spotify, YouTube Music)
 
-**Caching:**
-- API caches data for 10 seconds
-- Changing `userId` in config automatically clears cached data
-- The presence bot watches for config changes and re-initializes automatically
+**Real-time updates:**
+- Presence data pushed via WebSocket — instant updates, no polling
+- Profile data cached on server for 5 minutes
+- Changing `userId` in config automatically re-initializes the presence bot
 
 **Banner color extraction:**
 - Extracts the dominant color using Discord's own algorithm (reverse-engineered by [Vendicated](https://gist.github.com/Vendicated/ad803e9341e9c1110639361f17b58b5b))
@@ -252,13 +252,13 @@ Displays a random meme from a SQLite database.
 
 ---
 
-## API Caching
+## Data Flow
 
-| API | Cache Duration | Notes |
-|-----|---------------|-------|
-| Discord User | 10 seconds | Clears automatically on userId change |
-| Steam | 10 seconds | Game data cached briefly |
-| Overwatch | 24 hours | Stats refresh around 6 AM local time |
+| API | Mechanism | Notes |
+|-----|-----------|-------|
+| Discord User | **WebSocket** (push) + HTTP (initial load) | Real-time presence updates via WebSocket, 5 min profile cache |
+| Steam | HTTP polling (10s) | Game data cached briefly on server |
+| Overwatch | HTTP (24h cache) | Stats refresh around 6 AM local time |
 
 ---
 
@@ -280,27 +280,39 @@ Displays a random meme from a SQLite database.
 │   │   └── about.md              # Example markdown file
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── discord-user/     # Discord presence API (uses presence bot)
+│   │   │   ├── discord-user/     # Discord presence API (WebSocket + profile cache)
 │   │   │   ├── discord-server/   # Discord server widget API
 │   │   │   ├── steam/            # Steam stats API
 │   │   │   └── overwatch/        # Overwatch stats API
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   └── page.tsx
-│   └── components/
-│       ├── DiscordStatus.tsx      # Discord server widget
-│       ├── DiscordUser.tsx        # Discord user presence
-│       ├── SteamStatus.tsx        # Steam profile & games
-│       ├── OverwatchStatus.tsx       # Overwatch stats
-│       ├── MemeWidget.tsx         # Random meme display
-│       └── Tabs.tsx               # Tab navigation
+│   ├── components/
+│   │   ├── DiscordStatus.tsx      # Discord server widget
+│   │   ├── DiscordUser.tsx        # Discord user presence
+│   │   ├── SteamStatus.tsx        # Steam profile & games
+│   │   ├── OverwatchStatus.tsx       # Overwatch stats
+│   │   ├── MemeWidget.tsx         # Random meme display
+│   │   └── Tabs.tsx               # Tab navigation
+│   ├── hooks/
+│   │   └── useWebSocket.ts        # WebSocket connection hook
+│   └── types/
+│       ├── gray-matter.d.ts
+│       └── quantize.d.ts          # Type declaration for quantize
 ├── discord-presence.js        # Discord bot for presence updates
+├── server.js                  # Custom Next.js server with WebSocket
 ├── next.config.ts
 ├── package.json
 └── tsconfig.json
 ```
 
 ## Background Services
+
+### WebSocket Server
+
+The homepage runs on a custom Next.js server (`server.js`) with WebSocket support on the same port.
+
+The `dev` script automatically starts the WebSocket server alongside Next.js.
 
 ### Discord Presence Bot
 
@@ -320,8 +332,8 @@ The bot:
 - Tracks Discord presence (online, idle, DND, offline)
 - Monitors current activity and custom status
 - Records "last seen" timestamp when you go offline
+- Pushes presence data to the homepage server via **WebSocket** (no polling, no extra ports)
 - Watches `src/config/discord-user.json` for user ID changes and automatically re-initializes
-- Serves data on `http://localhost:3001/presence`
 
 **Hot Reload:**
 When you change the `userId` in `discord-user.json`, the bot detects the change and:

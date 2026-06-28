@@ -1,14 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import steamConfig from "@/config/steam.json";
+import crypto from "crypto";
 
-const CACHE_TTL = 5000;
+const REFRESH_INTERVAL = 10000;
 
-interface CacheData {
-  data: object;
-  cachedAt: number;
+interface SteamCache {
+  player: object | null;
+  recentGames: object[];
+  ownedGames: object[];
+  identityHash: string;
+  gamesHash: string;
 }
 
-let cache: CacheData | null = null;
+let cache: SteamCache | null = null;
+let refreshPromise: Promise<void> | null = null;
 
 async function getGameName(appid: number): Promise<string> {
   try {
@@ -71,14 +76,16 @@ async function fetchSteamData() {
       ownedGames = [];
     }
 
+    const playerObj = player ? {
+      steamid: player.steamid,
+      personaname: player.personaname,
+      avatarfull: player.avatarfull,
+      personastate: player.personastate,
+      gameextrainfo: player.gameextrainfo,
+    } : null;
+
     return {
-      player: player ? {
-        steamid: player.steamid,
-        personaname: player.personaname,
-        avatarfull: player.avatarfull,
-        personastate: player.personastate,
-        gameextrainfo: player.gameextrainfo,
-      } : null,
+      player: playerObj,
       recentGames,
       ownedGames,
     };
@@ -87,29 +94,77 @@ async function fetchSteamData() {
   }
 }
 
-export async function GET() {
+function computeHashes(data: { player: object | null; recentGames: object[]; ownedGames: object[] }) {
+  const identityHash = crypto.createHash("sha256")
+    .update(JSON.stringify(data.player || {}))
+    .digest("hex")
+    .slice(0, 16);
+  const gamesHash = crypto.createHash("sha256")
+    .update(JSON.stringify({ recentGames: data.recentGames, ownedGames: data.ownedGames }))
+    .digest("hex")
+    .slice(0, 16);
+  return { identityHash, gamesHash };
+}
+
+async function refreshCache() {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const data = await fetchSteamData();
+      const { identityHash, gamesHash } = computeHashes(data);
+      cache = { ...data, identityHash, gamesHash };
+      console.log(`[${new Date().toISOString()}] [Steam] Background refresh complete`);
+    } catch (e) {
+      console.error(`[${new Date().toISOString()}] [Steam] Background refresh failed:`, e);
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
+if (!(global as any).__steamRefreshInitialized) {
+  (global as any).__steamRefreshInitialized = true;
+  refreshCache();
+  setInterval(refreshCache, REFRESH_INTERVAL);
+}
+
+export async function GET(request: NextRequest) {
   const steamId = steamConfig.steamId || "unknown";
 
-  console.log(`[Steam] Request received for ${steamId}`);
-
-  if (cache && Date.now() - cache.cachedAt < CACHE_TTL) {
-    console.log(`[Steam] Cache HIT for ${steamId}`);
-    return NextResponse.json(cache.data, {
-      headers: {
-        "X-Cache": "HIT",
-        "Cache-Control": "no-store",
-      },
-    });
+  if (!cache) {
+    console.log(`[${new Date().toISOString()}] [Steam] No cache yet for ${steamId}, fetching...`);
+    await refreshCache();
   }
 
-  console.log(`[Steam] Cache MISS for ${steamId}, fetching...`);
-  const data = await fetchSteamData();
-  cache = { data, cachedAt: Date.now() };
+  const clientIdentityHash = request.nextUrl.searchParams.get("identityHash");
+  const clientGamesHash = request.nextUrl.searchParams.get("gamesHash");
 
-  return NextResponse.json(data, {
-    headers: {
-      "X-Cache": "MISS",
-      "Cache-Control": "no-store",
-    },
-  });
+  const identityChanged = !clientIdentityHash || clientIdentityHash !== cache!.identityHash;
+  const gamesChanged = !clientGamesHash || clientGamesHash !== cache!.gamesHash;
+  const changed = identityChanged || gamesChanged;
+
+  if (!changed) {
+    return NextResponse.json({
+      changed: false,
+      identityHash: cache!.identityHash,
+      gamesHash: cache!.gamesHash,
+    }, { headers: { "Cache-Control": "no-store" } });
+  }
+
+  const response: Record<string, unknown> = {
+    changed: true,
+    identityHash: cache!.identityHash,
+    gamesHash: cache!.gamesHash,
+  };
+
+  if (identityChanged) {
+    response.player = cache!.player;
+  }
+  if (gamesChanged) {
+    response.recentGames = cache!.recentGames;
+    response.ownedGames = cache!.ownedGames;
+  }
+
+  return NextResponse.json(response, { headers: { "Cache-Control": "no-store" } });
 }

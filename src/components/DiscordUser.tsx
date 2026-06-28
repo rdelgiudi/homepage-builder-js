@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import quantize from "quantize";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface DiscordActivity {
   type: number;
@@ -127,6 +128,17 @@ function resolveImageAsset(asset: string | undefined | null, activity: DiscordAc
 
   const activityName = activity.name?.toLowerCase() || "";
 
+  if (asset.startsWith("mp:external/")) {
+    const afterExternal = asset.slice("mp:external/".length);
+    const slashIdx = afterExternal.indexOf("/");
+    if (slashIdx !== -1) {
+      const original = afterExternal.slice(slashIdx + 1).replace(/^https\//, "https://").replace(/^http\//, "http://");
+      if (original.startsWith("http://") || original.startsWith("https://")) {
+        return original;
+      }
+    }
+  }
+
   if (asset.startsWith("mp:")) {
     return `https://media.discordapp.net/attachments/${asset.slice(3)}`;
   }
@@ -183,7 +195,9 @@ function getAlbumUrls(activity: DiscordActivity, userId: string): string[] {
 function getActivityKey(activity: DiscordActivity): string {
   const start = activity.timestamps?.start || 0;
   const appId = activity.application_id || "";
-  return `${appId}-${activity.name}-${start}`;
+  const state = activity.state || "";
+  const details = activity.details || "";
+  return `${appId}-${activity.name}-${state}-${details}-${start}`;
 }
 
 function getActivityTypeIcon(type: number): string {
@@ -365,6 +379,8 @@ export default function DiscordUser() {
   const lastUsernameRef = useRef<string | null>(null);
   const emptyNicknameCountRef = useRef<number>(0);
   const failedRefreshCountRef = useRef<number>(0);
+  const refetchRef = useRef<() => void>(() => {});
+  const albumUrlsCacheRef = useRef<Record<string, string[]>>({});
 
   useEffect(() => {
     async function fetchData() {
@@ -426,6 +442,7 @@ export default function DiscordUser() {
           Object.keys(activityStartsRef.current).forEach(key => {
             if (!(key in newStarts)) {
               delete activityStartsRef.current[key];
+              delete albumUrlsCacheRef.current[key];
             }
           });
 
@@ -456,9 +473,8 @@ export default function DiscordUser() {
         setLoading(false);
       }
     }
+    refetchRef.current = fetchData;
     fetchData();
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -476,6 +492,42 @@ export default function DiscordUser() {
       setAvatarColor(null);
     }
   }, [data?.avatar, data?.banner, data?.bannerColor, data?.id]);
+
+  useWebSocket({
+    onMessage: useCallback((msg: unknown) => {
+      const m = msg as { type?: string; data?: Record<string, unknown> };
+      const pd = m?.data;
+      if (m?.type === 'presence' && pd) {
+        setData(prev => prev ? {
+          ...prev,
+          status: pd.status as string,
+          activities: (pd.activities || []) as DiscordActivity[],
+          customStatus: pd.customStatus as DiscordUserData['customStatus'],
+          lastSeen: pd.lastSeen as string | null,
+          lastUpdated: pd.lastUpdated as string | null,
+        } : prev);
+
+        const wsActivities = ((pd.activities || []) as DiscordActivity[]).filter(a =>
+          a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
+        );
+        const newStarts: Record<string, number> = {};
+        wsActivities.forEach((activity: DiscordActivity) => {
+          if (activity.timestamps?.start) {
+            const key = getActivityKey(activity);
+            newStarts[key] = activity.timestamps.start;
+            activityStartsRef.current[key] = activity.timestamps.start;
+          }
+        });
+        Object.keys(activityStartsRef.current).forEach(key => {
+          if (!(key in newStarts)) {
+            delete activityStartsRef.current[key];
+          }
+        });
+
+        refetchRef.current();
+      }
+    }, []),
+  });
 
   if (loading && !lastDisplayNameRef.current) {
     return (
@@ -601,7 +653,10 @@ export default function DiscordUser() {
               <div className="flex gap-3 flex-1 min-w-0">
                 {allActivities.map((activity) => {
                   const activityKey = getActivityKey(activity);
-                  const albumUrls = getAlbumUrls(activity, data?.id || "");
+                  if (!albumUrlsCacheRef.current[activityKey]) {
+                    albumUrlsCacheRef.current[activityKey] = getAlbumUrls(activity, data?.id || "");
+                  }
+                  const albumUrls = albumUrlsCacheRef.current[activityKey];
                   const currentAlbumIdx = albumServiceIdx[activityKey] || 0;
                   const currentAlbumUrl = currentAlbumIdx < albumUrls.length ? albumUrls[currentAlbumIdx] : null;
                   const smallImageUrl = getActivityImageUrl(activity, data?.id || "", false);

@@ -127,21 +127,37 @@ function GameSection({ title, games }: { title: string; games: SteamGame[] }) {
 export default function SteamStatus() {
   const [data, setData] = useState<SteamData | null>(null);
   const [loading, setLoading] = useState(true);
+  const identityHashRef = useRef<string | null>(null);
+  const gamesHashRef = useRef<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await fetch("/api/steam");
+        const params = new URLSearchParams();
+        if (identityHashRef.current) params.set("identityHash", identityHashRef.current);
+        if (gamesHashRef.current) params.set("gamesHash", gamesHashRef.current);
+        const qs = params.toString();
+        const url = qs ? `/api/steam?${qs}` : "/api/steam";
+        const res = await fetch(url);
         const result = await res.json();
-        setData(result);
+        if (!result.changed) return;
+        identityHashRef.current = result.identityHash;
+        gamesHashRef.current = result.gamesHash;
+        setData(prev => {
+          const next = { ...(prev || {}), error: undefined };
+          if (result.player !== undefined) next.player = result.player;
+          if (result.recentGames !== undefined) next.recentGames = result.recentGames;
+          if (result.ownedGames !== undefined) next.ownedGames = result.ownedGames;
+          return next as SteamData;
+        });
       } catch {
-        setData({ player: null, recentGames: [], ownedGames: [], error: "Failed to fetch" });
+        setData(prev => prev || { player: null, recentGames: [], ownedGames: [], error: "Failed to fetch" });
       } finally {
         setLoading(false);
       }
     }
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, []);
 
