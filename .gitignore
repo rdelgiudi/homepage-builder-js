@@ -39,7 +39,7 @@ src/config/homepage.json
 
 # Markdown files
 !/src/content/about-example.md
-/src/content/
+/src/content/*
 
 # Visitor database
 visitors.db
