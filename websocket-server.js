@@ -1,30 +1,21 @@
 const { createServer } = require('http');
 const next = require('next');
 const { WebSocketServer } = require('ws');
-const fs = require('fs');
-const path = require('path');
+require('dotenv').config();
 
 const dev = process.env.NODE_ENV !== 'production';
 
-let generalConfig = { hostname: 'localhost', port: 3000, presencePort: 3001 };
-try {
-  generalConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'src/config/general.json'), 'utf-8'));
-} catch (e) {
-  console.error(`[${new Date().toISOString()}] Failed to read general.json, using defaults:`, e.message);
-}
-
-const hostname = generalConfig.hostname;
-const port = generalConfig.port;
-const PRESENCE_WS = `ws://${hostname}:${generalConfig.presencePort}`;
+const hostname = process.env.HOST || 'localhost';
+const port = parseInt(process.env.PORT, 10) || 3000;
+const presencePort = parseInt(process.env.PRESENCE_PORT, 10) || 3001;
+const PRESENCE_WS = `ws://${hostname}:${presencePort}`;
 const DISCORD_API = 'https://discord.com/api/v10';
 const PROFILE_CACHE_TTL = 300000;
 
-let discordConfig = { userId: '', botToken: '' };
-try {
-  discordConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'src/config/discord-user.json'), 'utf-8'));
-} catch (e) {
-  console.error(`[${new Date().toISOString()}] Failed to read discord-user.json:`, e.message);
-}
+const discordConfig = {
+  userId: process.env.DISCORD_USER_ID || '',
+  botToken: process.env.DISCORD_BOT_TOKEN || '',
+};
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -472,12 +463,10 @@ function broadcastMessage(msg) {
 
 // --- Steam periodic fetch ---
 
-let steamConfig = { apiKey: '', steamId: '' };
-try {
-  steamConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'src/config/steam.json'), 'utf-8'));
-} catch (e) {
-  console.error(`[${new Date().toISOString()}] Failed to read steam.json:`, e.message);
-}
+const steamConfig = {
+  apiKey: process.env.STEAM_API_KEY || '',
+  steamId: process.env.STEAM_ID || '',
+};
 
 let steamData = null;
 let steamIdentityHash = '';
@@ -591,12 +580,9 @@ async function refreshSteam() {
 
 const OVERFAST_API = 'https://overfast-api.tekrop.fr';
 
-let overwatchConfig = { battleTag: '' };
-try {
-  overwatchConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'src/config/overwatch.json'), 'utf-8'));
-} catch (e) {
-  console.error(`[${new Date().toISOString()}] Failed to read overwatch.json:`, e.message);
-}
+const overwatchConfig = {
+  battleTag: process.env.OVERWATCH_BATTLE_TAG || '',
+};
 
 let overwatchData = null;
 let overwatchHash = '';
@@ -605,7 +591,7 @@ let overwatchRefreshPromise = null;
 async function fetchOverwatchData() {
   const { battleTag } = overwatchConfig;
   if (!battleTag || battleTag === 'YourTag-12345') {
-    return { available: false, error: 'Configure your BattleTag in src/config/overwatch.json' };
+    return { available: false, error: 'Configure your BattleTag via the OVERWATCH_BATTLE_TAG env var or src/config/overwatch.json' };
   }
 
   try {

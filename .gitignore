@@ -30,13 +30,8 @@ next-env.d.ts
 .idea/
 .vscode/
 
-# Sensitive config files (use .example.json files as templates)
-src/config/discord.json
-src/config/discord-user.json
-src/config/steam.json
-src/config/overwatch.json
+# Local config files (use .example.json files as templates)
 src/config/homepage.json
-src/config/general.json
 
 # Markdown files
 !/src/content/about-example.md

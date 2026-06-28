@@ -1,0 +1,14 @@
+services:
+  homepage:
+    build: .
+    container_name: next-js-homepage
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - HOST=0.0.0.0
+      - DISCORD_USER_ID=${DISCORD_USER_ID:-}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
+      - STEAM_API_KEY=${STEAM_API_KEY:-}
+      - STEAM_ID=${STEAM_ID:-}
+      - OVERWATCH_BATTLE_TAG=${OVERWATCH_BATTLE_TAG:-}

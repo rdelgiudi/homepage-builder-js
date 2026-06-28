@@ -1,5 +1,4 @@
 import Image from "next/image";
-import discordConfig from "@/config/discord.json";
 
 interface DiscordWidget {
   id: string;
@@ -22,7 +21,7 @@ async function getDiscordWidget(serverId: string): Promise<DiscordWidget | null>
 }
 
 export default async function DiscordStatus() {
-  const serverId = discordConfig.serverId;
+  const serverId = process.env.DISCORD_SERVER_ID || '';
   const widget = await getDiscordWidget(serverId);
 
   if (!widget) {

@@ -1,32 +1,14 @@
 const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
 const { WebSocketServer } = require('ws');
-const fs = require('fs');
-const path = require('path');
+require('dotenv').config();
 
-let generalConfig = { hostname: 'localhost', port: 3000, presencePort: 3001 };
-try {
-  generalConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'src/config/general.json'), 'utf-8'));
-} catch (e) {
-  console.error(`[${new Date().toISOString()}] Failed to read general.json, using defaults:`, e.message);
-}
+const PORT = parseInt(process.env.PRESENCE_PORT, 10) || 3001;
 
-const PORT = generalConfig.presencePort;
-
-const configPath = path.join(__dirname, 'src/config/discord-user.json');
-let config;
-
-try {
-  config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-} catch {
-  console.error(`[${new Date().toISOString()}] Could not read config at src/config/discord-user.json`);
-  process.exit(1);
-}
-
-let userId = config.userId;
-const botToken = config.botToken;
+let userId = process.env.DISCORD_USER_ID || '';
+const botToken = process.env.DISCORD_BOT_TOKEN || '';
 
 if (!userId || !botToken || userId === 'YOUR_DISCORD_USER_ID') {
-  console.error(`[${new Date().toISOString()}] Invalid config: userId and botToken are required`);
+  console.error(`[${new Date().toISOString()}] Invalid config: set DISCORD_USER_ID and DISCORD_BOT_TOKEN env vars`);
   process.exit(1);
 }
 
@@ -131,7 +113,7 @@ client.on('clientReady', async () => {
   console.log(`[${new Date().toISOString()}] Discord bot logged in as ${client.user.tag}`);
 
   wss = new WebSocketServer({ port: PORT });
-  console.log(`[${new Date().toISOString()}] Presence WebSocket server running on ws://${generalConfig.hostname}:${PORT}`);
+  console.log(`[${new Date().toISOString()}] Presence WebSocket server running on port ${PORT}`);
 
   wss.on('connection', (ws) => {
     console.log(`[${new Date().toISOString()}] [Discord Presence] Server connected (${wss.clients.size} total)`);
@@ -171,27 +153,4 @@ client.on('error', (error) => {
   console.error(`[${new Date().toISOString()}] Discord client error:`, error);
 });
 
-function watchConfig() {
-  try {
-    fs.watch(configPath, { persistent: false }, async (eventType) => {
-      if (eventType === 'change') {
-        try {
-          const newConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          if (newConfig.userId && newConfig.userId !== userId) {
-            console.log(`[${new Date().toISOString()}] userId changed: ${userId} -> ${newConfig.userId}`);
-            userId = newConfig.userId;
-            userPresence = emptyPresence();
-            await fetchUserPresence();
-          }
-        } catch (err) {
-          console.error(`[${new Date().toISOString()}] Error reading updated config:`, err.message);
-        }
-      }
-    });
-  } catch (err) {
-    console.error(`[${new Date().toISOString()}] Could not watch config file:`, err.message);
-  }
-}
-
-watchConfig();
 client.login(botToken).catch(console.error);
