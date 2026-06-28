@@ -134,7 +134,46 @@ async function fetchGameIcon(name: string): Promise<string | null> {
   return await fetchGameIconFromRawg(name);
 }
 
-async function fetchAlbumCoverFromItunes(track: string, artist: string): Promise<{ url: string; aspectRatio: number } | null> {
+interface AlbumCoverResult {
+  url: string;
+  trackName: string;
+  artistName: string;
+}
+
+function normalize(s: string): string {
+  return s.toLowerCase().trim();
+}
+
+function containsJapanese(text: string): boolean {
+  return /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(text);
+}
+
+function matchScore(resultTrack: string, resultArtist: string, targetTrack: string, targetArtist: string): number {
+  const normTrack = normalize(targetTrack);
+  const normArtist = normalize(targetArtist);
+  const normResultTrack = normalize(resultTrack);
+  const normResultArtist = normalize(resultArtist);
+  let trackScore = 0;
+  let artistScore = 0;
+
+  if (normTrack && normResultTrack) {
+    if (normResultTrack === normTrack) trackScore = 100;
+    else if (normResultTrack.includes(normTrack) || normTrack.includes(normResultTrack)) trackScore = 50;
+  }
+
+  if (normArtist && normResultArtist) {
+    if (normResultArtist === normArtist) artistScore = 100;
+    else if (normResultArtist.includes(normArtist) || normArtist.includes(normResultArtist)) artistScore = 50;
+  }
+
+  if (normTrack && normArtist) {
+    return trackScore > 0 && artistScore > 0 ? trackScore + artistScore : 0;
+  }
+
+  return trackScore + artistScore;
+}
+
+async function fetchAlbumCoverFromItunes(track: string, artist: string): Promise<AlbumCoverResult | null> {
   try {
     const query = encodeURIComponent(`${track} ${artist}`);
     const res = await fetch(
@@ -144,26 +183,29 @@ async function fetchAlbumCoverFromItunes(track: string, artist: string): Promise
     if (!res.ok) return null;
     const data = await res.json();
     const results = data?.results || [];
-    if (results.length === 0) return null;
 
-    const withSizes = results.map((r: { artworkUrl100?: string }) => {
-      const base = r.artworkUrl100?.replace("100x100bb", "").replace("200x200bb", "");
-      return {
-        url: r.artworkUrl100?.replace("100x100bb", "600x600bb") || null,
-        aspectRatio: 1,
-        width: 600,
-      };
-    }).filter((r: { url: string }) => r.url);
+    let best: { url: string; trackName: string; artistName: string; score: number } | null = null;
+    let looseFallback: AlbumCoverResult | null = null;
 
-    if (withSizes.length === 0) return null;
+    for (const r of results) {
+      const url = r.artworkUrl100?.replace("100x100bb", "600x600bb");
+      if (!url) continue;
+      const resultTrack = r.trackName || "";
+      const resultArtist = r.artistName || "";
+      if (!looseFallback) looseFallback = { url, trackName: resultTrack, artistName: resultArtist };
+      const score = matchScore(resultTrack, resultArtist, track, artist);
+      if (score === 200) return { url, trackName: resultTrack, artistName: resultArtist };
+      if (score > (best?.score || 0)) best = { url, trackName: resultTrack, artistName: resultArtist, score };
+    }
 
-    withSizes.sort((a: { width: number }, b: { width: number }) => b.width - a.width);
-    return { url: withSizes[0].url, aspectRatio: 1 };
+    if (best && best.score >= 50) return best;
+    if (looseFallback && (containsJapanese(track) || containsJapanese(artist))) return looseFallback;
+    return null;
   } catch {}
   return null;
 }
 
-async function fetchAlbumCoverFromDeezer(track: string, artist: string): Promise<{ url: string; aspectRatio: number } | null> {
+async function fetchAlbumCoverFromDeezer(track: string, artist: string): Promise<AlbumCoverResult | null> {
   try {
     const query = encodeURIComponent(`${track} ${artist}`);
     const res = await fetch(
@@ -173,30 +215,35 @@ async function fetchAlbumCoverFromDeezer(track: string, artist: string): Promise
     if (!res.ok) return null;
     const data = await res.json();
     const items = data?.data || [];
-    if (items.length === 0) return null;
 
-    const withSizes = items.map((item: { album?: { cover_small?: string; cover_medium?: string; cover_big?: string; cover_xl?: string } }) => {
+    let best: { url: string; trackName: string; artistName: string; score: number } | null = null;
+    let looseFallback: AlbumCoverResult | null = null;
+
+    for (const item of items) {
       const sizes = [
         { url: item.album?.cover_xl, width: 500 },
         { url: item.album?.cover_big, width: 252 },
         { url: item.album?.cover_medium, width: 126 },
         { url: item.album?.cover_small, width: 56 },
       ].filter((s): s is { url: string; width: number } => !!s.url);
-
-      if (sizes.length === 0) return null;
+      if (sizes.length === 0) continue;
       sizes.sort((a, b) => b.width - a.width);
-      return { url: sizes[0].url, aspectRatio: 1, width: sizes[0].width };
-    }).filter((r: unknown): r is { url: string; aspectRatio: number } => r !== null);
+      const resultTrack = item.title || "";
+      const resultArtist = item.artist?.name || "";
+      if (!looseFallback) looseFallback = { url: sizes[0].url, trackName: resultTrack, artistName: resultArtist };
+      const score = matchScore(resultTrack, resultArtist, track, artist);
+      if (score === 200) return { url: sizes[0].url, trackName: resultTrack, artistName: resultArtist };
+      if (score > (best?.score || 0)) best = { url: sizes[0].url, trackName: resultTrack, artistName: resultArtist, score };
+    }
 
-    if (withSizes.length === 0) return null;
-
-    withSizes.sort((a: { width: number }, b: { width: number }) => b.width - a.width);
-    return { url: withSizes[0].url, aspectRatio: 1 };
+    if (best && best.score >= 50) return best;
+    if (looseFallback && (containsJapanese(track) || containsJapanese(artist))) return looseFallback;
+    return null;
   } catch {}
   return null;
 }
 
-async function fetchAlbumCoverFromMusicBrainz(track: string, artist: string): Promise<{ url: string; aspectRatio: number } | null> {
+async function fetchAlbumCoverFromMusicBrainz(track: string, artist: string): Promise<AlbumCoverResult | null> {
   try {
     const query = encodeURIComponent(`recording:"${track}" AND artist:"${artist}"`);
     const res = await fetch(
@@ -211,19 +258,40 @@ async function fetchAlbumCoverFromMusicBrainz(track: string, artist: string): Pr
     if (!res.ok) return null;
     const data = await res.json();
     const recordings = data?.recordings || [];
-    if (recordings.length === 0) return null;
+
+    let best: { url: string; trackName: string; artistName: string; score: number } | null = null;
+    let looseFallback: AlbumCoverResult | null = null;
 
     for (const rec of recordings) {
       const releaseId = rec?.releases?.[0]?.id;
-      if (releaseId) {
-        return { url: `https://coverartarchive.org/release/${releaseId}/front-500`, aspectRatio: 1 };
-      }
+      if (!releaseId) continue;
+      const resultTrack = rec.title || "";
+      const artistCredit = rec["artist-credit"];
+      const resultArtist = Array.isArray(artistCredit) && artistCredit.length > 0
+        ? (artistCredit[0].name || artistCredit[0].artist?.name || "")
+        : "";
+      const url = `https://coverartarchive.org/release/${releaseId}/front-500`;
+      if (!looseFallback) looseFallback = { url, trackName: resultTrack, artistName: resultArtist };
+      const score = matchScore(resultTrack, resultArtist, track, artist);
+      if (score === 200) return { url, trackName: resultTrack, artistName: resultArtist };
+      if (score > (best?.score || 0)) best = { url, trackName: resultTrack, artistName: resultArtist, score };
     }
+
+    if (best && best.score >= 50) return best;
+    if (looseFallback && (containsJapanese(track) || containsJapanese(artist))) return looseFallback;
+    return null;
   } catch {}
   return null;
 }
 
-async function fetchAlbumCover(track: string, artist: string, preferSpotify: boolean = true): Promise<string | null> {
+const albumCoverCache = new Map<string, string[]>();
+
+async function fetchAlbumCover(track: string, artist: string, preferSpotify: boolean = true): Promise<string[]> {
+  const cacheKey = `${track}|${artist}|${preferSpotify}`;
+  const cached = albumCoverCache.get(cacheKey);
+  if (cached) return cached;
+
+  const urls: string[] = [];
   const sources = preferSpotify
     ? [
         () => fetchAlbumCoverFromItunes(track, artist),
@@ -239,11 +307,12 @@ async function fetchAlbumCover(track: string, artist: string, preferSpotify: boo
   for (const source of sources) {
     try {
       const result = await source();
-      if (result) return result.url;
+      if (result?.url && !urls.includes(result.url)) urls.push(result.url);
     } catch {}
   }
 
-  return null;
+  albumCoverCache.set(cacheKey, urls);
+  return urls;
 }
 
 async function fetchDiscordData() {
@@ -300,6 +369,7 @@ async function fetchDiscordData() {
         const hasSmallImage = activity.assets?.small_image;
         let fallbackLarge: string | null = null;
         let fallbackSmall: string | null = null;
+        const albumCovers: string[] = [];
 
         const isYouTubeMusic = activity.name && (
           activity.name.toLowerCase() === "youtube music" ||
@@ -321,24 +391,35 @@ async function fetchDiscordData() {
             const artist = activity.state || "";
 
             if (track) {
-              fallbackLarge = await fetchAlbumCover(track, artist, !isYouTubeMusic);
+              const covers = await fetchAlbumCover(track, artist, !isYouTubeMusic);
+              albumCovers.push(...covers);
+              fallbackLarge = covers[0] || null;
             }
             if (!fallbackLarge && isYouTubeMusic && isExternalAvatar) {
               const videoIdMatch = activity.assets?.large_image?.match(/\/vi\/([^/]+)\//);
               if (videoIdMatch) {
-                fallbackLarge = `https://i.ytimg.com/vi/${videoIdMatch[1]}/hqdefault.jpg`;
+                const ytUrl = `https://i.ytimg.com/vi/${videoIdMatch[1]}/hqdefault.jpg`;
+                albumCovers.push(ytUrl);
+                fallbackLarge = ytUrl;
               }
             }
           } else if (isStreamingYouTube) {
             const videoId = activity.assets?.large_image?.slice(8);
             if (videoId) {
-              fallbackLarge = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+              const ytUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+              albumCovers.push(ytUrl);
+              fallbackLarge = ytUrl;
             }
+          }
+
+          if (hasLargeImage && !albumCovers.includes(hasLargeImage)) {
+            albumCovers.push(hasLargeImage);
           }
         }
 
         return {
           ...activity,
+          albumCovers,
           assets: {
             ...activity.assets,
             large_image: fallbackLarge || hasLargeImage,

@@ -17,6 +17,7 @@ interface DiscordActivity {
     large_text?: string;
     small_text?: string;
   };
+  albumCovers?: string[];
 }
 
 interface DiscordUserData {
@@ -121,21 +122,17 @@ function getBannerUrl(userId: string, bannerHash: string | null): string {
   return `https://cdn.discordapp.com/banners/${userId}/${bannerHash}.${ext}?size=600`;
 }
 
-function getActivityImageUrl(activity: DiscordActivity, userId: string, isLarge: boolean): string | null {
-  const asset = isLarge ? activity.assets?.large_image : activity.assets?.small_image;
+function resolveImageAsset(asset: string | undefined | null, activity: DiscordActivity, userId: string): string | null {
   if (!asset) return null;
 
   const activityName = activity.name?.toLowerCase() || "";
-  const isSpotify = activityName.includes("spotify");
-  const isYouTubeMusic = activityName.includes("youtube music") || (activityName.includes("youtube") && activity.type === 2);
 
   if (asset.startsWith("mp:")) {
     return `https://media.discordapp.net/attachments/${asset.slice(3)}`;
   }
 
   if (asset.startsWith("spotify:")) {
-    const spotifyHash = asset.slice(8);
-    return `https://i.scdn.co/image/${spotifyHash}`;
+    return `https://i.scdn.co/image/${asset.slice(8)}`;
   }
 
   if (asset.startsWith("youtube:")) {
@@ -150,7 +147,7 @@ function getActivityImageUrl(activity: DiscordActivity, userId: string, isLarge:
     return asset;
   }
 
-  if (isLarge && (activity.type === 2 || isSpotify)) {
+  if (activity.type === 2 || activityName.includes("spotify")) {
     if (/^[a-f0-9]{32}$/i.test(asset)) {
       return `https://i.scdn.co/image/${asset}`;
     }
@@ -158,6 +155,29 @@ function getActivityImageUrl(activity: DiscordActivity, userId: string, isLarge:
 
   const appId = activity.application_id || userId;
   return `https://cdn.discordapp.com/app-assets/${appId}/${asset}.png`;
+}
+
+function getActivityImageUrl(activity: DiscordActivity, userId: string, isLarge: boolean): string | null {
+  const asset = isLarge ? activity.assets?.large_image : activity.assets?.small_image;
+  return resolveImageAsset(asset, activity, userId);
+}
+
+function getAlbumUrls(activity: DiscordActivity, userId: string): string[] {
+  const urls: string[] = [];
+
+  if (activity.albumCovers?.length) {
+    for (const cover of activity.albumCovers) {
+      const resolved = resolveImageAsset(cover, activity, userId);
+      if (resolved && !urls.includes(resolved)) urls.push(resolved);
+    }
+  }
+
+  if (urls.length === 0) {
+    const url = getActivityImageUrl(activity, userId, true);
+    if (url) urls.push(url);
+  }
+
+  return urls;
 }
 
 function getActivityKey(activity: DiscordActivity): string {
@@ -335,6 +355,7 @@ export default function DiscordUser() {
   const [imgError, setImgError] = useState(false);
   const [avatarColor, setAvatarColor] = useState<string | null>(null);
   const [activityImageErrors, setActivityImageErrors] = useState<Record<string, boolean>>({});
+  const [albumServiceIdx, setAlbumServiceIdx] = useState<Record<string, number>>({});
   const [, setTick] = useState(0);
   const dataRef = useRef<DiscordUserData | null>(null);
   const activityStartsRef = useRef<Record<string, number>>({});
@@ -580,7 +601,9 @@ export default function DiscordUser() {
               <div className="flex gap-3 flex-1 min-w-0">
                 {allActivities.map((activity) => {
                   const activityKey = getActivityKey(activity);
-                  const largeImageUrl = getActivityImageUrl(activity, data?.id || "", true);
+                  const albumUrls = getAlbumUrls(activity, data?.id || "");
+                  const currentAlbumIdx = albumServiceIdx[activityKey] || 0;
+                  const currentAlbumUrl = currentAlbumIdx < albumUrls.length ? albumUrls[currentAlbumIdx] : null;
                   const smallImageUrl = getActivityImageUrl(activity, data?.id || "", false);
                   const startTime = activityStartsRef.current[activityKey];
                   const maxDurationSecs = activity.timestamps?.end && activity.timestamps?.start
@@ -601,18 +624,21 @@ export default function DiscordUser() {
                   return (
                     <div key={activityKey} className="dark:bg-[#2b2d31] bg-[#ebedef] rounded-md p-2 flex items-stretch gap-2 flex-1 min-w-0">
                       <div className="relative w-14 aspect-square rounded flex-shrink-0 dark:bg-[#1e1f22] bg-white">
-                        {largeImageUrl && !activityImageErrors[`${activityKey}-large`] ? (
+                        {currentAlbumUrl ? (
                           <Image
-                            src={largeImageUrl}
+                            src={currentAlbumUrl}
                             alt={activity.name}
                             fill
                             className="object-contain rounded"
                             unoptimized={true}
-                            onError={() => setActivityImageErrors(prev => ({ ...prev, [`${activityKey}-large`]: true }))}
+                            onError={() => {
+                              const nextIdx = (albumServiceIdx[activityKey] || 0) + 1;
+                              setAlbumServiceIdx(prev => ({ ...prev, [activityKey]: nextIdx }));
+                            }}
                           />
                         ) : (
-                          <div className="w-full h-full bg-[#5865F2] rounded flex items-center justify-center text-xl">
-                            {getActivityTypeIcon(activity.type)}
+                          <div className="w-full h-full flex items-center justify-center text-xl">
+                            🎵
                           </div>
                         )}
                         {smallImageUrl && !activityImageErrors[`${activityKey}-small`] && (
