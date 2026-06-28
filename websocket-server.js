@@ -559,6 +559,7 @@ async function refreshSteam() {
   if (steamRefreshPromise) return steamRefreshPromise;
   steamRefreshPromise = (async () => {
     try {
+      const t0 = Date.now();
       const data = await fetchSteamData();
       if (!data) return;
       const { identityHash, gamesHash } = computeSteamHashes(data);
@@ -568,8 +569,8 @@ async function refreshSteam() {
       steamIdentityHash = identityHash;
       steamGamesHash = gamesHash;
       steamData = data;
-      broadcastMessage({ type: 'steam', data, identityHash, gamesHash });
-      console.log(`[${new Date().toISOString()}] [Steam] Refreshed & broadcast`);
+      const count = broadcastMessage({ type: 'steam', data, identityHash, gamesHash });
+      console.log(`[${new Date().toISOString()}] [Steam] Relayed to ${count} browser client(s) in ${Date.now() - t0}ms`);
     } catch (e) {
       console.error(`[${new Date().toISOString()}] [Steam] Refresh failed:`, e.message);
     } finally {
@@ -700,13 +701,14 @@ async function refreshOverwatch() {
   if (overwatchRefreshPromise) return overwatchRefreshPromise;
   overwatchRefreshPromise = (async () => {
     try {
+      const t0 = Date.now();
       const data = await fetchOverwatchData();
       const hash = computeOverwatchHash(data);
       if (hash === overwatchHash) return;
       overwatchHash = hash;
       overwatchData = data;
-      broadcastMessage({ type: 'overwatch', data, hash });
-      console.log(`[${new Date().toISOString()}] [Overwatch] Refreshed & broadcast`);
+      const count = broadcastMessage({ type: 'overwatch', data, hash });
+      console.log(`[${new Date().toISOString()}] [Overwatch] Relayed to ${count} browser client(s) in ${Date.now() - t0}ms`);
     } catch (e) {
       console.error(`[${new Date().toISOString()}] [Overwatch] Refresh failed:`, e.message);
     } finally {
@@ -787,9 +789,7 @@ app.prepare().then(() => {
           const enriched = enrichedData;
           if (enriched) {
             const count = broadcast(enriched);
-            const status = enriched.status || 'unknown';
-            const activity = enriched.activities?.[0]?.name || 'none';
-            console.log(`[${new Date().toISOString()}] [Discord Presence] Enriched & relayed (status: ${status}, activity: "${activity}") to ${count} browser client(s) in ${Date.now() - t0}ms`);
+            console.log(`[${new Date().toISOString()}] [Discord Presence] Relayed to ${count} browser client(s) in ${Date.now() - t0}ms`);
           }
         }
       } catch (e) {

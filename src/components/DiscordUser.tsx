@@ -488,6 +488,7 @@ export default function DiscordUser() {
             className="object-cover"
             onError={() => setImgError(true)}
             unoptimized={true}
+            referrerPolicy="no-referrer"
           />
         ) : (
           <div
@@ -509,6 +510,7 @@ export default function DiscordUser() {
                   height={80}
                   className="rounded-full border-4 border-white dark:border-[#313338]"
                   unoptimized={true}
+                  referrerPolicy="no-referrer"
                 />
               ) : (
                 <div className="w-20 h-20 rounded-full bg-[#5865F2] flex items-center justify-center border-4 border-white dark:border-[#313338]">
@@ -574,6 +576,7 @@ export default function DiscordUser() {
                             fill
                             className="object-contain rounded"
                             unoptimized={true}
+                            referrerPolicy="no-referrer"
                             onError={() => {
                               setActivityImageErrors(prev => ({ ...prev, [`${activityKey}-album`]: Date.now() }));
                             }}
@@ -592,6 +595,7 @@ export default function DiscordUser() {
                               fill
                               className="object-contain"
                               unoptimized={true}
+                              referrerPolicy="no-referrer"
                               onError={() => setActivityImageErrors(prev => ({ ...prev, [`${activityKey}-small`]: Date.now() }))}
                             />
                           </div>

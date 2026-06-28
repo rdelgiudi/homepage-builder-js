@@ -96,7 +96,7 @@ async function fetchUserPresence() {
       const member = await guild.members.fetch(userId);
       if (member) {
         userPresence = buildPresenceFromMember(member, userPresence.nickname);
-        console.log(`[${new Date().toISOString()}] [Discord Presence] Fetched initial presence (status: ${userPresence.status})`);
+        console.log(`[${new Date().toISOString()}] [Discord Presence] Fetched initial presence`);
         broadcastPresence();
         return;
       }
@@ -109,8 +109,6 @@ async function fetchUserPresence() {
 
 function broadcastPresence() {
   if (!wss) return;
-  const status = userPresence.status || 'unknown';
-  const activity = userPresence.activities?.[0]?.name || 'none';
   const message = JSON.stringify({ type: 'presence', data: userPresence });
   let count = 0;
   wss.clients.forEach((ws) => {
@@ -119,7 +117,7 @@ function broadcastPresence() {
       count++;
     }
   });
-  console.log(`[${new Date().toISOString()}] [Discord Presence] Broadcast (status: ${status}, activity: "${activity}") to ${count} client(s)`);
+  console.log(`[${new Date().toISOString()}] [Discord Presence] Relayed to ${count} browser client(s)`);
 }
 
 client.on('ready', async () => {
