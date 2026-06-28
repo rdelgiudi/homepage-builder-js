@@ -5,9 +5,17 @@ const fs = require('fs');
 const path = require('path');
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
-const port = parseInt(process.env.PORT || '3000', 10);
-const PRESENCE_WS = 'ws://localhost:3001';
+
+let generalConfig = { hostname: 'localhost', port: 3000, presencePort: 3001 };
+try {
+  generalConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'src/config/general.json'), 'utf-8'));
+} catch (e) {
+  console.error(`[${new Date().toISOString()}] Failed to read general.json, using defaults:`, e.message);
+}
+
+const hostname = generalConfig.hostname;
+const port = generalConfig.port;
+const PRESENCE_WS = `ws://${hostname}:${generalConfig.presencePort}`;
 const DISCORD_API = 'https://discord.com/api/v10';
 const PROFILE_CACHE_TTL = 300000;
 

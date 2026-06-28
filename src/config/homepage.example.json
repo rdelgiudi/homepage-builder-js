@@ -3,12 +3,37 @@
   "tagline": "Your tagline or bio goes here",
   "tabs": [
     {
-      "label": "About",
-      "icon": "👤",
+      "label": "Welcome",
+      "icon": "👋",
       "sections": [
         {
+          "type": "header",
+          "title": "Hello! Welcome to my site!",
+          "icon": "👋"
+        },
+        {
+          "type": "text",
+          "content": "A simple paragraph of text with an optional icon.",
+          "icon": "💬"
+        },
+        {
+          "type": "text",
+          "content": "This one is left-aligned.",
+          "align": "left"
+        },
+        {
+          "type": "text",
+          "content": "This one is right-aligned.",
+          "align": "right"
+        },
+        {
           "type": "markdown",
-          "file": "about-example.md"
+          "file": "about.md"
+        },
+        {
+          "type": "meme",
+          "icon": "",
+          "text": "A random meme, refreshed each visit"
         }
       ]
     },
@@ -19,43 +44,25 @@
         {
           "type": "links",
           "items": [
-            {
-              "label": "GitHub",
-              "url": "https://github.com/yourusername",
-              "icon": "🐙"
-            },
-            {
-              "label": "Twitter",
-              "url": "https://twitter.com/yourusername",
-              "icon": "🐦"
-            },
-            {
-              "label": "Email",
-              "url": "mailto:you@example.com",
-              "icon": "📧"
-            },
-            {
-              "label": "YouTube",
-              "url": "https://youtube.com/@yourchannel",
-              "icon": "📺"
-            }
+            { "label": "GitHub",  "url": "https://github.com/yourusername",  "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/github.svg", "invertDark": true },
+            { "label": "Twitter", "url": "https://twitter.com/yourusername", "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/twitter.svg", "invertDark": true },
+            { "label": "YouTube", "url": "https://youtube.com/@yourchannel", "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/youtube.svg", "invertDark": true },
+            { "label": "Email",   "url": "mailto:you@example.com",          "icon": "📧" }
+          ]
+        },
+        {
+          "type": "links",
+          "align": "left",
+          "items": [
+            { "label": "GitHub",  "url": "https://github.com/yourusername",  "icon": "🐙" },
+            { "label": "Email",   "url": "mailto:you@example.com",          "icon": "📧" }
           ]
         },
         {
           "type": "buttons",
           "items": [
-            {
-              "label": "Download Resume",
-              "url": "https://yoursite.com/resume.pdf",
-              "icon": "📄",
-              "style": "primary"
-            },
-            {
-              "label": "View Portfolio",
-              "url": "https://yoursite.com",
-              "icon": "🎨",
-              "style": "secondary"
-            }
+            { "label": "Download Resume", "url": "https://yoursite.com/resume.pdf", "icon": "📄", "style": "primary" },
+            { "label": "View Portfolio",  "url": "https://yoursite.com",            "icon": "🎨", "style": "secondary" }
           ]
         }
       ]
@@ -65,19 +72,30 @@
       "icon": "🎮",
       "sections": [
         {
-          "type": "steam",
-          "icon": "🎮",
-          "text": "My Steam Profile"
-        },
-        {
           "type": "discord-user",
-          "icon": "👤",
+          "icon": "",
           "text": "My Discord Status"
         },
         {
+          "type": "steam",
+          "icon": "",
+          "text": "My Steam Profile"
+        },
+        {
           "type": "overwatch",
-          "icon": "🎮",
+          "icon": "",
           "text": "My Overwatch Stats"
+        }
+      ]
+    },
+    {
+      "label": "Widgets",
+      "icon": "🧩",
+      "sections": [
+        {
+          "type": "discord",
+          "icon": "💬",
+          "text": "Discord Server Widget"
         }
       ]
     }

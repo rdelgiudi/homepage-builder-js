@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import DiscordStatus from "@/components/DiscordStatus";
 import DiscordUser from "@/components/DiscordUser";
 import SteamStatus from "@/components/SteamStatus";
@@ -13,6 +14,7 @@ interface LinkItem {
   label: string;
   url: string;
   icon?: string;
+  invertDark?: boolean;
 }
 
 interface ButtonItem {
@@ -20,52 +22,91 @@ interface ButtonItem {
   url: string;
   icon?: string;
   style?: "primary" | "secondary";
+  invertDark?: boolean;
+}
+
+type Align = "left" | "center" | "right";
+
+const alignClasses: Record<Align, string> = {
+  left: "text-left justify-start",
+  center: "text-center justify-center",
+  right: "text-right justify-end",
+};
+
+function sectionAlign(section: Section): string {
+  return alignClasses[("align" in section ? section.align : undefined) || "center"];
+}
+
+function isIconUrl(s: string): boolean {
+  return s.startsWith("http://") || s.startsWith("https://");
+}
+
+function Icon({ icon, className, width = 24, height = 24, invertDark }: { icon?: string; className?: string; width?: number; height?: number; invertDark?: boolean }) {
+  if (!icon) return null;
+  if (isIconUrl(icon)) {
+    return <Image src={icon} alt="" width={width} height={height} className={`${className || ""}${invertDark ? " dark:invert" : ""}`} unoptimized />;
+  }
+  return <span className={className}>{icon}</span>;
 }
 
 interface TextSection {
   type: "text";
   content: string;
   icon?: string;
+  align?: Align;
+  invertDark?: boolean;
 }
 
 interface LinksSection {
   type: "links";
   items: LinkItem[];
+  align?: Align;
 }
 
 interface ButtonsSection {
   type: "buttons";
   items: ButtonItem[];
+  align?: Align;
 }
 
 interface HeaderSection {
   type: "header";
   title: string;
   icon?: string;
+  align?: Align;
+  invertDark?: boolean;
 }
 
 interface DiscordSection {
   type: "discord";
   icon?: string;
   text?: string;
+  align?: Align;
+  invertDark?: boolean;
 }
 
 interface DiscordUserSection {
   type: "discord-user";
   icon?: string;
   text?: string;
+  align?: Align;
+  invertDark?: boolean;
 }
 
 interface SteamSection {
   type: "steam";
   icon?: string;
   text?: string;
+  align?: Align;
+  invertDark?: boolean;
 }
 
 interface OverwatchSection {
   type: "overwatch";
   icon?: string;
   text?: string;
+  align?: Align;
+  invertDark?: boolean;
 }
 
 interface MarkdownSection {
@@ -77,37 +118,41 @@ interface MemeSection {
   type: "meme";
   icon?: string;
   text?: string;
+  align?: Align;
+  invertDark?: boolean;
 }
 
 interface TabItem {
   label: string;
   icon?: string;
+  invertDark?: boolean;
   sections: (TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection)[];
 }
 
 type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection;
 
 function renderSection(section: Section, index: number) {
+  const sa = sectionAlign(section);
   switch (section.type) {
     case "header":
       return (
-        <div key={index} className="text-center">
-          {section.icon && <span className="text-6xl block mb-4">{section.icon}</span>}
+        <div key={index} className={sa}>
+          {section.icon && <Icon icon={section.icon} className="text-6xl block mb-4" width={60} height={60} invertDark={section.invertDark} />}
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white">{section.title}</h2>
         </div>
       );
 
     case "text":
       return (
-        <div key={index} className="flex items-center gap-3 text-lg text-gray-600 dark:text-gray-300">
-          {section.icon && <span className="text-2xl">{section.icon}</span>}
+        <div key={index} className={`flex items-center gap-3 text-lg text-gray-600 dark:text-gray-300 ${sa}`}>
+          {section.icon && <Icon icon={section.icon} className="text-2xl" width={28} height={28} invertDark={section.invertDark} />}
           <p>{section.content}</p>
         </div>
       );
 
     case "links":
       return (
-        <div key={index} className="flex flex-wrap gap-3 justify-center">
+        <div key={index} className={`flex flex-wrap gap-3 ${sa}`}>
           {section.items.map((item, i) => (
             <a
               key={i}
@@ -116,7 +161,7 @@ function renderSection(section: Section, index: number) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              {item.icon && <span>{item.icon}</span>}
+              {item.icon && <Icon icon={item.icon} invertDark={item.invertDark} />}
               <span>{item.label}</span>
             </a>
           ))}
@@ -125,7 +170,7 @@ function renderSection(section: Section, index: number) {
 
     case "buttons":
       return (
-        <div key={index} className="flex flex-wrap gap-3 justify-center">
+        <div key={index} className={`flex flex-wrap gap-3 ${sa}`}>
           {section.items.map((item, i) => (
             <a
               key={i}
@@ -138,7 +183,7 @@ function renderSection(section: Section, index: number) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              {item.icon && <span>{item.icon}</span>}
+              {item.icon && <Icon icon={item.icon} invertDark={item.invertDark} />}
               <span>{item.label}</span>
             </a>
           ))}
@@ -149,8 +194,8 @@ function renderSection(section: Section, index: number) {
       return (
         <div key={index}>
           {(section.icon || section.text) && (
-            <p className="text-gray-500 dark:text-gray-400 mb-2 flex items-center justify-center gap-2">
-              {section.icon && <span className="text-xl">{section.icon}</span>}
+            <p className={`text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2 ${sa}`}>
+              {section.icon && <Icon icon={section.icon} className="text-xl" width={24} height={24} invertDark={section.invertDark} />}
               {section.text && <span>{section.text}</span>}
             </p>
           )}
@@ -162,8 +207,8 @@ function renderSection(section: Section, index: number) {
       return (
         <div key={index}>
           {(section.icon || section.text) && (
-            <p className="text-gray-500 dark:text-gray-400 mb-2 flex items-center justify-center gap-2">
-              {section.icon && <span className="text-xl">{section.icon}</span>}
+            <p className={`text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2 ${sa}`}>
+              {section.icon && <Icon icon={section.icon} className="text-xl" width={24} height={24} invertDark={section.invertDark} />}
               {section.text && <span>{section.text}</span>}
             </p>
           )}
@@ -175,8 +220,8 @@ function renderSection(section: Section, index: number) {
       return (
         <div key={index}>
           {(section.icon || section.text) && (
-            <p className="text-gray-500 dark:text-gray-400 mb-2 flex items-center justify-center gap-2">
-              {section.icon && <span className="text-xl">{section.icon}</span>}
+            <p className={`text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2 ${sa}`}>
+              {section.icon && <Icon icon={section.icon} className="text-xl" width={24} height={24} invertDark={section.invertDark} />}
               {section.text && <span>{section.text}</span>}
             </p>
           )}
@@ -188,8 +233,8 @@ function renderSection(section: Section, index: number) {
       return (
         <div key={index}>
           {(section.icon || section.text) && (
-            <p className="text-gray-500 dark:text-gray-400 mb-2 flex items-center justify-center gap-2">
-              {section.icon && <span className="text-xl">{section.icon}</span>}
+            <p className={`text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2 ${sa}`}>
+              {section.icon && <Icon icon={section.icon} className="text-xl" width={24} height={24} invertDark={section.invertDark} />}
               {section.text && <span>{section.text}</span>}
             </p>
           )}
@@ -208,8 +253,8 @@ function renderSection(section: Section, index: number) {
       return (
         <div key={index}>
           {(section.icon || section.text) && (
-            <p className="text-gray-500 dark:text-gray-400 mb-2 flex items-center justify-center gap-2">
-              {section.icon && <span className="text-xl">{section.icon}</span>}
+            <p className={`text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2 ${sa}`}>
+              {section.icon && <Icon icon={section.icon} className="text-xl" width={24} height={24} invertDark={section.invertDark} />}
               {section.text && <span>{section.text}</span>}
             </p>
           )}
@@ -268,7 +313,7 @@ export default function Tabs({ tabs }: TabsProps) {
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white"
               }`}
             >
-              {tab.icon && <span>{tab.icon}</span>}
+              {tab.icon && <Icon icon={tab.icon} invertDark={tab.invertDark} />}
               <span>{tab.label}</span>
             </button>
           ))}

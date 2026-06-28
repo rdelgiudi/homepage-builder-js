@@ -3,7 +3,14 @@ const { WebSocketServer } = require('ws');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 3001;
+let generalConfig = { hostname: 'localhost', port: 3000, presencePort: 3001 };
+try {
+  generalConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'src/config/general.json'), 'utf-8'));
+} catch (e) {
+  console.error(`[${new Date().toISOString()}] Failed to read general.json, using defaults:`, e.message);
+}
+
+const PORT = generalConfig.presencePort;
 
 const configPath = path.join(__dirname, 'src/config/discord-user.json');
 let config;
@@ -124,7 +131,7 @@ client.on('clientReady', async () => {
   console.log(`[${new Date().toISOString()}] Discord bot logged in as ${client.user.tag}`);
 
   wss = new WebSocketServer({ port: PORT });
-  console.log(`[${new Date().toISOString()}] Presence WebSocket server running on ws://localhost:${PORT}`);
+  console.log(`[${new Date().toISOString()}] Presence WebSocket server running on ws://${generalConfig.hostname}:${PORT}`);
 
   wss.on('connection', (ws) => {
     console.log(`[${new Date().toISOString()}] [Discord Presence] Server connected (${wss.clients.size} total)`);

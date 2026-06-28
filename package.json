@@ -10,6 +10,9 @@
     "start": "node websocket-server.js",
     "lint": "next lint"
   },
+  "overrides": {
+    "undici": "^6.27.0"
+  },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.20",
     "autoprefixer": "^10.5.1",

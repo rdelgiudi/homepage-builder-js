@@ -173,7 +173,7 @@ function RankBadge({ role, rank }: { role: string; rank: RankInfo | null }) {
             alt={role}
             width={20}
             height={20}
-            className="opacity-90 rounded-sm shadow-sm"
+            className="opacity-90 rounded-sm shadow-sm invert dark:invert-0"
             unoptimized
           />
         )}
@@ -194,7 +194,7 @@ function RankBadge({ role, rank }: { role: string; rank: RankInfo | null }) {
           alt={role}
           width={20}
           height={20}
-          className="opacity-90 rounded-sm shadow-sm"
+          className="opacity-90 rounded-sm shadow-sm invert dark:invert-0"
           unoptimized
         />
       )}
