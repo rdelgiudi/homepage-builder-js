@@ -256,7 +256,7 @@ Displays a random meme from a SQLite database.
 
 | API | Mechanism | Notes |
 |-----|-----------|-------|
-| Discord User | **WebSocket** (push) + HTTP (initial load) | Real-time presence updates via WebSocket, 5 min profile cache |
+| Discord User | **WebSocket** (push) | Real-time presence updates via WebSocket with server-side enrichment, 5 min profile cache |
 | Steam | HTTP polling (10s) | Game data cached briefly on server |
 | Overwatch | HTTP (24h cache) | Stats refresh around 6 AM local time |
 
@@ -280,7 +280,6 @@ Displays a random meme from a SQLite database.
 │   │   └── about.md              # Example markdown file
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── discord-user/     # Discord presence API (WebSocket + profile cache)
 │   │   │   ├── discord-server/   # Discord server widget API
 │   │   │   ├── steam/            # Steam stats API
 │   │   │   └── overwatch/        # Overwatch stats API
@@ -300,7 +299,7 @@ Displays a random meme from a SQLite database.
 │       ├── gray-matter.d.ts
 │       └── quantize.d.ts          # Type declaration for quantize
 ├── discord-presence.js        # Discord bot for presence updates
-├── server.js                  # Custom Next.js server with WebSocket
+├── websocket-server.js           # Custom Next.js server with WebSocket
 ├── next.config.ts
 ├── package.json
 └── tsconfig.json
@@ -310,7 +309,7 @@ Displays a random meme from a SQLite database.
 
 ### WebSocket Server
 
-The homepage runs on a custom Next.js server (`server.js`) with WebSocket support on the same port.
+The homepage runs on a custom Next.js server (`websocket-server.js`) with WebSocket support on the same port.
 
 The `dev` script automatically starts the WebSocket server alongside Next.js.
 

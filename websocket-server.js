@@ -1,0 +1,541 @@
+const { createServer } = require('http');
+const { parse } = require('url');
+const next = require('next');
+const { WebSocketServer } = require('ws');
+const fs = require('fs');
+const path = require('path');
+
+const dev = process.env.NODE_ENV !== 'production';
+const hostname = 'localhost';
+const port = parseInt(process.env.PORT || '3000', 10);
+const PRESENCE_WS = 'ws://localhost:3001';
+const DISCORD_API = 'https://discord.com/api/v10';
+const PROFILE_CACHE_TTL = 300000;
+
+let discordConfig = { userId: '', botToken: '' };
+try {
+  discordConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'src/config/discord-user.json'), 'utf-8'));
+} catch (e) {
+  console.error(`[${new Date().toISOString()}] Failed to read discord-user.json:`, e.message);
+}
+
+const app = next({ dev, hostname, port });
+const handle = app.getRequestHandler();
+
+// --- Enrichment helpers (ported from API route) ---
+
+const activityStartTimes = new Map();
+
+function getActivityIdentity(activity) {
+  return `${activity.name || ''}|${activity.details || ''}|${activity.state || ''}`;
+}
+
+function extractOriginalUrlFromMpExternal(url) {
+  if (!url.startsWith('mp:external/')) return null;
+  const rest = url.slice('mp:external/'.length);
+  const firstSlash = rest.indexOf('/');
+  if (firstSlash === -1) return null;
+  const urlPart = rest.slice(firstSlash + 1);
+  const schemeSlash = urlPart.indexOf('/');
+  if (schemeSlash === -1) return null;
+  const scheme = urlPart.slice(0, schemeSlash);
+  const path = urlPart.slice(schemeSlash + 1);
+  return `${scheme}://${path}`;
+}
+
+function normalize(s) {
+  return s.toLowerCase().trim();
+}
+
+function containsJapanese(text) {
+  return /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(text);
+}
+
+function matchScore(resultTrack, resultArtist, targetTrack, targetArtist) {
+  const normTrack = normalize(targetTrack);
+  const normArtist = normalize(targetArtist);
+  const normResultTrack = normalize(resultTrack);
+  const normResultArtist = normalize(resultArtist);
+  let trackScore = 0;
+  let artistScore = 0;
+
+  if (normTrack && normResultTrack) {
+    if (normResultTrack === normTrack) trackScore = 100;
+    else if (normResultTrack.includes(normTrack) || normTrack.includes(normResultTrack)) trackScore = 50;
+  }
+
+  if (normArtist && normResultArtist) {
+    if (normResultArtist === normArtist) artistScore = 100;
+    else if (normResultArtist.includes(normArtist) || normArtist.includes(normResultArtist)) artistScore = 50;
+  }
+
+  if (normTrack && normArtist) {
+    return trackScore > 0 && artistScore > 0 ? trackScore + artistScore : 0;
+  }
+
+  return trackScore + artistScore;
+}
+
+async function fetchAlbumCoverFromItunes(track, artist) {
+  try {
+    const query = encodeURIComponent(`${track} ${artist}`);
+    const res = await fetch(
+      `https://itunes.apple.com/search?term=${query}&media=music&limit=5`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const results = data?.results || [];
+
+    let best = null;
+    let looseFallback = null;
+
+    for (const r of results) {
+      const url = r.artworkUrl100?.replace("100x100bb", "600x600bb");
+      if (!url) continue;
+      const resultTrack = r.trackName || "";
+      const resultArtist = r.artistName || "";
+      if (!looseFallback) looseFallback = { url, trackName: resultTrack, artistName: resultArtist };
+      const score = matchScore(resultTrack, resultArtist, track, artist);
+      if (score === 200) return { url, trackName: resultTrack, artistName: resultArtist };
+      if (score > (best?.score || 0)) best = { url, trackName: resultTrack, artistName: resultArtist, score };
+    }
+
+    if (best && best.score >= 50) return best;
+    if (looseFallback && (containsJapanese(track) || containsJapanese(artist))) return looseFallback;
+    return null;
+  } catch {}
+  return null;
+}
+
+async function fetchAlbumCoverFromDeezer(track, artist) {
+  try {
+    const query = encodeURIComponent(`${track} ${artist}`);
+    const res = await fetch(
+      `https://api.deezer.com/search?q=${query}&limit=5`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const items = data?.data || [];
+
+    let best = null;
+    let looseFallback = null;
+
+    for (const item of items) {
+      const sizes = [
+        { url: item.album?.cover_xl, width: 500 },
+        { url: item.album?.cover_big, width: 252 },
+        { url: item.album?.cover_medium, width: 126 },
+        { url: item.album?.cover_small, width: 56 },
+      ].filter(s => !!s.url);
+      if (sizes.length === 0) continue;
+      sizes.sort((a, b) => b.width - a.width);
+      const resultTrack = item.title || "";
+      const resultArtist = item.artist?.name || "";
+      if (!looseFallback) looseFallback = { url: sizes[0].url, trackName: resultTrack, artistName: resultArtist };
+      const score = matchScore(resultTrack, resultArtist, track, artist);
+      if (score === 200) return { url: sizes[0].url, trackName: resultTrack, artistName: resultArtist };
+      if (score > (best?.score || 0)) best = { url: sizes[0].url, trackName: resultTrack, artistName: resultArtist, score };
+    }
+
+    if (best && best.score >= 50) return best;
+    if (looseFallback && (containsJapanese(track) || containsJapanese(artist))) return looseFallback;
+    return null;
+  } catch {}
+  return null;
+}
+
+async function fetchAlbumCoverFromMusicBrainz(track, artist) {
+  try {
+    const query = encodeURIComponent(`recording:"${track}" AND artist:"${artist}"`);
+    const res = await fetch(
+      `https://musicbrainz.org/ws/2/recording?query=${query}&fmt=json&limit=5`,
+      {
+        signal: AbortSignal.timeout(3000),
+        headers: { "User-Agent": "HomepageDiscordWidget/1.0 (personal use)" },
+      }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const recordings = data?.recordings || [];
+
+    let best = null;
+    let looseFallback = null;
+
+    for (const rec of recordings) {
+      const releaseId = rec?.releases?.[0]?.id;
+      if (!releaseId) continue;
+      const resultTrack = rec.title || "";
+      const artistCredit = rec["artist-credit"];
+      const resultArtist = Array.isArray(artistCredit) && artistCredit.length > 0
+        ? (artistCredit[0].name || artistCredit[0].artist?.name || "")
+        : "";
+      const url = `https://coverartarchive.org/release/${releaseId}/front-500`;
+      if (!looseFallback) looseFallback = { url, trackName: resultTrack, artistName: resultArtist };
+      const score = matchScore(resultTrack, resultArtist, track, artist);
+      if (score === 200) return { url, trackName: resultTrack, artistName: resultArtist };
+      if (score > (best?.score || 0)) best = { url, trackName: resultTrack, artistName: resultArtist, score };
+    }
+
+    if (best && best.score >= 50) return best;
+    if (looseFallback && (containsJapanese(track) || containsJapanese(artist))) return looseFallback;
+    return null;
+  } catch {}
+  return null;
+}
+
+const albumCoverCache = new Map();
+
+async function fetchAlbumCover(track, artist, preferSpotify = true) {
+  const cacheKey = `${track}|${artist}|${preferSpotify}`;
+  const cached = albumCoverCache.get(cacheKey);
+  if (cached) return cached;
+
+  const promise = (async () => {
+    const sources = preferSpotify
+      ? [
+          () => fetchAlbumCoverFromItunes(track, artist),
+          () => fetchAlbumCoverFromDeezer(track, artist),
+          () => fetchAlbumCoverFromMusicBrainz(track, artist),
+        ]
+      : [
+          () => fetchAlbumCoverFromDeezer(track, artist),
+          () => fetchAlbumCoverFromItunes(track, artist),
+          () => fetchAlbumCoverFromMusicBrainz(track, artist),
+        ];
+
+    for (const source of sources) {
+      try {
+        const result = await source();
+        if (result?.url) return result.url;
+      } catch {}
+    }
+
+    return null;
+  })();
+
+  albumCoverCache.set(cacheKey, promise);
+  return promise;
+}
+
+async function fetchGameIconFromSteam(item) {
+  const iconUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${item.id}/icon.jpg`;
+  const logoUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${item.id}/logo.png`;
+
+  try {
+    const iconRes = await fetch(iconUrl, { signal: AbortSignal.timeout(2000) });
+    if (iconRes.ok) return iconUrl;
+  } catch {}
+
+  try {
+    const logoRes = await fetch(logoUrl, { signal: AbortSignal.timeout(2000) });
+    if (logoRes.ok) return logoUrl;
+  } catch {}
+
+  return logoUrl;
+}
+
+async function fetchGameIconFromRawg(name) {
+  try {
+    const res = await fetch(
+      `https://api.rawg.io/api/games?search=${encodeURIComponent(name)}&page_size=5`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const results = data?.results || [];
+
+    for (const game of results) {
+      if (game.background_image) return game.background_image;
+      if (game.deleted_at) continue;
+      if (game.name.toLowerCase() === name.toLowerCase() && game.background_image) return game.background_image;
+    }
+
+    if (results.length > 0 && results[0].background_image) return results[0].background_image;
+  } catch {}
+  return null;
+}
+
+async function fetchGameIcon(name) {
+  try {
+    const query = encodeURIComponent(name);
+    const res = await fetch(
+      `https://store.steampowered.com/api/storesearch/?term=${query}&l=english&cc=us`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const items = data?.items || [];
+
+    if (items.length === 0) return await fetchGameIconFromRawg(name);
+
+    let scored = items.filter(item => !item.types || item.types.includes("game"));
+    if (scored.length === 0) scored = items;
+
+    scored.sort((a, b) => {
+      const aExact = a.name.toLowerCase() === name.toLowerCase() ? 1 : 0;
+      const bExact = b.name.toLowerCase() === name.toLowerCase() ? 1 : 0;
+      return bExact - aExact;
+    });
+
+    const best = scored[0];
+    if (best) {
+      const steamIcon = await fetchGameIconFromSteam(best);
+      if (steamIcon) return steamIcon;
+    }
+  } catch {}
+
+  return await fetchGameIconFromRawg(name);
+}
+
+// --- Profile caching ---
+
+let profileCache = null;
+
+async function fetchProfile() {
+  const { userId, botToken } = discordConfig;
+  if (!userId || !botToken || userId === 'YOUR_DISCORD_USER_ID') return null;
+
+  if (profileCache && Date.now() - profileCache.cachedAt < PROFILE_CACHE_TTL) {
+    return profileCache.data;
+  }
+
+  try {
+    const res = await fetch(`${DISCORD_API}/users/${userId}`, {
+      headers: { Authorization: `Bot ${botToken}` },
+    });
+    if (!res.ok) {
+      console.error(`[${new Date().toISOString()}] Discord profile fetch failed: ${res.status}`);
+      return profileCache?.data || null;
+    }
+    const data = await res.json();
+    profileCache = { data, cachedAt: Date.now() };
+    return data;
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] Discord profile fetch error:`, err.message);
+    return profileCache?.data || null;
+  }
+}
+
+// --- Enrichment ---
+
+let enrichedData = null;
+let wss;
+
+async function enrichPresence(rawPresence) {
+  const userData = await fetchProfile();
+  if (!userData) return;
+
+  const activities = await Promise.all(
+    (rawPresence.activities || []).map(async (activity) => {
+      const hasLargeImage = activity.assets?.large_image;
+      const hasSmallImage = activity.assets?.small_image;
+      let fallbackLarge = null;
+      let albumCover = null;
+
+      const isYouTubeMusic = activity.name && (
+        activity.name.toLowerCase() === 'youtube music' ||
+        activity.name.toLowerCase().includes('youtube music')
+      );
+
+      const isMusic = activity.type === 2 || (activity.type === 1 && isYouTubeMusic);
+      const isStreamingYouTube = activity.type === 1 && activity.assets?.large_image?.startsWith('youtube:');
+
+      if (activity.name) {
+        if (activity.type === 0) {
+          if (!hasLargeImage?.startsWith('http')) {
+            fallbackLarge = await fetchGameIcon(activity.name);
+          }
+        } else if (isMusic) {
+          const track = activity.details || activity.assets?.large_text || '';
+          const artist = activity.state || '';
+
+          if (isYouTubeMusic) {
+            for (const field of ['large_image', 'small_image']) {
+              const val = activity.assets?.[field];
+              if (!val) continue;
+              if (val.startsWith('mp:external/')) {
+                const extracted = extractOriginalUrlFromMpExternal(val);
+                if (extracted) {
+                  albumCover = extracted;
+                  fallbackLarge = albumCover;
+                  break;
+                }
+              }
+              if (val.startsWith('youtube:')) {
+                albumCover = `https://img.youtube.com/vi/${val.slice(8)}/default.jpg`;
+                fallbackLarge = albumCover;
+                break;
+              }
+            }
+          }
+
+          if (!albumCover && track) {
+            albumCover = await fetchAlbumCover(track, artist, !isYouTubeMusic);
+            fallbackLarge = albumCover || null;
+          }
+        } else if (isStreamingYouTube) {
+          const videoId = activity.assets?.large_image?.slice(8);
+          if (videoId) {
+            albumCover = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+            fallbackLarge = albumCover;
+          }
+        }
+
+        if (!albumCover && hasLargeImage) {
+          albumCover = hasLargeImage;
+        }
+      }
+
+      const identity = getActivityIdentity(activity);
+      const serverStart = activityStartTimes.get(identity) ?? Date.now();
+      const timestamps = activity.timestamps?.start
+        ? activity.timestamps
+        : { start: serverStart };
+
+      if (!activity.timestamps?.start && !activityStartTimes.has(identity)) {
+        activityStartTimes.set(identity, serverStart);
+      }
+
+      return {
+        ...activity,
+        albumCover,
+        timestamps,
+        assets: {
+          ...activity.assets,
+          large_image: fallbackLarge || hasLargeImage,
+          small_image: hasSmallImage,
+        },
+      };
+    })
+  );
+
+  const currentIdentities = new Set(activities.map(a => getActivityIdentity(a)));
+  for (const key of activityStartTimes.keys()) {
+    if (!currentIdentities.has(key)) activityStartTimes.delete(key);
+  }
+
+  const discriminator = userData.discriminator === '0' ? '0' : userData.discriminator;
+
+  enrichedData = {
+    id: userData.id,
+    username: discriminator === '0'
+      ? userData.username
+      : `${userData.username}#${discriminator}`,
+    globalName: userData.global_name || null,
+    avatar: userData.avatar,
+    banner: userData.banner || null,
+    bannerColor: userData.banner_color || null,
+    accentColor: userData.accent_color || null,
+    globalNickname: null,
+    status: rawPresence.status,
+    activities,
+    customStatus: rawPresence.customStatus,
+    lastSeen: rawPresence.lastSeen,
+    lastUpdated: rawPresence.lastUpdated,
+  };
+}
+
+function broadcast(data) {
+  if (!wss) return;
+  const message = JSON.stringify({ type: 'presence', data });
+  let count = 0;
+  wss.clients.forEach((client) => {
+    if (client.readyState === 1) {
+      client.send(message);
+      count++;
+    }
+  });
+  return count;
+}
+
+// --- App setup ---
+
+app.prepare().then(() => {
+  const server = createServer((req, res) => {
+    const parsedUrl = parse(req.url, true);
+    handle(req, res, parsedUrl);
+  });
+
+  wss = new WebSocketServer({ noServer: true });
+
+  wss.on('connection', (ws) => {
+    console.log(`[${new Date().toISOString()}] [WS] Browser client connected (${wss.clients.size} total)`);
+    if (enrichedData) {
+      ws.send(JSON.stringify({ type: 'presence', data: enrichedData }));
+    }
+    ws.on('close', () => {
+      console.log(`[${new Date().toISOString()}] [WS] Browser client disconnected (${wss.clients.size} total)`);
+    });
+  });
+
+  const handleUpgrade = app.getUpgradeHandler();
+
+  server.on('upgrade', (req, socket, head) => {
+    const { pathname } = parse(req.url, true);
+    if (pathname === '/ws') {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit('connection', ws, req);
+      });
+    } else {
+      handleUpgrade(req, socket, head);
+    }
+  });
+
+  server.listen(port, () => {
+    console.log(`[${new Date().toISOString()}] > Ready on http://${hostname}:${port}`);
+  });
+
+  let presenceWs = null;
+  let reconnectTimer = null;
+
+  function connectPresence() {
+    const ws = new (require('ws'))(PRESENCE_WS);
+
+    ws.on('open', async () => {
+      console.log(`[${new Date().toISOString()}] [Discord Presence] Connected to presence service`);
+      presenceWs = ws;
+      const initialPresence = await fetchProfile().then(() => null);
+      // Send cached data if available after reconnect
+      if (enrichedData) {
+        const count = broadcast(enrichedData);
+        if (count > 0) {
+          console.log(`[${new Date().toISOString()}] [Discord Presence] Sent cached data to ${count} browser client(s)`);
+        }
+      }
+    });
+
+    ws.on('message', async (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString());
+        if (msg.type === 'presence') {
+          const t0 = Date.now();
+          await enrichPresence(msg.data);
+          const enriched = enrichedData;
+          if (enriched) {
+            const count = broadcast(enriched);
+            const status = enriched.status || 'unknown';
+            const activity = enriched.activities?.[0]?.name || 'none';
+            console.log(`[${new Date().toISOString()}] [Discord Presence] Enriched & relayed (status: ${status}, activity: "${activity}") to ${count} browser client(s) in ${Date.now() - t0}ms`);
+          }
+        }
+      } catch (e) {
+        console.error(`[${new Date().toISOString()}] [Discord Presence] WS message error:`, e);
+      }
+    });
+
+    ws.on('close', () => {
+      console.log(`[${new Date().toISOString()}] [Discord Presence] Disconnected, reconnecting in 5s...`);
+      presenceWs = null;
+      reconnectTimer = setTimeout(connectPresence, 5000);
+    });
+
+    ws.on('error', (err) => {
+      console.error(`[${new Date().toISOString()}] [Discord Presence] WS error:`, err.message);
+      ws.close();
+    });
+  }
+
+  connectPresence();
+});

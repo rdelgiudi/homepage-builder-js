@@ -18,7 +18,7 @@ interface DiscordActivity {
     large_text?: string;
     small_text?: string;
   };
-  albumCovers?: string[];
+  albumCover?: string | null;
 }
 
 interface DiscordUserData {
@@ -174,35 +174,19 @@ function getActivityImageUrl(activity: DiscordActivity, userId: string, isLarge:
   return resolveImageAsset(asset, activity, userId);
 }
 
-function getAlbumUrls(activity: DiscordActivity, userId: string): string[] {
-  const urls: string[] = [];
 
-  if (activity.albumCovers?.length) {
-    for (const cover of activity.albumCovers) {
-      const resolved = resolveImageAsset(cover, activity, userId);
-      if (resolved && !urls.includes(resolved)) urls.push(resolved);
-    }
-  }
 
-  if (urls.length === 0) {
-    const url = getActivityImageUrl(activity, userId, true);
-    if (url) urls.push(url);
-  }
-
-  return urls;
-}
 
 function getActivityKey(activity: DiscordActivity): string {
-  const start = activity.timestamps?.start || 0;
   const appId = activity.application_id || "";
   const state = activity.state || "";
   const details = activity.details || "";
-  return `${appId}-${activity.name}-${state}-${details}-${start}`;
+  return `${appId}-${activity.name}-${state}-${details}`;
 }
 
 function getActivityTypeIcon(type: number): string {
   switch (type) {
-    case 0: return "🕹️";
+    case 0: return "🎮";
     case 2: return "🎵";
     case 1: return "📺";
     case 3: return "🎵";
@@ -210,6 +194,13 @@ function getActivityTypeIcon(type: number): string {
     case 5: return "📺";
     default: return "🕹️";
   }
+}
+
+const COOLDOWN_MS = 5000;
+
+function isOnCooldown(key: string, errors: Record<string, number>): boolean {
+  const ts = errors[key];
+  return !!ts && (Date.now() - ts) < COOLDOWN_MS;
 }
 
 function formatTimeRemaining(durationMs: number): string {
@@ -368,115 +359,13 @@ export default function DiscordUser() {
   const [loading, setLoading] = useState(true);
   const [imgError, setImgError] = useState(false);
   const [avatarColor, setAvatarColor] = useState<string | null>(null);
-  const [activityImageErrors, setActivityImageErrors] = useState<Record<string, boolean>>({});
-  const [albumServiceIdx, setAlbumServiceIdx] = useState<Record<string, number>>({});
+  const [activityImageErrors, setActivityImageErrors] = useState<Record<string, number>>({});
   const [, setTick] = useState(0);
   const dataRef = useRef<DiscordUserData | null>(null);
-  const activityStartsRef = useRef<Record<string, number>>({});
   const lastDisplayNameRef = useRef<string | null>(null);
   const lastAvatarUrlRef = useRef<string | null>(null);
   const lastStatusRef = useRef<string>("offline");
   const lastUsernameRef = useRef<string | null>(null);
-  const emptyNicknameCountRef = useRef<number>(0);
-  const failedRefreshCountRef = useRef<number>(0);
-  const refetchRef = useRef<() => void>(() => {});
-  const albumUrlsCacheRef = useRef<Record<string, string[]>>({});
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const res = await fetch("/api/discord-user");
-        const result = await res.json();
-
-        if (result && result.username && result.id) {
-          failedRefreshCountRef.current = 0;
-
-          const prevData = dataRef.current;
-          if (prevData && prevData.id && result.id && prevData.id !== result.id) {
-            lastDisplayNameRef.current = null;
-            lastAvatarUrlRef.current = null;
-            lastStatusRef.current = "offline";
-            lastUsernameRef.current = null;
-            emptyNicknameCountRef.current = 0;
-            setAvatarColor(null);
-            setImgError(false);
-          }
-          setData(result);
-          dataRef.current = result;
-
-          if (result.username) {
-            lastUsernameRef.current = result.username;
-          }
-
-          if (result.username) {
-            const globalName = result.globalName?.trim();
-            const displayName = globalName
-              ? globalName
-              : (result.username.includes('#') ? result.username.split('#')[0] : result.username);
-            lastDisplayNameRef.current = displayName;
-          }
-          if (result.id && result.avatar) {
-            lastAvatarUrlRef.current = getAvatarUrl(result.id, result.avatar);
-          }
-          if (result.status) {
-            lastStatusRef.current = result.status;
-          }
-
-          const newActivities = result?.activities?.filter((a: DiscordActivity) =>
-            a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
-          ) || [];
-
-          const newStarts: Record<string, number> = {};
-          newActivities.forEach((activity: DiscordActivity) => {
-            if (activity.timestamps?.start) {
-              const key = getActivityKey(activity);
-              const newStart = activity.timestamps.start;
-              newStarts[key] = newStart;
-
-              if (activityStartsRef.current[key] !== newStart) {
-                activityStartsRef.current[key] = newStart;
-              }
-            }
-          });
-
-          Object.keys(activityStartsRef.current).forEach(key => {
-            if (!(key in newStarts)) {
-              delete activityStartsRef.current[key];
-              delete albumUrlsCacheRef.current[key];
-            }
-          });
-
-          setActivityImageErrors(prev => {
-            const newErrors: Record<string, boolean> = {};
-            Object.keys(prev).forEach(key => {
-              const baseKey = key.replace(/-large$|-small$/, '');
-              if (baseKey in newStarts) {
-                newErrors[key] = prev[key];
-              }
-            });
-            return newErrors;
-          });
-        } else {
-          failedRefreshCountRef.current += 1;
-          if (failedRefreshCountRef.current > 3 && dataRef.current) {
-            setData(null);
-            dataRef.current = null;
-          }
-        }
-      } catch {
-        failedRefreshCountRef.current += 1;
-        if (failedRefreshCountRef.current > 3 && dataRef.current) {
-          setData(null);
-          dataRef.current = null;
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
-    refetchRef.current = fetchData;
-    fetchData();
-  }, []);
-
   useEffect(() => {
     const tickInterval = setInterval(() => {
       setTick(t => t + 1);
@@ -495,36 +384,39 @@ export default function DiscordUser() {
 
   useWebSocket({
     onMessage: useCallback((msg: unknown) => {
-      const m = msg as { type?: string; data?: Record<string, unknown> };
-      const pd = m?.data;
-      if (m?.type === 'presence' && pd) {
-        setData(prev => prev ? {
-          ...prev,
-          status: pd.status as string,
-          activities: (pd.activities || []) as DiscordActivity[],
-          customStatus: pd.customStatus as DiscordUserData['customStatus'],
-          lastSeen: pd.lastSeen as string | null,
-          lastUpdated: pd.lastUpdated as string | null,
-        } : prev);
+      const m = msg as { type?: string; data?: DiscordUserData };
+      if (m?.type === 'presence' && m.data?.id && m.data?.username) {
+        const result = m.data;
 
-        const wsActivities = ((pd.activities || []) as DiscordActivity[]).filter(a =>
-          a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
-        );
-        const newStarts: Record<string, number> = {};
-        wsActivities.forEach((activity: DiscordActivity) => {
-          if (activity.timestamps?.start) {
-            const key = getActivityKey(activity);
-            newStarts[key] = activity.timestamps.start;
-            activityStartsRef.current[key] = activity.timestamps.start;
-          }
-        });
-        Object.keys(activityStartsRef.current).forEach(key => {
-          if (!(key in newStarts)) {
-            delete activityStartsRef.current[key];
-          }
-        });
+        const prevData = dataRef.current;
+        if (prevData && prevData.id && result.id && prevData.id !== result.id) {
+          lastDisplayNameRef.current = null;
+          lastAvatarUrlRef.current = null;
+          lastStatusRef.current = "offline";
+          lastUsernameRef.current = null;
+          setAvatarColor(null);
+          setImgError(false);
+        }
+        setData(result);
+        dataRef.current = result;
 
-        refetchRef.current();
+        if (result.username) {
+          lastUsernameRef.current = result.username;
+          const globalName = result.globalName?.trim();
+          const displayName = globalName
+            ? globalName
+            : (result.username.includes('#') ? result.username.split('#')[0] : result.username);
+          lastDisplayNameRef.current = displayName;
+        }
+        if (result.id && result.avatar) {
+          lastAvatarUrlRef.current = getAvatarUrl(result.id, result.avatar);
+        }
+        if (result.status) {
+          lastStatusRef.current = result.status;
+        }
+
+        setLoading(false);
+        setActivityImageErrors({});
       }
     }, []),
   });
@@ -653,14 +545,9 @@ export default function DiscordUser() {
               <div className="flex gap-3 flex-1 min-w-0">
                 {allActivities.map((activity) => {
                   const activityKey = getActivityKey(activity);
-                  if (!albumUrlsCacheRef.current[activityKey]) {
-                    albumUrlsCacheRef.current[activityKey] = getAlbumUrls(activity, data?.id || "");
-                  }
-                  const albumUrls = albumUrlsCacheRef.current[activityKey];
-                  const currentAlbumIdx = albumServiceIdx[activityKey] || 0;
-                  const currentAlbumUrl = currentAlbumIdx < albumUrls.length ? albumUrls[currentAlbumIdx] : null;
+                  const currentAlbumUrl = resolveImageAsset(activity.albumCover || activity.assets?.large_image || null, activity, data?.id || "");
                   const smallImageUrl = getActivityImageUrl(activity, data?.id || "", false);
-                  const startTime = activityStartsRef.current[activityKey];
+                  const startTime = activity.timestamps?.start;
                   const maxDurationSecs = activity.timestamps?.end && activity.timestamps?.start
                     ? Math.floor((activity.timestamps.end - activity.timestamps.start) / 1000)
                     : null;
@@ -679,32 +566,33 @@ export default function DiscordUser() {
                   return (
                     <div key={activityKey} className="dark:bg-[#2b2d31] bg-[#ebedef] rounded-md p-2 flex items-stretch gap-2 flex-1 min-w-0">
                       <div className="relative w-14 aspect-square rounded flex-shrink-0 dark:bg-[#1e1f22] bg-white">
-                        {currentAlbumUrl ? (
+                        {currentAlbumUrl && !isOnCooldown(`${activityKey}-album`, activityImageErrors) ? (
                           <Image
+                            key={currentAlbumUrl}
                             src={currentAlbumUrl}
                             alt={activity.name}
                             fill
                             className="object-contain rounded"
                             unoptimized={true}
                             onError={() => {
-                              const nextIdx = (albumServiceIdx[activityKey] || 0) + 1;
-                              setAlbumServiceIdx(prev => ({ ...prev, [activityKey]: nextIdx }));
+                              setActivityImageErrors(prev => ({ ...prev, [`${activityKey}-album`]: Date.now() }));
                             }}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-xl">
-                            🎵
+                            {activity.type === 0 ? '🎮' : '🎵'}
                           </div>
                         )}
-                        {smallImageUrl && !activityImageErrors[`${activityKey}-small`] && (
+                        {smallImageUrl && !isOnCooldown(`${activityKey}-small`, activityImageErrors) && (
                           <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full overflow-hidden dark:border-[#2b2d31] border-white">
                             <Image
+                              key={smallImageUrl}
                               src={smallImageUrl}
                               alt=""
                               fill
                               className="object-contain"
                               unoptimized={true}
-                              onError={() => setActivityImageErrors(prev => ({ ...prev, [`${activityKey}-small`]: true }))}
+                              onError={() => setActivityImageErrors(prev => ({ ...prev, [`${activityKey}-small`]: Date.now() }))}
                             />
                           </div>
                         )}
