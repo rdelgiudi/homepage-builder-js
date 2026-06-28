@@ -36,6 +36,7 @@ src/config/discord-user.json
 src/config/steam.json
 src/config/overwatch.json
 src/config/homepage.json
+src/config/general.json
 
 # Markdown files
 !/src/content/about-example.md
