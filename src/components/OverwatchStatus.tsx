@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useCallback } from "react";
 import Image from "next/image";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface RankInfo {
   division: string;
@@ -236,29 +237,15 @@ function StatBar({ label, value, maxValue, color }: { label: string; value: numb
 export default function OverwatchStatus() {
   const [data, setData] = useState<OverwatchData | null>(null);
   const [loading, setLoading] = useState(true);
-  const hashRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const url = hashRef.current ? `/api/overwatch?hash=${hashRef.current}` : "/api/overwatch";
-        const res = await fetch(url, { cache: "no-store" });
-        const result = await res.json();
-        if (result.changed === false) return;
-        hashRef.current = result.hash;
-        setData(result);
-      } catch {
-        setData({ available: false, error: "Failed to fetch" });
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-
-    const pollInterval = 30000;
-    const interval = setInterval(fetchData, pollInterval);
-    return () => clearInterval(interval);
-  }, []);
+  useWebSocket({
+    onMessage: useCallback((msg: unknown) => {
+      const m = msg as { type?: string; data?: OverwatchData };
+      if (m?.type !== 'overwatch' || !m.data) return;
+      setData(m.data);
+      setLoading(false);
+    }, []),
+  });
 
   if (loading) {
     return (

@@ -450,6 +450,272 @@ function broadcast(data) {
   return count;
 }
 
+function broadcastMessage(msg) {
+  if (!wss) return;
+  const message = JSON.stringify(msg);
+  let count = 0;
+  wss.clients.forEach((client) => {
+    if (client.readyState === 1) {
+      client.send(message);
+      count++;
+    }
+  });
+  return count;
+}
+
+// --- Steam periodic fetch ---
+
+let steamConfig = { apiKey: '', steamId: '' };
+try {
+  steamConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'src/config/steam.json'), 'utf-8'));
+} catch (e) {
+  console.error(`[${new Date().toISOString()}] Failed to read steam.json:`, e.message);
+}
+
+let steamData = null;
+let steamIdentityHash = '';
+let steamGamesHash = '';
+let steamRefreshPromise = null;
+const crypto = require('crypto');
+
+async function fetchSteamData() {
+  const { apiKey, steamId } = steamConfig;
+  if (!apiKey || !steamId || steamId === 'YOUR_STEAM_ID') return null;
+
+  try {
+    const playerRes = await fetch(
+      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${apiKey}&steamids=${steamId}`
+    );
+    if (!playerRes.ok) return null;
+    const playerData = await playerRes.json();
+    const player = playerData.response?.players?.[0] || null;
+
+    let recentGames = [];
+    try {
+      const gamesRes = await fetch(
+        `https://api.steampowered.com/IPlayerService/GetRecentlyPlayedGames/v0001/?key=${apiKey}&steamid=${steamId}&format=json&count=100`
+      );
+      const gamesData = await gamesRes.json();
+      recentGames = gamesData.response?.games || [];
+    } catch {}
+
+    let ownedGames = [];
+    try {
+      const ownedRes = await fetch(
+        `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${apiKey}&steamid=${steamId}&format=json&include_played_free_games=true`
+      );
+      const ownedData = await ownedRes.json();
+      const allOwned = ownedData.response?.games || [];
+      const gamesWithPlaytime = allOwned
+        .filter(g => g.playtime_forever > 0)
+        .sort((a, b) => b.playtime_forever - a.playtime_forever)
+        .slice(0, 10);
+
+      ownedGames = await Promise.all(
+        gamesWithPlaytime.map(async (g) => {
+          const name = await getGameName(g.appid);
+          return { appid: g.appid, name, playtime_forever: g.playtime_forever };
+        })
+      );
+    } catch {}
+
+    const playerObj = player ? {
+      steamid: player.steamid,
+      personaname: player.personaname,
+      avatarfull: player.avatarfull,
+      personastate: player.personastate,
+      gameextrainfo: player.gameextrainfo,
+    } : null;
+
+    return { player: playerObj, recentGames, ownedGames };
+  } catch {
+    return null;
+  }
+}
+
+async function getGameName(appid) {
+  try {
+    const res = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appid}&filters=basic`);
+    const data = await res.json();
+    return data[appid]?.data?.name || `App ${appid}`;
+  } catch {
+    return `App ${appid}`;
+  }
+}
+
+function computeSteamHashes(data) {
+  const identityHash = crypto.createHash('sha256')
+    .update(JSON.stringify(data.player || {}))
+    .digest('hex')
+    .slice(0, 16);
+  const gamesHash = crypto.createHash('sha256')
+    .update(JSON.stringify({ recentGames: data.recentGames, ownedGames: data.ownedGames }))
+    .digest('hex')
+    .slice(0, 16);
+  return { identityHash, gamesHash };
+}
+
+async function refreshSteam() {
+  if (steamRefreshPromise) return steamRefreshPromise;
+  steamRefreshPromise = (async () => {
+    try {
+      const data = await fetchSteamData();
+      if (!data) return;
+      const { identityHash, gamesHash } = computeSteamHashes(data);
+      const identityChanged = identityHash !== steamIdentityHash;
+      const gamesChanged = gamesHash !== steamGamesHash;
+      if (!identityChanged && !gamesChanged) return;
+      steamIdentityHash = identityHash;
+      steamGamesHash = gamesHash;
+      steamData = data;
+      broadcastMessage({ type: 'steam', data, identityHash, gamesHash });
+      console.log(`[${new Date().toISOString()}] [Steam] Refreshed & broadcast`);
+    } catch (e) {
+      console.error(`[${new Date().toISOString()}] [Steam] Refresh failed:`, e.message);
+    } finally {
+      steamRefreshPromise = null;
+    }
+  })();
+  return steamRefreshPromise;
+}
+
+// --- Overwatch periodic fetch ---
+
+const OVERFAST_API = 'https://overfast-api.tekrop.fr';
+
+let overwatchConfig = { battleTag: '' };
+try {
+  overwatchConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'src/config/overwatch.json'), 'utf-8'));
+} catch (e) {
+  console.error(`[${new Date().toISOString()}] Failed to read overwatch.json:`, e.message);
+}
+
+let overwatchData = null;
+let overwatchHash = '';
+let overwatchRefreshPromise = null;
+
+async function fetchOverwatchData() {
+  const { battleTag } = overwatchConfig;
+  if (!battleTag || battleTag === 'YourTag-12345') {
+    return { available: false, error: 'Configure your BattleTag in src/config/overwatch.json' };
+  }
+
+  try {
+    const encodedBattleTag = battleTag.replace('#', '-');
+    const profileRes = await fetch(`${OVERFAST_API}/players/${encodeURIComponent(encodedBattleTag)}`);
+    if (!profileRes.ok) throw new Error(`Profile fetch failed: ${profileRes.status}`);
+    const profileData = await profileRes.json();
+
+    if (profileData.private || !profileData.summary) {
+      return { available: false, error: 'Overwatch profile is private', battleTag,
+        suggestion: 'Set your Overwatch profile to public to display stats' };
+    }
+
+    const [statsRes, heroesListRes] = await Promise.all([
+      fetch(`${OVERFAST_API}/players/${encodeURIComponent(encodedBattleTag)}/stats/summary?platform=pc`),
+      fetch(`${OVERFAST_API}/heroes`),
+    ]);
+
+    const summary = profileData.summary;
+    const pcCompetitive = summary.competitive?.pc;
+    const ranks = {
+      tank: pcCompetitive?.tank || null,
+      damage: pcCompetitive?.damage || null,
+      support: pcCompetitive?.support || null,
+    };
+
+    let heroPortraits = {};
+    if (heroesListRes.ok) {
+      const heroesList = await heroesListRes.json();
+      heroPortraits = (heroesList || []).reduce((acc, h) => {
+        acc[h.key] = h.portrait;
+        return acc;
+      }, {});
+    }
+
+    let generalStats = null;
+    let mostPlayedHeroes = [];
+
+    if (statsRes.ok) {
+      const statsData = await statsRes.json();
+      const general = statsData.general;
+      if (general) {
+        generalStats = {
+          eliminations: general.average?.eliminations || 0,
+          assists: general.average?.assists || 0,
+          deaths: general.average?.deaths || 0,
+          damage: general.average?.damage || 0,
+          healing: general.average?.healing || 0,
+          kda: general.kda || 0,
+          games_played: general.games_played || 0,
+          games_won: general.games_won || 0,
+          games_lost: general.games_lost || 0,
+          winrate: general.winrate || 0,
+          playtime: general.time_played || 0,
+        };
+      }
+
+      const heroes = statsData.heroes || {};
+      mostPlayedHeroes = Object.entries(heroes)
+        .map(([key, h]) => ({
+          hero: key.charAt(0).toUpperCase() + key.slice(1).replace(/-/g, ' '),
+          key,
+          icon: heroPortraits[key] || '',
+          playtime: h.time_played || 0,
+          winrate: h.winrate || 0,
+          games_played: h.games_played || 0,
+          kda: h.kda || 0,
+          eliminations: h.average?.eliminations || 0,
+          deaths: h.average?.deaths || 0,
+          healing: h.average?.healing || 0,
+          damage: h.average?.damage || 0,
+        }))
+        .filter(h => h.games_played > 0 || h.playtime > 0)
+        .sort((a, b) => b.playtime - a.playtime)
+        .slice(0, 12);
+    }
+
+    return {
+      available: true,
+      username: summary.username,
+      avatar: summary.avatar,
+      title: summary.title || null,
+      ranks,
+      mostPlayedHeroes,
+      generalStats,
+      battleTag,
+      lastUpdated: summary.last_updated_at * 1000,
+    };
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] OverFast API error:`, error.message);
+    return { available: false, error: 'Failed to fetch Overwatch data', battleTag };
+  }
+}
+
+function computeOverwatchHash(data) {
+  return crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex').slice(0, 16);
+}
+
+async function refreshOverwatch() {
+  if (overwatchRefreshPromise) return overwatchRefreshPromise;
+  overwatchRefreshPromise = (async () => {
+    try {
+      const data = await fetchOverwatchData();
+      const hash = computeOverwatchHash(data);
+      if (hash === overwatchHash) return;
+      overwatchHash = hash;
+      overwatchData = data;
+      broadcastMessage({ type: 'overwatch', data, hash });
+      console.log(`[${new Date().toISOString()}] [Overwatch] Refreshed & broadcast`);
+    } catch (e) {
+      console.error(`[${new Date().toISOString()}] [Overwatch] Refresh failed:`, e.message);
+    } finally {
+      overwatchRefreshPromise = null;
+    }
+  })();
+  return overwatchRefreshPromise;
+}
+
 // --- App setup ---
 
 app.prepare().then(() => {
@@ -464,6 +730,12 @@ app.prepare().then(() => {
     console.log(`[${new Date().toISOString()}] [WS] Browser client connected (${wss.clients.size} total)`);
     if (enrichedData) {
       ws.send(JSON.stringify({ type: 'presence', data: enrichedData }));
+    }
+    if (steamData) {
+      ws.send(JSON.stringify({ type: 'steam', data: steamData, identityHash: steamIdentityHash, gamesHash: steamGamesHash }));
+    }
+    if (overwatchData) {
+      ws.send(JSON.stringify({ type: 'overwatch', data: overwatchData, hash: overwatchHash }));
     }
     ws.on('close', () => {
       console.log(`[${new Date().toISOString()}] [WS] Browser client disconnected (${wss.clients.size} total)`);
@@ -538,4 +810,10 @@ app.prepare().then(() => {
   }
 
   connectPresence();
+
+  refreshSteam();
+  setInterval(refreshSteam, 10000);
+
+  refreshOverwatch();
+  setInterval(refreshOverwatch, 30000);
 });

@@ -257,8 +257,8 @@ Displays a random meme from a SQLite database.
 | API | Mechanism | Notes |
 |-----|-----------|-------|
 | Discord User | **WebSocket** (push) | Real-time presence updates via WebSocket with server-side enrichment, 5 min profile cache |
-| Steam | HTTP polling (10s) | Game data cached briefly on server |
-| Overwatch | HTTP (24h cache) | Stats refresh around 6 AM local time |
+| Steam | **WebSocket** (push, 10s refresh) | Profile and game data pushed via WebSocket |
+| Overwatch | **WebSocket** (push, 30s refresh) | Stats and ranks pushed via WebSocket |
 
 ---
 
@@ -281,8 +281,6 @@ Displays a random meme from a SQLite database.
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── discord-server/   # Discord server widget API
-│   │   │   ├── steam/            # Steam stats API
-│   │   │   └── overwatch/        # Overwatch stats API
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   └── page.tsx

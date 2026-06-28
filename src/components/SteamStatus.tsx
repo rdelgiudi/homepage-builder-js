@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface SteamGame {
   appid: number;
@@ -127,39 +128,15 @@ function GameSection({ title, games }: { title: string; games: SteamGame[] }) {
 export default function SteamStatus() {
   const [data, setData] = useState<SteamData | null>(null);
   const [loading, setLoading] = useState(true);
-  const identityHashRef = useRef<string | null>(null);
-  const gamesHashRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const params = new URLSearchParams();
-        if (identityHashRef.current) params.set("identityHash", identityHashRef.current);
-        if (gamesHashRef.current) params.set("gamesHash", gamesHashRef.current);
-        const qs = params.toString();
-        const url = qs ? `/api/steam?${qs}` : "/api/steam";
-        const res = await fetch(url);
-        const result = await res.json();
-        if (!result.changed) return;
-        identityHashRef.current = result.identityHash;
-        gamesHashRef.current = result.gamesHash;
-        setData(prev => {
-          const next = { ...(prev || {}), error: undefined };
-          if (result.player !== undefined) next.player = result.player;
-          if (result.recentGames !== undefined) next.recentGames = result.recentGames;
-          if (result.ownedGames !== undefined) next.ownedGames = result.ownedGames;
-          return next as SteamData;
-        });
-      } catch {
-        setData(prev => prev || { player: null, recentGames: [], ownedGames: [], error: "Failed to fetch" });
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  useWebSocket({
+    onMessage: useCallback((msg: unknown) => {
+      const m = msg as { type?: string; data?: SteamData };
+      if (m?.type !== 'steam' || !m.data) return;
+      setData(m.data);
+      setLoading(false);
+    }, []),
+  });
 
   if (loading) {
     return (

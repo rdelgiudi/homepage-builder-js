@@ -1,51 +1,81 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 
 interface UseWebSocketOptions {
   onMessage: (data: unknown) => void;
   enabled?: boolean;
 }
 
+let sharedWs: WebSocket | null = null;
+let subscriberCount = 0;
+const listeners = new Set<(data: unknown) => void>();
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+function createConnection() {
+  if (typeof window === "undefined") return;
+
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const url = `${protocol}//${window.location.host}/ws`;
+
+  const ws = new WebSocket(url);
+
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      for (const listener of listeners) {
+        listener(msg);
+      }
+    } catch {}
+  };
+
+  ws.onclose = () => {
+    if (sharedWs === ws) {
+      sharedWs = null;
+      if (subscriberCount > 0) {
+        reconnectTimer = setTimeout(createConnection, 3000);
+      }
+    }
+  };
+
+  ws.onerror = () => {
+    ws.close();
+  };
+
+  sharedWs = ws;
+}
+
+function teardownConnection() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  sharedWs?.close();
+  sharedWs = null;
+}
+
 export function useWebSocket({ onMessage, enabled = true }: UseWebSocketOptions) {
-  const wsRef = useRef<WebSocket | null>(null);
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
 
-  const connect = useCallback(() => {
+  useEffect(() => {
     if (!enabled) return;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const url = `${protocol}//${window.location.host}/ws`;
+    const listener = (data: unknown) => onMessageRef.current(data);
+    listeners.add(listener);
 
-    const ws = new WebSocket(url);
+    if (subscriberCount === 0) {
+      createConnection();
+    }
+    subscriberCount++;
 
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        onMessageRef.current(msg);
-      } catch {}
-    };
+    return () => {
+      listeners.delete(listener);
+      subscriberCount--;
 
-    ws.onclose = () => {
-      if (wsRef.current === ws) {
-        wsRef.current = null;
-        setTimeout(connect, 3000);
+      if (subscriberCount === 0) {
+        teardownConnection();
       }
     };
-
-    ws.onerror = () => {
-      ws.close();
-    };
-
-    wsRef.current = ws;
   }, [enabled]);
-
-  useEffect(() => {
-    connect();
-    return () => {
-      wsRef.current?.close();
-      wsRef.current = null;
-    };
-  }, [connect]);
 }
