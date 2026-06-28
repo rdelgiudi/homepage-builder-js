@@ -1,8 +1,21 @@
 import Tabs from "@/components/Tabs";
 import VisitorCounter from "@/components/VisitorCounter";
 import { Suspense } from "react";
+import fs from "fs";
+import path from "path";
 
-const configPromise = import("@/config/homepage.json") as Promise<{ default: { name: string; tagline: string; tabs: unknown[] } }>;
+export const dynamic = "force-dynamic";
+
+const CONFIG_PATH = path.join(process.cwd(), "src/config/homepage.json");
+
+async function loadConfig() {
+  try {
+    const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
+    return JSON.parse(raw) as { name: string; tagline: string; tabs: unknown[] };
+  } catch {
+    return { name: "Homepage", tagline: "Welcome", tabs: [] };
+  }
+}
 
 function TabsFallback() {
   return (
@@ -16,8 +29,7 @@ function TabsFallback() {
 }
 
 export default async function Home() {
-  const config = await configPromise;
-  const { name, tagline, tabs = [] } = config.default as { name: string; tagline: string; tabs: unknown[] };
+  const { name, tagline, tabs = [] } = await loadConfig();
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800">
