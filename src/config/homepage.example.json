@@ -1,6 +1,7 @@
 {
   "name": "Display Name",
   "tagline": "Your tagline or bio goes here",
+  "favicon": "",
   "tabs": [
     {
       "label": "Welcome",
