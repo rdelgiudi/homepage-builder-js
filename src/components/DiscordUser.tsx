@@ -439,13 +439,13 @@ export default function DiscordUser() {
   if (loading && !lastDisplayNameRef.current) {
     return (
       <div className="bg-white dark:bg-[#313338] rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="h-28 bg-gray-200 dark:bg-[#313338] animate-pulse" />
+        <div className="h-28 bg-gray-200 dark:bg-[#2b2d31] relative overflow-hidden animate-shimmer" />
         <div className="px-4 pb-4 pt-16 relative">
           <div className="relative -mt-20 mb-2 w-20 h-20">
-            <div className="w-20 h-20 rounded-full bg-gray-200 dark:bg-[#313338] border-4 border-white dark:border-[#313338] animate-pulse" />
+            <div className="w-20 h-20 rounded-full bg-gray-200 dark:bg-[#2b2d31] border-4 border-white dark:border-[#313338] relative overflow-hidden animate-shimmer" />
           </div>
-          <div className="h-5 w-32 bg-gray-200 dark:bg-[#313338] rounded animate-pulse" />
-          <div className="mt-1 h-4 w-24 bg-gray-200 dark:bg-[#313338] rounded animate-pulse" />
+          <div className="h-5 w-32 bg-gray-200 dark:bg-[#2b2d31] rounded relative overflow-hidden animate-shimmer" />
+          <div className="mt-1 h-4 w-24 bg-gray-200 dark:bg-[#2b2d31] rounded relative overflow-hidden animate-shimmer" />
         </div>
       </div>
     );
@@ -532,7 +532,7 @@ export default function DiscordUser() {
                   <span className="text-3xl text-white font-bold">{data?.username?.charAt(0).toUpperCase()}</span>
                 </div>
               )}
-              <div className="absolute bottom-0 right-0 bg-white dark:bg-[#313338] rounded-full p-0.5">
+              <div className={`absolute bottom-0 right-0 bg-white dark:bg-[#313338] rounded-full p-0.5${data?.status === "online" ? " animate-pulse-glow" : ""}`}>
                 <StatusIcon status={data?.status || "offline"} clientStatus={data?.clientStatus} />
               </div>
               {data?.customStatus && (data.customStatus.text || data.customStatus.emoji) && (

@@ -2,6 +2,8 @@
   "name": "Display Name",
   "tagline": "Your tagline or bio goes here",
   "favicon": "",
+  "titleGradient": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
+  "taglineGradient": [],
   "tabs": [
     {
       "label": "Welcome",

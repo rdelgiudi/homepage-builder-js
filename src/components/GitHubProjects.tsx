@@ -76,7 +76,7 @@ function RepoCard({ config, data }: { config: RepoConfig; data: RepoData }) {
       href={data.html_url}
       target="_blank"
       rel="noopener noreferrer"
-      className="block bg-white dark:bg-[#2b2d31] rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+      className="block bg-white dark:bg-[#2b2d31] rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:-translate-y-0.5 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200"
     >
       <div className="flex items-start gap-3">
         <svg className="w-5 h-5 mt-0.5 flex-shrink-0 text-gray-400" viewBox="0 0 16 16" fill="currentColor">
@@ -178,13 +178,13 @@ export default function GitHubProjects({ repos }: { repos: RepoConfig[] }) {
     return (
       <div className="space-y-3">
         {repos.map((r, i) => (
-          <div key={i} className="bg-white dark:bg-[#2b2d31] rounded-lg border border-gray-200 dark:border-gray-700 p-4 animate-pulse">
+          <div key={i} className="bg-white dark:bg-[#2b2d31] rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-start gap-3">
-              <div className="w-5 h-5 rounded bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+              <div className="w-5 h-5 rounded bg-gray-200 dark:bg-[#1e1f22] flex-shrink-0 relative overflow-hidden animate-shimmer" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded" />
-                <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded" />
-                <div className="h-3 w-3/4 bg-gray-200 dark:bg-gray-700 rounded" />
+                <div className="h-4 w-40 bg-gray-200 dark:bg-[#1e1f22] rounded relative overflow-hidden animate-shimmer" />
+                <div className="h-3 w-full bg-gray-200 dark:bg-[#1e1f22] rounded relative overflow-hidden animate-shimmer" />
+                <div className="h-3 w-3/4 bg-gray-200 dark:bg-[#1e1f22] rounded relative overflow-hidden animate-shimmer" />
               </div>
             </div>
           </div>

@@ -174,7 +174,7 @@ function renderSection(section: Section, index: number) {
             <a
               key={i}
               href={item.url}
-              className="flex items-center gap-2 px-5 py-3 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-800 dark:text-white rounded-lg transition-colors"
+              className="flex items-center gap-2 px-5 py-3 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 hover:-translate-y-0.5 hover:shadow-md text-gray-800 dark:text-white rounded-lg transition-all duration-200"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -192,7 +192,7 @@ function renderSection(section: Section, index: number) {
             <a
               key={i}
               href={item.url}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg transition-colors ${
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                 item.style === "primary"
                   ? "bg-blue-600 hover:bg-blue-700 text-white"
                   : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white"
@@ -330,17 +330,17 @@ export default function Tabs({ tabs }: TabsProps) {
 
   return (
     <div className="w-full">
-      <div className="sticky top-0 z-20 w-screen ml-[calc(50%-50vw)] bg-gradient-to-br from-gray-100/90 to-gray-200/90 dark:from-gray-900/90 dark:to-gray-800/90 backdrop-blur-sm border-b border-gray-300 dark:border-gray-700">
+      <div className="sticky top-0 z-20 w-screen ml-[calc(50%-50vw)] bg-gray-100/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-300 dark:border-gray-700">
         <div className="max-w-[870px] mx-auto px-8 flex gap-4 justify-center pt-2 pb-2">
           {tabs.map((tab, index) => (
             <button
               key={index}
               type="button"
               onClick={() => handleTabClick(index)}
-              className={`flex items-center gap-2 px-4 py-2 transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 transition-all duration-200 ${
                 activeTab === index
                   ? "text-blue-600 dark:text-white border-b-2 border-blue-600 dark:border-blue-400"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white hover:scale-105"
               }`}
             >
               {tab.icon && <Icon icon={tab.icon} invertDark={tab.invertDark} />}
@@ -351,7 +351,11 @@ export default function Tabs({ tabs }: TabsProps) {
       </div>
 
       <div className="space-y-8 pt-4">
-        {tabs[activeTab].sections.map((section, index) => renderSection(section, index))}
+        {tabs[activeTab].sections.map((section, index) => (
+          <div key={`section-${activeTab}-${index}`} className="animate-fade-in-up" style={{ animationDelay: `${index * 0.07}s` }}>
+            {renderSection(section, index)}
+          </div>
+        ))}
       </div>
     </div>
   );

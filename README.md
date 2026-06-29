@@ -1,16 +1,17 @@
 # Custom Homepage with Discord, Steam & Overwatch Status
 
-A customizable Next.js homepage with Discord, Steam, and Overwatch integration.
+A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integration.
 
 ## Features
 
 - Tab-based navigation
 - Discord server widget showing member count
-- Discord user presence via WebSocket (instant updates, no polling)
+- Discord user presence via WebSocket (instant updates, no polling, mobile indicator)
 - Steam integration showing recently played games and game library
 - Overwatch 2 stats integration (ranks, hero stats, performance metrics)
+- GitHub project cards (via public API, no key needed)
 - Fully customizable sections (text, links, buttons, headers)
-- Icon support using emoji
+- Icon support using emoji or image URLs
 - Responsive design with Tailwind CSS
 - Light/dark mode support
 - Easy to customize via JSON config files
@@ -25,7 +26,7 @@ A customizable Next.js homepage with Discord, Steam, and Overwatch integration.
 
 ```bash
 npm install
-npm run dev:full  #or "npm run dev" if discord presence bot is not needed
+npm run dev:full  # or "npm run dev" if discord presence bot is not needed
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view your homepage.
@@ -39,6 +40,8 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
   "name": "Your Name",
   "tagline": "Your tagline or bio goes here",
   "favicon": "https://example.com/favicon.svg",
+  "titleGradient": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
+  "taglineGradient": [],
   "tabs": [
     {
       "label": "Home",
@@ -49,25 +52,21 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
       ]
     },
     {
-      "label": "Gaming",
-      "icon": "🎮",
+      "label": "Projects",
+      "icon": "📦",
       "sections": [
-        { "type": "steam", "icon": "🎮", "text": "Find me on Steam!" },
-        { "type": "discord-user", "icon": "👤", "text": "My Discord Status" },
-        { "type": "overwatch", "icon": "🎮", "text": "My Overwatch Stats" }
-      ]
-    },
-    {
-      "label": "Links",
-      "icon": "🔗",
-      "sections": [
-        { "type": "links", "items": [{ "label": "GitHub", "url": "https://github.com/user", "icon": "🐙" }] },
-        { "type": "buttons", "items": [{ "label": "Download", "url": "https://file.pdf", "icon": "📄", "style": "primary" }] }
+        { "type": "github", "icon": "⭐", "text": "Open Source", "repos": [
+          { "owner": "user", "repo": "repo-name", "label": "My Project", "note": "A personal note" }
+        ]}
       ]
     }
   ]
 }
 ```
+
+**Gradient customization:**
+- `titleGradient` — Array of color stops for the animated title text gradient. Defaults to the current blue/purple/pink palette.
+- `taglineGradient` — Color stops for the tagline gradient. Leave empty or omit to inherit `titleGradient` colors.
 
 ### Section Types
 
@@ -78,11 +77,12 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 | `links` | Row of link cards |
 | `buttons` | Action buttons (primary/secondary) |
 | `discord` | Discord server widget |
-| `discord-user` | Discord user presence with activity, status, custom status, and elapsed time |
+| `discord-user` | Discord user presence with activity, status, custom status, elapsed time, and mobile indicator |
 | `steam` | Steam profile, recently played, and top games |
 | `overwatch` | Overwatch 2 stats with competitive ranks, hero stats, and performance metrics |
 | `markdown` | Renders a markdown file from `content/` directory |
 | `meme` | Shows a random meme |
+| `github` | GitHub project cards from public repos |
 
 ## Components Reference
 
@@ -131,6 +131,7 @@ Displays detailed Discord user presence including online status, current activit
 - Elapsed time for current activity
 - "Last seen" timestamp when offline
 - Music track info with album art (Spotify, YouTube Music)
+- **Mobile indicator** — phone icon replaces status dot when on mobile only, appends " · On Mobile"
 
 **Real-time updates:**
 - Presence data pushed via WebSocket — instant updates, no polling
@@ -158,11 +159,11 @@ Displays Steam profile, recently played games, and top games by playtime.
 2. Find your Steam 64-bit ID:
    - Go to https://steamcommunity.com/
    - Find your profile name, expand options and copy click **View my profile**
-   - Copy the **SteamID64** (64-bit ID) from the URL: https<nolink>://steamcommunity.com/profiles/<Your SteamID64\>/
+   - Copy the **SteamID64** (64-bit ID) from the URL
 
 **Features:**
 - Steam profile with avatar and display name
-- Online status indicator (Online, In Game, Away, Offline)
+- Online status indicator with animated pulse glow (blue for Online, green for In Game)
 - Recently played games (last 2 weeks)
 - Top games by total playtime
 - Game cards with box art, playtime, and direct Steam store links
@@ -212,18 +213,45 @@ Displays Overwatch competitive ranks, hero statistics, and performance metrics.
 
 ---
 
-### MemeWidget (`meme`)
+### GitHubProjects (`github`)
 
-Displays a random meme from a SQLite database.
+Displays GitHub project cards with stars, forks, language, license, and update time.
+
+**Config:** no environment variables needed (uses GitHub's public API)
 
 **Features:**
-- Random meme selection
-- Image display with caption
-- Reaction buttons (optional)
+- Repo name (with optional custom label)
+- Optional personal note below the title
+- Description (2-line clamp)
+- Language with colored dot (GitHub-matching colors)
+- Star and fork counts
+- License badge (SPDX ID)
+- "Updated X ago" (shows years for 12+ month old repos)
 
-**Database:**
-- Meme data stored in a SQLite database
-- Requires `better-sqlite3` package
+**Config example in homepage.json:**
+```json
+{
+  "type": "github",
+  "icon": "⭐",
+  "text": "Open Source Projects",
+  "repos": [
+    { "owner": "user", "repo": "my-project", "label": "My Project", "note": "A short personal note" }
+  ]
+}
+```
+
+---
+
+### MemeWidget (`meme`)
+
+Displays a random meme from an external API.
+
+**Config:** no environment variables needed
+
+**Features:**
+- Random meme from r/memes subreddit
+- Image display with title and subreddit source
+- Refresh button for a new meme
 
 ---
 
@@ -234,103 +262,72 @@ Displays a random meme from a SQLite database.
 | Discord User | **WebSocket** (push) | Real-time presence updates via WebSocket with server-side enrichment, 5 min profile cache |
 | Steam | **WebSocket** (push, 10s refresh) | Profile and game data pushed via WebSocket |
 | Overwatch | **WebSocket** (push, 30s refresh) | Stats and ranks pushed via WebSocket |
+| GitHub | **REST** (direct from browser) | Uses unauthenticated `api.github.com` requests in the browser |
+| Visitor Counter | **REST** (server API) | SQLite-backed `/api/visitors` with hashed visitor IDs |
 
 ---
-
-## Customization
 
 ## Project Structure
 
 ```
 ├── src/
 │   ├── config/
-│   │   ├── homepage.json         # Homepage content (name, tagline, favicon, tabs)
+│   │   ├── homepage.json            # All site config
 │   │   └── homepage.example.json
 │   ├── content/
-│   │   ├── about.md              # Example markdown file
+│   │   ├── about.md
 │   │   └── about-example.md
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── discord-server/   # Discord server widget API
+│   │   │   ├── markdown/route.ts    # Markdown API
+│   │   │   ├── meme/route.ts        # Random meme
+│   │   │   └── visitors/route.ts    # Visitor counter (SQLite)
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   └── page.tsx
 │   ├── components/
-│   │   ├── DiscordStatus.tsx      # Discord server widget
-│   │   ├── DiscordUser.tsx        # Discord user presence
-│   │   ├── SteamStatus.tsx        # Steam profile & games
-│   │   ├── OverwatchStatus.tsx       # Overwatch stats
-│   │   ├── MemeWidget.tsx         # Random meme display
-│   │   └── Tabs.tsx               # Tab navigation
+│   │   ├── DiscordStatus.tsx        # Discord server widget
+│   │   ├── DiscordUser.tsx          # Discord user presence
+│   │   ├── SteamStatus.tsx          # Steam profile & games
+│   │   ├── OverwatchStatus.tsx      # Overwatch stats
+│   │   ├── MemeWidget.tsx           # Random meme
+│   │   ├── MarkdownWidget.tsx       # Markdown renderer
+│   │   ├── VisitorCounter.tsx       # Visitor count
+│   │   ├── GitHubProjects.tsx       # GitHub repo cards
+│   │   └── Tabs.tsx                 # Tab navigation
 │   ├── hooks/
-│   │   └── useWebSocket.ts        # WebSocket connection hook
+│   │   └── useWebSocket.ts          # WebSocket hook (singleton)
 │   └── types/
-│       ├── gray-matter.d.ts
-│       └── quantize.d.ts          # Type declaration for quantize
-├── discord-presence.js        # Discord bot for presence updates
-├── websocket-server.js           # Custom Next.js server with WebSocket
-├── next.config.ts
-├── package.json
-└── tsconfig.json
+├── discord-presence.js              # Discord.js bot
+├── websocket-server.js              # Custom server + WebSocket
+├── docker-entrypoint.sh
+├── Dockerfile
+├── docker-compose-example.yml
+├── .env.example
+└── next.config.ts
 ```
 
-## Background Services
-
-### WebSocket Server
-
-The homepage runs on a custom Next.js server (`websocket-server.js`) with WebSocket support on the same port.
-
-The `dev` script automatically starts the WebSocket server alongside Next.js.
-
-### Discord Presence Bot
-
-For Discord user status tracking, run the presence bot:
+## Docker
 
 ```bash
-npm run presence
+npm run docker
 ```
 
-Or run both homepage and presence bot together:
-
-```bash
-npm run dev:full
-```
-
-The bot:
-- Tracks Discord presence (online, idle, DND, offline)
-- Monitors current activity and custom status
-- Records "last seen" timestamp when you go offline
-- Pushes presence data to the homepage server via **WebSocket** (no polling, no extra ports)
-- Watches `DISCORD_USER_ID` env var for user ID changes and automatically re-initializes
-
-**Hot Reload:**
-When you change `DISCORD_USER_ID` in `.env`, the bot detects the change and:
-1. Resets all cached presence data
-2. Immediately starts tracking the new user
-3. No restart required
-
-## Customization
-
-### Changing Colors
-
-Edit the gradient in `src/app/page.tsx`:
-
-```tsx
-className="bg-gradient-to-br from-gray-900 to-gray-800"
-```
-
-### Adding More Tabs
-
-Add more entries to the `tabs` array in `homepage.json`.
+Single container with:
+- Discord presence bot (background)
+- WebSocket server + Next.js (foreground)
+- Named volume for `visitors.db` persistence
+- Optional bind mounts for `src/config/` and `src/content/`
 
 ## Tech Stack
 
 - **Next.js 15** - React framework
 - **TypeScript** - Type safety
 - **Tailwind CSS** - Styling
-- **Discord Widget API** - Server info
+- **Discord API** - User presence & server widget
 - **Steam API** - Game library
 - **OverFast API** - Overwatch 2 stats
+- **GitHub API** - Repo data
 
 ## License
 

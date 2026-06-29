@@ -8,10 +8,18 @@ export const dynamic = "force-dynamic";
 
 const CONFIG_PATH = path.join(process.cwd(), "src/config/homepage.json");
 
-async function loadConfig() {
+interface GradientConfig {
+  name: string;
+  tagline: string;
+  titleGradient?: string[];
+  taglineGradient?: string[];
+  tabs: unknown[];
+}
+
+async function loadConfig(): Promise<GradientConfig> {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
-    return JSON.parse(raw) as { name: string; tagline: string; tabs: unknown[] };
+    return JSON.parse(raw) as GradientConfig;
   } catch {
     return { name: "Homepage", tagline: "Welcome", tabs: [] };
   }
@@ -21,22 +29,29 @@ function TabsFallback() {
   return (
     <div className="w-full">
       <div className="flex gap-4 justify-center mb-6 border-b border-gray-300 dark:border-gray-700 pb-2">
-        <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-        <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+        <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded relative overflow-hidden animate-shimmer" />
+        <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded relative overflow-hidden animate-shimmer" />
       </div>
     </div>
   );
 }
 
 export default async function Home() {
-  const { name, tagline, tabs = [] } = await loadConfig();
+  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, tabs = [] } = await loadConfig();
+  const taglineGradient = rawTaglineGradient?.length ? rawTaglineGradient : titleGradient;
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800">
-      <div className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800 pt-8 pb-4">
+    <main className="min-h-screen bg-gray-100 dark:bg-gray-900">
+      <div className="bg-gray-100 dark:bg-gray-900 pt-8 pb-4">
         <div className="w-full max-w-[870px] mx-auto text-center space-y-4">
-          <h1 className="text-5xl font-bold text-gray-900 dark:text-white">{name}</h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300">{tagline}</p>
+          <h1
+            className={`text-5xl font-bold pb-2${titleGradient?.length ? ' animate-gradient-text' : ' text-gray-900 dark:text-white'}`}
+            style={titleGradient?.length ? { backgroundImage: `linear-gradient(135deg, ${titleGradient.join(', ')})` } : undefined}
+          >{name}</h1>
+          <p
+            className={`text-xl ${taglineGradient?.length ? 'animate-gradient-text' : 'text-gray-600 dark:text-gray-300'}`}
+            style={taglineGradient?.length ? { backgroundImage: `linear-gradient(135deg, ${taglineGradient.join(', ')})` } : undefined}
+          >{tagline}</p>
         </div>
       </div>
 

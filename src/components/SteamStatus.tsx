@@ -40,6 +40,14 @@ const dotColors: Record<string, string> = {
   away: "bg-yellow-500",
 };
 
+const glowColors: Record<string, string> = {
+  "bg-blue-500": "rgba(59, 130, 246, 0.5)",
+  "bg-green-500": "rgba(34, 197, 94, 0.5)",
+  "bg-yellow-500": "rgba(234, 179, 8, 0.5)",
+  "bg-red-500": "rgba(239, 68, 68, 0.5)",
+  "bg-gray-500": "rgba(107, 114, 128, 0.5)",
+};
+
 function getStatus(player: SteamPlayer): { dotColor: string; textColor: string; text: string } {
   const isAway = player.personastate === 3;
   const isBusy = player.personastate === 2;
@@ -184,9 +192,18 @@ export default function SteamStatus() {
             className="rounded-full"
             unoptimized={true}
           />
-          <div
-            className={`absolute bottom-0 right-0 w-5 h-5 rounded-full border-2 border-white dark:border-gray-800 ${status.dotColor}`}
-          />
+          {(() => {
+            const isInGame = !!player.gameextrainfo && player.personastate !== 3;
+            const isOnline = player.personastate === 1 && !player.gameextrainfo;
+            const showGlow = isInGame || isOnline;
+            const glowColor = isInGame ? 'rgba(34, 197, 94, 0.5)' : 'rgba(59, 130, 246, 0.5)';
+            return (
+              <div
+                className={`absolute bottom-0 right-0 w-5 h-5 rounded-full border-2 border-white dark:border-gray-800 ${status.dotColor}${showGlow ? ' animate-pulse-glow' : ''}`}
+                style={showGlow ? { '--glow-color': glowColor } as React.CSSProperties : undefined}
+              />
+            );
+          })()}
         </div>
         <div className="text-left">
           <p className={`font-semibold text-lg ${status.textColor}`}>{player.personaname}</p>
