@@ -50,7 +50,9 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
     "particleBackground": true,
     "gradientBorders": true,
     "tabTransitions": true,
-    "customScrollbar": true
+    "customScrollbar": true,
+    "progressGradient": true,
+    "progressGradientColors": []
   },
   "tabs": [
     {
@@ -89,8 +91,12 @@ Toggle visual effects on or off:
 | `gradientBorders` | Animated gradient border + subtle scale on hover for link cards, buttons, GitHub project cards, Steam "View Profile", and Meme "New Meme" |
 | `tabTransitions` | Smooth crossfade animation when switching between tabs |
 | `customScrollbar` | Thin, rounded scrollbar matching the theme |
+| `progressGradient` | Animated gradient fill on music activity progress bar with sparkle particles |
+| `progressGradientColors` | Custom gradient color stops for the progress bar (falls back to `titleGradient`, then default blue→purple→pink) |
 
 All effects default to `true` if omitted. Set any to `false` to disable.
+
+`progressGradientColors` accepts an array of CSS color strings. When unset it inherits `titleGradient` colors, falling back to a default blue→purple→pink gradient. On track change, the progress bar smoothly shrinks to the new position with burst sparkle particles.
 
 ### Section Types
 
@@ -156,6 +162,9 @@ Displays detailed Discord user presence including online status, current activit
 - "Last seen" timestamp when offline
 - Music track info with album art (Spotify, YouTube Music)
 - **Mobile indicator** — phone icon replaces status dot when on mobile only, appends " · On Mobile"
+- **Animated gradient progress bar** — music progress bar uses moving gradient (matches title colors by default) with sparkle particles at the current position
+- **Crossfade track transitions** — smooth fade-out/fade-in for song changes within the same app (album art, title, and details crossfade without layout shift)
+- **Diminishing progress on track change** — progress bar smoothly shrinks to zero with an intense burst sparkle effect when a new song starts
 
 **Real-time updates:**
 - Presence data pushed via WebSocket — instant updates, no polling

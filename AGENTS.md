@@ -92,6 +92,8 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 | `gradientBorders` | boolean | `true` | Animated gradient border + subtle scale on hover for link cards, buttons, GitHub project cards, Steam "View Profile", and Meme "New Meme" |
 | `tabTransitions` | boolean | `true` | Smooth crossfade when switching tabs |
 | `customScrollbar` | boolean | `true` | Thin rounded scrollbar styling |
+| `progressGradient` | boolean | `true` | Animated gradient fill on music activity progress bar + tiny sparkle particles at the current position |
+| `progressGradientColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the progress bar; falls back to `titleGradient` colors, then to a default blue→purple→pink gradient |
 
 ### Tab sections types:
 
@@ -148,6 +150,37 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 ### Particle twinkle
 - Each particle has its own `twinkleSpeed` and `twinklePhase`.
 - Opacity oscillates between 80–100% of base opacity using `sin(time)` for a subtle star-like twinkle.
+
+### Activity identity key
+- `getActivityKey` uses only `${application_id}-${name}` (stable identity), excluding `state`/`details`.
+- Song changes (same app, different track) keep the same key → content updates in place with no shrink/enlarge animation.
+- Changing apps (e.g., Spotify → game) generates a different key → proper leave/enter animations.
+- Image cooldown keys use the image URL (`album-${url}`, `small-${url}`) instead of activity key, so new album art isn't blocked by a previous failed load.
+
+### Leaving activity lifecycle
+- 0–800ms: `animate-shrink` class plays (vertical shrink first, then horizontal).
+- 800–1100ms: `collapsedKeys` state set — card is `width: 0px` with inline `transform: scale(0,0)`; `animate-shrink` class stays throughout to prevent pop-back from lost `forwards` fill.
+- At 1100ms: card removed from DOM, new data applied, new activities get `animate-enlarge`.
+- `pendingDataRef` guards mid-transition WebSocket messages — latest data stored, activity processing skipped until current animation completes.
+- Width calculation uses `activeCards` (non-collapsed cards only), so remaining cards smoothly expand into vacated space during the collapse phase.
+- **Critical**: activities must render in their **original flex order** (one `allActivities.map()`). Never split into separate `nonLeaving` and `leavingActivities` groups — that moves the leaving card to the end of the flex container, causing remaining cards to jump position before the collapse animation plays. Each card checks `leavingKeySet.has(key)` to decide its animation, preserving DOM order.
+- First data load skips entering animations via `isFirstDataRef`.
+
+### Crossfade text uses absolute positioning
+- During crossfade (song change within same app), old and new details/state text are both rendered to achieve fade-out/fade-in.
+- Old text is wrapped in `absolute inset-0 pointer-events-none` inside a `relative` container so it overlays the new text without affecting layout height.
+- New text flows naturally, providing the layout height. Old text fades out on top.
+- Album art uses the same pattern: old image is `absolute inset-0` inside the `relative w-14` container, new image renders below it.
+
+### Progress bar gradient + sparkles
+- Music activities (type 2 or "youtube music") with timestamps get an animated gradient progress bar.
+- `animate-gradient-bar` class: horizontal gradient shifted via `gradient-shift` 3s animation.
+- Colors come from `effects.progressGradientColors` → `titleGradient` → default blue→purple→pink.
+- When `progressGradient` is `false`, falls back to solid `bg-[#5865F2]` (Discord blurple) with no sparkles.
+- 6 sparkle particles at the current position: 3 white/purple/pink dots (up-right burst via `sparkle` keyframe), 2 blue/light-purple (up-left burst via `sparkle-alt`), 1 tiny white dot filling gaps. Staggered delays 0–0.85s, looping every 1.6–1.8s.
+- Progress percentage extracted as `progressPct` local variable to keep fill width and sparkle position aligned.
+- **Diminish on track change**: When a new song starts (crossfade), the progress bar fill gets `transition: width 0.5s ease-out` and the sparkle container gets `transition: left 0.5s ease-out` so both smoothly animate from the old position to the new (usually ~0%). Normal per-second ticks have `transition: none` to avoid lag.
+- **Burst sparkles**: During crossfade, 6 additional one-shot burst particles (`sparkle-burst` / `sparkle-burst-alt` keyframes, 0.6–0.7s ease-out, not `infinite`) explode outward from the progress position for an intense spark effect as the bar shrinks.
 
 ### npm overrides
 - `package.json` overrides `undici@^6.27.0` to fix high-severity vulns without breaking `discord.js`.

@@ -12,7 +12,9 @@
     "particleBackground": true,
     "gradientBorders": true,
     "tabTransitions": true,
-    "customScrollbar": true
+    "customScrollbar": true,
+    "progressGradient": true,
+    "progressGradientColors": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"]
   },
   "tabs": [
     {

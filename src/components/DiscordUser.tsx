@@ -194,9 +194,7 @@ function getActivityImageUrl(activity: DiscordActivity, userId: string, isLarge:
 
 function getActivityKey(activity: DiscordActivity): string {
   const appId = activity.application_id || "";
-  const state = activity.state || "";
-  const details = activity.details || "";
-  return `${appId}-${activity.name}-${state}-${details}`;
+  return `${appId}-${activity.name}`;
 }
 
 function getActivityTypeIcon(type: number): string {
@@ -369,7 +367,16 @@ async function getVibrantColorFromImage(url: string): Promise<string | null> {
   });
 }
 
-export default function DiscordUser() {
+const DEFAULT_GRADIENT_COLORS = ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"];
+
+interface DiscordUserProps {
+  enableGradient?: boolean;
+  gradientColors?: string[];
+  titleGradientColors?: string[];
+}
+
+export default function DiscordUser({ enableGradient = true, gradientColors, titleGradientColors }: DiscordUserProps) {
+  const resolvedGradient = gradientColors ?? titleGradientColors;
   const [data, setData] = useState<DiscordUserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [imgError, setImgError] = useState(false);
@@ -381,6 +388,15 @@ export default function DiscordUser() {
   const lastAvatarUrlRef = useRef<string | null>(null);
   const lastStatusRef = useRef<string>("offline");
   const lastUsernameRef = useRef<string | null>(null);
+  const [enteringKeys, setEnteringKeys] = useState<Set<string>>(new Set());
+  const [leavingActivities, setLeavingActivities] = useState<Map<string, DiscordActivity>>(new Map());
+  const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(new Set());
+  const prevActivityKeysRef = useRef<Set<string>>(new Set());
+  const prevActivitiesMapRef = useRef<Map<string, DiscordActivity>>(new Map());
+  const isFirstDataRef = useRef(true);
+  const pendingDataRef = useRef<DiscordUserData | null>(null);
+  const prevContentRef = useRef<Map<string, { details: string | null; state: string | null; albumUrl: string | null; progressPct: number }>>(new Map());
+  const [crossfadeContent, setCrossfadeContent] = useState<Map<string, { oldDetails: string | null; oldState: string | null; oldAlbumUrl: string | null; oldProgressPct: number }>>(new Map());
   useEffect(() => {
     const tickInterval = setInterval(() => {
       setTick(t => t + 1);
@@ -412,7 +428,6 @@ export default function DiscordUser() {
           setAvatarColor(null);
           setImgError(false);
         }
-        setData(result);
         dataRef.current = result;
 
         if (result.username) {
@@ -429,6 +444,78 @@ export default function DiscordUser() {
         if (result.status) {
           lastStatusRef.current = result.status;
         }
+
+        if (pendingDataRef.current) {
+          pendingDataRef.current = result;
+          setLoading(false);
+          setActivityImageErrors({});
+          return;
+        }
+
+        const currentActivities = (result.activities || []).filter(
+          (a: DiscordActivity) => a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
+        );
+        const currentKeys = new Set(currentActivities.map((a: DiscordActivity) => getActivityKey(a)));
+
+        if (!isFirstDataRef.current) {
+          const newKeys = new Set([...currentKeys].filter(k => !prevActivityKeysRef.current.has(k)));
+          const removedKeys = new Set([...prevActivityKeysRef.current].filter(k => !currentKeys.has(k)));
+
+          if (removedKeys.size > 0) {
+            const leaving = new Map<string, DiscordActivity>();
+            for (const k of removedKeys) {
+              const act = prevActivitiesMapRef.current.get(k);
+              if (act) leaving.set(k, act);
+            }
+            if (leaving.size > 0) {
+              const oldKeys = new Set(prevActivityKeysRef.current);
+              setLeavingActivities(prev => {
+                const merged = new Map(prev);
+                for (const [k, v] of leaving) merged.set(k, v);
+                return merged;
+              });
+              pendingDataRef.current = result;
+              setTimeout(() => {
+                setCollapsedKeys(new Set(removedKeys));
+                setTimeout(() => {
+                  setCollapsedKeys(new Set());
+                  setLeavingActivities(prev => {
+                    const next = new Map(prev);
+                    for (const k of removedKeys) next.delete(k);
+                    return next;
+                  });
+                  const nextData = pendingDataRef.current;
+                  pendingDataRef.current = null;
+                  if (nextData) {
+                    setData(nextData);
+                    const nextActivities = (nextData.activities || []).filter(
+                      (a: DiscordActivity) => a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
+                    );
+                    const nextKeys = new Set(nextActivities.map((a: DiscordActivity) => getActivityKey(a)));
+                    const entering = new Set([...nextKeys].filter(k => !oldKeys.has(k)));
+                    if (entering.size > 0) {
+                      setEnteringKeys(entering);
+                      setTimeout(() => setEnteringKeys(new Set()), 800);
+                    }
+                  }
+                }, 300);
+              }, 800);
+            }
+          } else {
+            setData(result);
+            if (newKeys.size > 0) {
+              setEnteringKeys(newKeys);
+              setTimeout(() => setEnteringKeys(new Set()), 800);
+            }
+          }
+        } else {
+          setData(result);
+        }
+        isFirstDataRef.current = false;
+        prevActivityKeysRef.current = currentKeys;
+        const currentMap = new Map<string, DiscordActivity>();
+        for (const a of currentActivities) currentMap.set(getActivityKey(a), a);
+        prevActivitiesMapRef.current = currentMap;
 
         setLoading(false);
         setActivityImageErrors({});
@@ -491,6 +578,219 @@ export default function DiscordUser() {
   ) || []).reverse();
   const currentActivity = allActivities[0];
   const otherActivities = allActivities.slice(1);
+
+  const leavingKeySet = new Set(leavingActivities.keys());
+  const activeCards = allActivities.filter((a) => !collapsedKeys.has(getActivityKey(a))).length;
+  const cardWidth = activeCards > 1 ? `calc(${100 / activeCards}% - ${12 * (activeCards - 1) / activeCards}px)` : '100%';
+
+  function renderActivityCard(activity: DiscordActivity, isLeaving: boolean) {
+    const activityKey = getActivityKey(activity);
+    const isEntering = !isLeaving && enteringKeys.has(activityKey);
+    const isCollapsed = isLeaving && collapsedKeys.has(activityKey);
+    const currentAlbumUrl = isCollapsed ? null : resolveImageAsset(activity.albumCover || activity.assets?.large_image || null, activity, data?.id || "");
+    const smallImageUrl = isCollapsed ? null : getActivityImageUrl(activity, data?.id || "", false);
+    const startTime = activity.timestamps?.start;
+    const maxDurationSecs = activity.timestamps?.end && activity.timestamps?.start
+      ? Math.floor((activity.timestamps.end - activity.timestamps.start) / 1000)
+      : null;
+    const rawElapsedSeconds = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+    const isMusicActivity = activity.type === 2 || (activity.name && activity.name.toLowerCase().includes("youtube music"));
+    const elapsedSeconds = isMusicActivity && maxDurationSecs !== null
+      ? Math.min(rawElapsedSeconds, maxDurationSecs)
+      : rawElapsedSeconds;
+    const hours = Math.floor(elapsedSeconds / 3600);
+    const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+    const secs = elapsedSeconds % 60;
+    const elapsedStr = hours > 0
+      ? `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+      : `${minutes}:${secs.toString().padStart(2, '0')}`;
+
+    const progressPct = isMusicActivity && maxDurationSecs !== null
+      ? Math.min(100, (elapsedSeconds / maxDurationSecs) * 100)
+      : 0;
+
+    const currentContent = { details: activity.details, state: activity.state, albumUrl: currentAlbumUrl, progressPct };
+    const prevContent = prevContentRef.current.get(activityKey);
+    const isContentStable = !isLeaving && !isEntering && !isCollapsed;
+    const isContentChanged = isContentStable && prevContent !== undefined && !isOnCooldown(`${activityKey}-album`, activityImageErrors) &&
+      (prevContent.details !== currentContent.details ||
+       prevContent.state !== currentContent.state ||
+       prevContent.albumUrl !== currentContent.albumUrl);
+
+    const existingCrossfade = crossfadeContent.get(activityKey);
+
+    if (!existingCrossfade && isContentChanged) {
+      const oldData = { oldDetails: prevContent!.details, oldState: prevContent!.state, oldAlbumUrl: prevContent!.albumUrl, oldProgressPct: prevContent!.progressPct };
+      setCrossfadeContent(prev => new Map(prev).set(activityKey, oldData));
+      setTimeout(() => {
+        setCrossfadeContent(prev => {
+          const next = new Map(prev);
+          next.delete(activityKey);
+          return next;
+        });
+      }, 550);
+    }
+
+    const crossfadeData = existingCrossfade;
+
+    if (!existingCrossfade) {
+      prevContentRef.current.set(activityKey, currentContent);
+    }
+
+    return (
+      <div key={activityKey} className={`dark:bg-[#2b2d31] bg-[#ebedef] rounded-md p-2 flex items-stretch gap-2 flex-shrink-0 min-w-0 overflow-hidden${isEntering ? ' animate-enlarge' : ''}${isLeaving ? ' animate-shrink' : ''}`} style={{ width: isCollapsed ? '0px' : cardWidth, transform: isLeaving && isCollapsed ? 'scale(0,0)' : undefined, transition: 'width 0.3s ease-out, transform 0s' }}>
+        <div className="relative w-14 aspect-square rounded flex-shrink-0 dark:bg-[#1e1f22] bg-white">
+          {crossfadeData?.oldAlbumUrl && !isOnCooldown(`album-${crossfadeData.oldAlbumUrl}`, activityImageErrors) ? (
+            <div className="absolute inset-0 animate-crossfade-out">
+              <Image
+                src={crossfadeData.oldAlbumUrl}
+                alt=""
+                fill
+                className="object-contain rounded"
+                unoptimized={true}
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          ) : null}
+          <div className={`w-full h-full ${crossfadeData ? 'animate-crossfade-in' : ''}`}>
+            {currentAlbumUrl && !isOnCooldown(`album-${currentAlbumUrl}`, activityImageErrors) ? (
+              <Image
+                key={currentAlbumUrl}
+                src={currentAlbumUrl}
+                alt={activity.name}
+                fill
+                className="object-contain rounded"
+                unoptimized={true}
+                referrerPolicy="no-referrer"
+                onError={() => {
+                  setActivityImageErrors(prev => ({ ...prev, [`album-${currentAlbumUrl}`]: Date.now() }));
+                }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-xl">
+                {activity.type === 0 ? '🎮' : '🎵'}
+              </div>
+            )}
+          </div>
+          {smallImageUrl && !isLeaving && !isOnCooldown(`small-${smallImageUrl}`, activityImageErrors) && (
+            <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full overflow-hidden dark:border-[#2b2d31] border-white">
+              <Image
+                key={smallImageUrl}
+                src={smallImageUrl}
+                alt=""
+                fill
+                className="object-contain"
+                unoptimized={true}
+                referrerPolicy="no-referrer"
+                onError={() => setActivityImageErrors(prev => ({ ...prev, [`small-${smallImageUrl}`]: Date.now() }))}
+              />
+            </div>
+          )}
+          <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 dark:bg-[#2b2d31] bg-white dark:border-[#2b2d31] border-white rounded-full flex items-center justify-center border">
+            <span className="text-sm leading-none">
+              {getActivityTypeIcon(activity.type)}
+            </span>
+          </div>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="dark:text-white text-gray-900 text-xs font-medium truncate">
+            {activity.name}
+          </p>
+          {crossfadeData ? (
+            <div className="relative">
+              <div className="absolute inset-0 animate-crossfade-out pointer-events-none">
+                {crossfadeData.oldDetails && (
+                  <p className="dark:text-[#b5bac1] text-gray-500 text-[10px] truncate">
+                    {crossfadeData.oldDetails}
+                  </p>
+                )}
+                {crossfadeData.oldState && (
+                  <p className="dark:text-[#b5bac1] text-gray-500 text-[10px] truncate">
+                    {crossfadeData.oldState}
+                  </p>
+                )}
+              </div>
+              <div className="animate-crossfade-in">{activity.details && (
+                <p className="dark:text-[#b5bac1] text-gray-500 text-[10px] truncate">
+                  {activity.details}
+                </p>
+              )}
+              {activity.state && (
+                <p className="dark:text-[#b5bac1] text-gray-500 text-[10px] truncate">
+                  {activity.state}
+                </p>
+              )}</div>
+            </div>
+          ) : (
+            <>
+              {!isLeaving && activity.details && (
+                <p key={`details-${activityKey}-${activity.details}`} className="dark:text-[#b5bac1] text-gray-500 text-[10px] truncate">
+                  {activity.details}
+                </p>
+              )}
+              {!isLeaving && activity.state && (
+                <p key={`state-${activityKey}-${activity.state}`} className="dark:text-[#b5bac1] text-gray-500 text-[10px] truncate">
+                  {activity.state}
+                </p>
+              )}
+            </>
+          )}
+          {!isLeaving && ((activity.type === 2) || (activity.name && activity.name.toLowerCase().includes("youtube music"))) && activity.timestamps?.end && activity.timestamps?.start ? (
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="dark:text-[#b5bac1] text-gray-500 text-[8px]">
+                  {elapsedStr}
+                </span>
+                <div className="flex-1 h-1 relative">
+                  <div className="absolute inset-0 dark:bg-[#1e1f22] bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${enableGradient ? '' : 'bg-[#5865F2]'} rounded-full${enableGradient ? ' animate-gradient-bar' : ''}`}
+                      style={enableGradient ? {
+                        width: `${progressPct}%`,
+                        transition: crossfadeData ? 'width 0.5s ease-out' : 'none',
+                        background: resolvedGradient?.length ? `linear-gradient(90deg, ${resolvedGradient.join(', ')})` : undefined,
+                        backgroundSize: resolvedGradient?.length ? '200% 100%' : undefined
+                      } : {
+                        width: `${progressPct}%`,
+                        transition: crossfadeData ? 'width 0.5s ease-out' : 'none'
+                      }}
+                    />
+                  </div>
+                  {enableGradient && (
+                    <div className="absolute top-0 h-full pointer-events-none overflow-visible" style={{ left: `${progressPct}%`, transition: crossfadeData ? 'left 0.5s ease-out' : 'none' }}>
+                      <div className="relative h-full w-4">
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full animate-sparkle-1" style={{ backgroundColor: resolvedGradient?.[2] || '#c084fc' }} />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[2px] rounded-full animate-sparkle-2" style={{ backgroundColor: resolvedGradient?.[1] || '#a78bfa', animationDelay: '0.35s' }} />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[2px] rounded-full animate-sparkle-3" style={{ backgroundColor: resolvedGradient?.[4] || '#f472b6', animationDelay: '0.7s' }} />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[2px] rounded-full animate-sparkle-4" style={{ backgroundColor: resolvedGradient?.[0] || '#60a5fa', animationDelay: '0.15s' }} />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full animate-sparkle-5" style={{ backgroundColor: resolvedGradient?.[3] || '#a78bfa', animationDelay: '0.5s' }} />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[1.5px] h-[1.5px] rounded-full animate-sparkle-6" style={{ backgroundColor: resolvedGradient?.[2] || '#c084fc', animationDelay: '0.85s' }} />
+                        {crossfadeData && (
+                          <>
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[4px] rounded-full animate-sparkle-burst-1" style={{ backgroundColor: resolvedGradient?.[2] || '#c084fc' }} />
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full animate-sparkle-burst-2" style={{ backgroundColor: resolvedGradient?.[0] || '#60a5fa' }} />
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full animate-sparkle-burst-3" style={{ backgroundColor: resolvedGradient?.[4] || '#f472b6' }} />
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[4px] rounded-full animate-sparkle-burst-4" style={{ backgroundColor: resolvedGradient?.[1] || '#a78bfa' }} />
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[2px] rounded-full animate-sparkle-burst-5" style={{ backgroundColor: resolvedGradient?.[3] || '#a78bfa' }} />
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[2px] rounded-full animate-sparkle-burst-6" style={{ backgroundColor: resolvedGradient?.[2] || '#c084fc' }} />
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <span className="dark:text-[#b5bac1] text-gray-500 text-[8px]">
+                  {formatTimeRemaining(activity.timestamps.end - activity.timestamps.start)}
+                </span>
+              </div>
+            ) : !isLeaving && startTime ? (
+              <p className="dark:text-[#b5bac1] text-gray-500 text-[10px]">
+                {elapsedStr}
+              </p>
+            ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white dark:bg-[#313338] rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
@@ -559,111 +859,15 @@ export default function DiscordUser() {
           </div>
 
           <div className="flex items-start gap-4 flex-1 min-w-0 pb-1">
-            {allActivities.length > 0 && (
+            {allActivities.length > 0 ? (
               <div className="flex gap-3 flex-1 min-w-0">
                 {allActivities.map((activity) => {
-                  const activityKey = getActivityKey(activity);
-                  const currentAlbumUrl = resolveImageAsset(activity.albumCover || activity.assets?.large_image || null, activity, data?.id || "");
-                  const smallImageUrl = getActivityImageUrl(activity, data?.id || "", false);
-                  const startTime = activity.timestamps?.start;
-                  const maxDurationSecs = activity.timestamps?.end && activity.timestamps?.start
-                    ? Math.floor((activity.timestamps.end - activity.timestamps.start) / 1000)
-                    : null;
-                  const rawElapsedSeconds = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
-                  const isMusicActivity = activity.type === 2 || (activity.name && activity.name.toLowerCase().includes("youtube music"));
-                  const elapsedSeconds = isMusicActivity && maxDurationSecs !== null
-                    ? Math.min(rawElapsedSeconds, maxDurationSecs)
-                    : rawElapsedSeconds;
-                  const hours = Math.floor(elapsedSeconds / 3600);
-                  const minutes = Math.floor((elapsedSeconds % 3600) / 60);
-                  const secs = elapsedSeconds % 60;
-                  const elapsedStr = hours > 0
-                    ? `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-                    : `${minutes}:${secs.toString().padStart(2, '0')}`;
-                  
-                  return (
-                    <div key={activityKey} className="dark:bg-[#2b2d31] bg-[#ebedef] rounded-md p-2 flex items-stretch gap-2 flex-1 min-w-0">
-                      <div className="relative w-14 aspect-square rounded flex-shrink-0 dark:bg-[#1e1f22] bg-white">
-                        {currentAlbumUrl && !isOnCooldown(`${activityKey}-album`, activityImageErrors) ? (
-                          <Image
-                            key={currentAlbumUrl}
-                            src={currentAlbumUrl}
-                            alt={activity.name}
-                            fill
-                            className="object-contain rounded"
-                            unoptimized={true}
-                            referrerPolicy="no-referrer"
-                            onError={() => {
-                              setActivityImageErrors(prev => ({ ...prev, [`${activityKey}-album`]: Date.now() }));
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-xl">
-                            {activity.type === 0 ? '🎮' : '🎵'}
-                          </div>
-                        )}
-                        {smallImageUrl && !isOnCooldown(`${activityKey}-small`, activityImageErrors) && (
-                          <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full overflow-hidden dark:border-[#2b2d31] border-white">
-                            <Image
-                              key={smallImageUrl}
-                              src={smallImageUrl}
-                              alt=""
-                              fill
-                              className="object-contain"
-                              unoptimized={true}
-                              referrerPolicy="no-referrer"
-                              onError={() => setActivityImageErrors(prev => ({ ...prev, [`${activityKey}-small`]: Date.now() }))}
-                            />
-                          </div>
-                        )}
-                        <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 dark:bg-[#2b2d31] bg-white dark:border-[#2b2d31] border-white rounded-full flex items-center justify-center border">
-                          <span className="text-sm leading-none">
-                            {getActivityTypeIcon(activity.type)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="dark:text-white text-gray-900 text-xs font-medium truncate">
-                          {activity.name}
-                        </p>
-                        {activity.details && (
-                          <p className="dark:text-[#b5bac1] text-gray-500 text-[10px] truncate">
-                            {activity.details}
-                          </p>
-                        )}
-                        {activity.state && (
-                          <p className="dark:text-[#b5bac1] text-gray-500 text-[10px] truncate">
-                            {activity.state}
-                          </p>
-                        )}
-                        {((activity.type === 2) || (activity.name && activity.name.toLowerCase().includes("youtube music"))) && activity.timestamps?.end && activity.timestamps?.start ? (
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <span className="dark:text-[#b5bac1] text-gray-500 text-[8px]">
-                                {elapsedStr}
-                              </span>
-                              <div className="flex-1 h-1 dark:bg-[#1e1f22] bg-gray-200 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-[#5865F2] rounded-full"
-                                  style={{
-                                    width: `${Math.min(100, (elapsedSeconds / Math.floor((activity.timestamps.end - activity.timestamps.start) / 1000)) * 100)}%`
-                                  }}
-                                />
-                              </div>
-                              <span className="dark:text-[#b5bac1] text-gray-500 text-[8px]">
-                                {formatTimeRemaining(activity.timestamps.end - activity.timestamps.start)}
-                              </span>
-                            </div>
-                          ) : startTime ? (
-                            <p className="dark:text-[#b5bac1] text-gray-500 text-[10px]">
-                              {elapsedStr}
-                            </p>
-                          ) : null}
-                      </div>
-                    </div>
-                  );
+                  const key = getActivityKey(activity);
+                  const isLeaving = leavingKeySet.has(key);
+                  return renderActivityCard(activity, isLeaving);
                 })}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

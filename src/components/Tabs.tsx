@@ -148,7 +148,7 @@ interface TabItem {
 
 type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection;
 
-function renderSection(section: Section, index: number, enableGradientBorders?: boolean) {
+function renderSection(section: Section, index: number, enableGradientBorders?: boolean, enableProgressGradient?: boolean, progressGradientColors?: string[], titleGradient?: string[]) {
   const sa = sectionAlign(section);
   switch (section.type) {
     case "header":
@@ -229,7 +229,7 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          <DiscordUser />
+          <DiscordUser enableGradient={enableProgressGradient} gradientColors={progressGradientColors} titleGradientColors={titleGradient} />
         </div>
       );
 
@@ -301,13 +301,16 @@ interface TabsProps {
   tabs: TabItem[];
   enableGradientBorders?: boolean;
   enableTransitions?: boolean;
+  enableProgressGradient?: boolean;
+  progressGradientColors?: string[];
+  titleGradient?: string[];
 }
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
-export default function Tabs({ tabs, enableGradientBorders, enableTransitions }: TabsProps) {
+export default function Tabs({ tabs, enableGradientBorders, enableTransitions, enableProgressGradient, progressGradientColors, titleGradient }: TabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState(0);
@@ -382,7 +385,7 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions }:
             className={enableTransitions && visible ? "animate-fade-in-up" : ""}
             style={enableTransitions && visible ? { animationDelay: `${index * 0.07}s` } : undefined}
           >
-            {renderSection(section, index, enableGradientBorders)}
+            {renderSection(section, index, enableGradientBorders, enableProgressGradient, progressGradientColors, titleGradient)}
           </div>
         ))}
       </div>
