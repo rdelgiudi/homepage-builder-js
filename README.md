@@ -42,6 +42,10 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
   "favicon": "https://example.com/favicon.svg",
   "titleGradient": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
   "taglineGradient": [],
+  "backgroundColor": {
+    "light": "#f3f4f6",
+    "dark": "#111827"
+  },
   "tabs": [
     {
       "label": "Home",
@@ -64,9 +68,10 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 }
 ```
 
-**Gradient customization:**
-- `titleGradient` — Array of color stops for the animated title text gradient. Defaults to the current blue/purple/pink palette.
+**Gradient & background customization:**
+- `titleGradient` — Array of color stops for the animated title text gradient. Omit or empty = solid color.
 - `taglineGradient` — Color stops for the tagline gradient. Leave empty or omit to inherit `titleGradient` colors.
+- `backgroundColor` — Object `{ light: "#f3f4f6", dark: "#111827" }` for page background. Omit or set individual values to keep defaults.
 
 ### Section Types
 

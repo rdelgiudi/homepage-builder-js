@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  --bg-light: #f3f4f6;
+  --bg-dark: #111827;
+}
+
 html, body {
   transition: background-color 500ms ease, color 500ms ease;
 }
@@ -12,13 +17,29 @@ body {
 }
 
 html.dark body {
-  background-color: #111827;
+  background-color: var(--bg-dark);
   color: white;
 }
 
 html:not(.dark) body {
   background-color: white;
   color: #111827;
+}
+
+.bg-page {
+  background-color: var(--bg-light);
+}
+
+html.dark .bg-page {
+  background-color: var(--bg-dark);
+}
+
+.bg-tab-bar {
+  background-color: color-mix(in srgb, var(--bg-light) 90%, transparent);
+}
+
+html.dark .bg-tab-bar {
+  background-color: color-mix(in srgb, var(--bg-dark) 90%, transparent);
 }
 
 main, header, footer, section, article, aside, div {

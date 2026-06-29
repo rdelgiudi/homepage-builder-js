@@ -330,7 +330,7 @@ export default function Tabs({ tabs }: TabsProps) {
 
   return (
     <div className="w-full">
-      <div className="sticky top-0 z-20 w-screen ml-[calc(50%-50vw)] bg-gray-100/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-300 dark:border-gray-700">
+      <div className="sticky top-0 z-20 w-screen ml-[calc(50%-50vw)] bg-tab-bar backdrop-blur-sm border-b border-gray-300 dark:border-gray-700">
         <div className="max-w-[870px] mx-auto px-8 flex gap-4 justify-center pt-2 pb-2">
           {tabs.map((tab, index) => (
             <button

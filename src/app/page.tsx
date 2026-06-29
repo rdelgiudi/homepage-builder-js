@@ -13,6 +13,7 @@ interface GradientConfig {
   tagline: string;
   titleGradient?: string[];
   taglineGradient?: string[];
+  backgroundColor?: { light?: string; dark?: string };
   tabs: unknown[];
 }
 
@@ -37,12 +38,16 @@ function TabsFallback() {
 }
 
 export default async function Home() {
-  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, tabs = [] } = await loadConfig();
+  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, backgroundColor, tabs = [] } = await loadConfig();
   const taglineGradient = rawTaglineGradient?.length ? rawTaglineGradient : titleGradient;
 
+  const bgVars = backgroundColor?.light || backgroundColor?.dark
+    ? { '--bg-light': backgroundColor?.light || '#f3f4f6', '--bg-dark': backgroundColor?.dark || '#111827' } as React.CSSProperties
+    : undefined;
+
   return (
-    <main className="min-h-screen bg-gray-100 dark:bg-gray-900">
-      <div className="bg-gray-100 dark:bg-gray-900 pt-8 pb-4">
+    <main className="min-h-screen bg-page" style={bgVars}>
+      <div className="bg-page pt-8 pb-4">
         <div className="w-full max-w-[870px] mx-auto text-center space-y-4">
           <h1
             className={`text-5xl font-bold pb-2${titleGradient?.length ? ' animate-gradient-text' : ' text-gray-900 dark:text-white'}`}

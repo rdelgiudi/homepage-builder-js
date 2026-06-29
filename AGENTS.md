@@ -77,6 +77,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 | `favicon` | URL for favicon (optional, empty = default) |
 | `titleGradient` | Array of CSS color stops for title gradient text; omit or empty = solid color |
 | `taglineGradient` | Array of CSS color stops for tagline gradient; empty array or omit = inherits `titleGradient` |
+| `backgroundColor` | Object with `light` and `dark` hex colors for page background (defaults: `#f3f4f6` / `#111827`) |
 | `tabs` | Array of tab objects |
 
 ### Tab sections types:
