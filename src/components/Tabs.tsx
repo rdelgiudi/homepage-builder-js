@@ -9,6 +9,7 @@ import SteamStatus from "@/components/SteamStatus";
 import OverwatchStatus from "@/components/OverwatchStatus";
 import MarkdownWidget from "@/components/MarkdownWidget";
 import MemeWidget from "@/components/MemeWidget";
+import GitHubProjects from "@/components/GitHubProjects";
 
 interface LinkItem {
   label: string;
@@ -122,14 +123,30 @@ interface MemeSection {
   invertDark?: boolean;
 }
 
+interface RepoItem {
+  owner: string;
+  repo: string;
+  label?: string;
+  note?: string;
+}
+
+interface GitHubSection {
+  type: "github";
+  repos: RepoItem[];
+  icon?: string;
+  text?: string;
+  align?: Align;
+  invertDark?: boolean;
+}
+
 interface TabItem {
   label: string;
   icon?: string;
   invertDark?: boolean;
-  sections: (TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection)[];
+  sections: (TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection)[];
 }
 
-type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection;
+type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection;
 
 function renderSection(section: Section, index: number) {
   const sa = sectionAlign(section);
@@ -259,6 +276,19 @@ function renderSection(section: Section, index: number) {
             </p>
           )}
           <MemeWidget />
+        </div>
+      );
+
+    case "github":
+      return (
+        <div key={index}>
+          {(section.icon || section.text) && (
+            <p className={`text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2 ${sa}`}>
+              {section.icon && <Icon icon={section.icon} className="text-xl" width={24} height={24} invertDark={section.invertDark} />}
+              {section.text && <span>{section.text}</span>}
+            </p>
+          )}
+          <GitHubProjects repos={section.repos} />
         </div>
       );
 
