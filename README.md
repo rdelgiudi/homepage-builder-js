@@ -38,6 +38,7 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 {
   "name": "Your Name",
   "tagline": "Your tagline or bio goes here",
+  "favicon": "https://example.com/favicon.svg",
   "tabs": [
     {
       "label": "Home",
@@ -89,13 +90,7 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 
 Displays a Discord server widget showing member count and online presence.
 
-**Config file:** `src/config/discord.json`
-
-```json
-{
-  "serverId": "YOUR_DISCORD_SERVER_ID"
-}
-```
+**Config:** `DISCORD_SERVER_ID` environment variable
 
 **Setup:**
 1. Open Discord and go to your server
@@ -115,14 +110,7 @@ Displays a Discord server widget showing member count and online presence.
 
 Displays detailed Discord user presence including online status, current activity, custom status, and elapsed time.
 
-**Config file:** `src/config/discord-user.json`
-
-```json
-{
-  "userId": "123456789012345678",
-  "botToken": "YOUR_BOT_TOKEN"
-}
-```
+**Config:** `DISCORD_USER_ID` and `DISCORD_BOT_TOKEN` environment variables
 
 **Setup:**
 1. Enable **Developer Mode** in Discord (User Settings > Advanced > Developer Mode)
@@ -160,14 +148,7 @@ Displays detailed Discord user presence including online status, current activit
 
 Displays Steam profile, recently played games, and top games by playtime.
 
-**Config file:** `src/config/steam.json`
-
-```json
-{
-  "apiKey": "YOUR_STEAM_API_KEY",
-  "steamId": "YOUR_STEAM_64_BIT_ID"
-}
-```
+**Config:** `STEAM_API_KEY` and `STEAM_ID` environment variables
 
 **Setup:**
 1. Get a Steam API key: https://steamcommunity.com/dev/apikey
@@ -197,13 +178,7 @@ Displays Steam profile, recently played games, and top games by playtime.
 
 Displays Overwatch competitive ranks, hero statistics, and performance metrics.
 
-**Config file:** `src/config/overwatch.json`
-
-```json
-{
-  "battleTag": "Username-12345"
-}
-```
+**Config:** `OVERWATCH_BATTLE_TAG` environment variable
 
 **Setup:**
 1. Enter your BattleTag in format `Username-12345` (case-sensitive)
@@ -269,15 +244,11 @@ Displays a random meme from a SQLite database.
 ```
 ├── src/
 │   ├── config/
-│   │   ├── discord.json          # Discord Server ID (for widget)
-│   │   ├── discord-user.json     # Discord User ID & Bot Token (for presence)
-│   │   ├── homepage.json         # Homepage content
-│   │   ├── homepage.example.json
-│   │   ├── steam.json            # Steam API key & ID
-│   │   ├── overwatch.json       # BattleTag for Overwatch
-│   │   └── *.example.json        # Example configs for reference
+│   │   ├── homepage.json         # Homepage content (name, tagline, favicon, tabs)
+│   │   └── homepage.example.json
 │   ├── content/
-│   │   └── about.md              # Example markdown file
+│   │   ├── about.md              # Example markdown file
+│   │   └── about-example.md
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── discord-server/   # Discord server widget API
@@ -330,10 +301,10 @@ The bot:
 - Monitors current activity and custom status
 - Records "last seen" timestamp when you go offline
 - Pushes presence data to the homepage server via **WebSocket** (no polling, no extra ports)
-- Watches `src/config/discord-user.json` for user ID changes and automatically re-initializes
+- Watches `DISCORD_USER_ID` env var for user ID changes and automatically re-initializes
 
 **Hot Reload:**
-When you change the `userId` in `discord-user.json`, the bot detects the change and:
+When you change `DISCORD_USER_ID` in `.env`, the bot detects the change and:
 1. Resets all cached presence data
 2. Immediately starts tracking the new user
 3. No restart required
