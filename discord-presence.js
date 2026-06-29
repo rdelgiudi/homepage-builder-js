@@ -44,9 +44,7 @@ function buildPresenceFromMember(member, previousNickname) {
   );
 
   const isOnline = member.presence?.status && member.presence.status !== 'offline';
-  const lastSeenTimestamp = isOnline || userPresence.lastSeen
-    ? userPresence.lastSeen
-    : new Date().toISOString();
+  const lastSeenTimestamp = isOnline ? null : (userPresence.lastSeen || new Date().toISOString());
 
   return {
     status: member.presence?.status || 'offline',
@@ -72,6 +70,7 @@ function buildPresenceFromMember(member, previousNickname) {
           emoji: customStatusActivity.emoji?.name || null,
         }
       : null,
+    clientStatus: member.presence?.clientStatus || null,
     lastSeen: lastSeenTimestamp,
     lastUpdated: new Date().toISOString(),
     nickname: member.nickname || previousNickname || null,

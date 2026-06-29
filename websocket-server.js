@@ -428,6 +428,7 @@ async function enrichPresence(rawPresence) {
     accentColor: userData.accent_color || null,
     globalNickname: null,
     status: rawPresence.status,
+    clientStatus: rawPresence.clientStatus || null,
     activities,
     customStatus: rawPresence.customStatus,
     lastSeen: rawPresence.lastSeen,

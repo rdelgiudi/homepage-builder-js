@@ -21,6 +21,12 @@ interface DiscordActivity {
   albumCover?: string | null;
 }
 
+interface DiscordClientStatus {
+  desktop?: string;
+  mobile?: string;
+  web?: string;
+}
+
 interface DiscordUserData {
   id: string;
   username: string;
@@ -31,6 +37,7 @@ interface DiscordUserData {
   accentColor: number | null;
   globalNickname?: string | null;
   status?: string;
+  clientStatus?: DiscordClientStatus | null;
   activities?: DiscordActivity[];
   customStatus?: { text: string | null; emoji: string | null } | null;
   lastSeen?: string | null;
@@ -54,10 +61,18 @@ const statusText: Record<string, string> = {
   streaming: "Streaming",
 };
 
-function StatusIcon({ status }: { status: string }) {
+function StatusIcon({ status, clientStatus }: { status: string; clientStatus?: DiscordClientStatus | null }) {
   const size = 24;
   const color = statusColors[status] || statusColors.offline;
-  const borderColor = "#ffffff";
+  const isMobile = clientStatus?.mobile && !clientStatus?.desktop;
+
+  if (isMobile) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 1000 1500" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 187 0 L 813 0 C 916.277 0 1000 83.723 1000 187 L 1000 1313 C 1000 1416.277 916.277 1500 813 1500 L 187 1500 C 83.723 1500 0 1416.277 0 1313 L 0 187 C 0 83.723 83.723 0 187 0 Z M 125 1000 L 875 1000 L 875 250 L 125 250 Z M 500 1125 C 430.964 1125 375 1180.964 375 1250 C 375 1319.036 430.964 1375 500 1375 C 569.036 1375 625 1319.036 625 1250 C 625 1180.964 569.036 1125 500 1125 Z" fill={color} />
+      </svg>
+    );
+  }
 
   switch (status) {
     case "online":
@@ -518,7 +533,7 @@ export default function DiscordUser() {
                 </div>
               )}
               <div className="absolute bottom-0 right-0 bg-white dark:bg-[#313338] rounded-full p-0.5">
-                <StatusIcon status={data?.status || "offline"} />
+                <StatusIcon status={data?.status || "offline"} clientStatus={data?.clientStatus} />
               </div>
               {data?.customStatus && (data.customStatus.text || data.customStatus.emoji) && (
                 <div className="absolute bottom-8 left-full ml-2 w-40 max-w-[160px]">
@@ -538,6 +553,7 @@ export default function DiscordUser() {
               <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
                 {statusText[data.status] || data.status}
                 {data.status === "offline" && data?.lastSeen ? ` · Last seen ${formatLastSeen(data.lastSeen)}` : ""}
+                {data?.clientStatus?.mobile && !data?.clientStatus?.desktop && data.status !== "offline" ? " · On Mobile" : ""}
               </p>
             )}
           </div>
