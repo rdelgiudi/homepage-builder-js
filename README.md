@@ -85,7 +85,7 @@ Toggle visual effects on or off:
 
 | Effect | Description |
 |--------|-------------|
-| `particleBackground` | Floating particles in the background, color-adaptive for light/dark mode |
+| `particleBackground` | Floating particles with star-like twinkle, color-adaptive for light/dark mode |
 | `gradientBorders` | Animated gradient border + subtle scale on hover for link cards, buttons, GitHub project cards, Steam "View Profile", and Meme "New Meme" |
 | `tabTransitions` | Smooth crossfade animation when switching between tabs |
 | `customScrollbar` | Thin, rounded scrollbar matching the theme |
@@ -241,7 +241,7 @@ Displays Overwatch competitive ranks, hero statistics, and performance metrics.
 
 Displays GitHub project cards with stars, forks, language, license, and update time.
 
-**Config:** no environment variables needed (uses GitHub's public API)
+**Config:** no environment variables needed
 
 **Features:**
 - Repo name (with optional custom label)
@@ -251,6 +251,13 @@ Displays GitHub project cards with stars, forks, language, license, and update t
 - Star and fork counts
 - License badge (SPDX ID)
 - "Updated X ago" (shows years for 12+ month old repos)
+- Failed repos still show a card with name, note, and error message
+
+**Caching:**
+- Data fetched server-side via `/api/github`
+- Successful responses cached in-memory for 6 hours
+- Failed responses cached for 10 minutes to avoid retry storms
+- No GitHub API key needed
 
 **Config example in homepage.json:**
 ```json
@@ -286,7 +293,7 @@ Displays a random meme from an external API.
 | Discord User | **WebSocket** (push) | Real-time presence updates via WebSocket with server-side enrichment, 5 min profile cache |
 | Steam | **WebSocket** (push, 10s refresh) | Profile and game data pushed via WebSocket |
 | Overwatch | **WebSocket** (push, 30s refresh) | Stats and ranks pushed via WebSocket |
-| GitHub | **REST** (direct from browser) | Uses unauthenticated `api.github.com` requests in the browser |
+| GitHub | **REST** (server API, 6h cache) | `/api/github` proxies GitHub API, caches success 6h, errors 10m |
 | Visitor Counter | **REST** (server API) | SQLite-backed `/api/visitors` with hashed visitor IDs |
 
 ---
@@ -303,6 +310,7 @@ Displays a random meme from an external API.
 │   │   └── about-example.md
 │   ├── app/
 │   │   ├── api/
+│   │   │   ├── github/route.ts      # GitHub repo data (6h cache)
 │   │   │   ├── markdown/route.ts    # Markdown API
 │   │   │   ├── meme/route.ts        # Random meme
 │   │   │   └── visitors/route.ts    # Visitor counter (SQLite)

@@ -15,6 +15,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 ├── src/
 │   ├── app/
 │   │   ├── api/
+│   │   │   ├── github/route.ts      # GitHub repo data with 6h cache, 10m error cache
 │   │   │   ├── markdown/route.ts    # Reads markdown from src/content/ at runtime
 │   │   │   ├── meme/route.ts        # Random meme from external API
 │   │   │   └── visitors/route.ts    # Visitor counter (SQLite)
@@ -87,7 +88,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `particleBackground` | boolean | `true` | Floating canvas particles, adapts to light/dark mode |
+| `particleBackground` | boolean | `true` | Floating canvas particles with star-like twinkle, adapts to light/dark mode |
 | `gradientBorders` | boolean | `true` | Animated gradient border + subtle scale on hover for link cards, buttons, GitHub project cards, Steam "View Profile", and Meme "New Meme" |
 | `tabTransitions` | boolean | `true` | Smooth crossfade when switching tabs |
 | `customScrollbar` | boolean | `true` | Thin rounded scrollbar styling |
@@ -133,6 +134,20 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 ### Markdown files are runtime, not bundled
 - API route `/api/markdown` reads `src/content/` via `fs.readFileSync` at request time.
 - Not imported/bundled.
+
+### GitHub API caching
+- `/api/github` fetches repo data server-side and caches successfully in-memory for 6 hours.
+- Failed fetches are cached for 10 minutes to avoid hammering GitHub on retries.
+- Error cards still render with repo name/note and a "Failed to load" message.
+
+### Tab transitions are sequential
+- `Tabs.tsx` uses a 3-phase transition: fade out → wait → swap content → next frame → fade in.
+- A `transitioning` ref prevents double-clicks during the animation.
+- Configurable via `enableTransitions` prop from `effects.tabTransitions` in homepage.json.
+
+### Particle twinkle
+- Each particle has its own `twinkleSpeed` and `twinklePhase`.
+- Opacity oscillates between 80–100% of base opacity using `sin(time)` for a subtle star-like twinkle.
 
 ### npm overrides
 - `package.json` overrides `undici@^6.27.0` to fix high-severity vulns without breaking `discord.js`.
