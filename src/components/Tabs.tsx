@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import DiscordStatus from "@/components/DiscordStatus";
@@ -313,6 +313,7 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions }:
   const [activeTab, setActiveTab] = useState(0);
   const [mountedTab, setMountedTab] = useState(0);
   const [visible, setVisible] = useState(true);
+  const transitioning = useRef(false);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
@@ -326,19 +327,24 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions }:
   }, [searchParams, tabs, mountedTab]);
 
   const handleTabClick = (index: number) => {
-    if (index === mountedTab) return;
+    if (index === mountedTab || transitioning.current) return;
     setActiveTab(index);
+    const newUrl = `${window.location.pathname}?tab=${slugify(tabs[index].label)}`;
+    router.push(newUrl, { scroll: false });
+
     if (enableTransitions) {
+      transitioning.current = true;
       setVisible(false);
       setTimeout(() => {
         setMountedTab(index);
-        setVisible(true);
-      }, 200);
+        requestAnimationFrame(() => {
+          setVisible(true);
+          transitioning.current = false;
+        });
+      }, 150);
     } else {
       setMountedTab(index);
     }
-    const newUrl = `${window.location.pathname}?tab=${slugify(tabs[index].label)}`;
-    router.push(newUrl, { scroll: false });
   };
 
   if (tabs.length === 0) return null;
@@ -366,7 +372,7 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions }:
       </div>
 
       <div
-        className={`space-y-8 pt-4${enableTransitions ? ' transition-all duration-150 ease-out' : ''} ${
+        className={`space-y-8 pt-4${enableTransitions ? ' transition-all duration-100 ease-out' : ''} ${
           visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
         }`}
       >

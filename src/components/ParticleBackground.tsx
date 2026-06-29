@@ -9,7 +9,10 @@ interface Particle {
   vy: number;
   size: number;
   opacity: number;
+  baseOpacity: number;
   color: string;
+  twinkleSpeed: number;
+  twinklePhase: number;
 }
 
 export default function ParticleBackground() {
@@ -32,15 +35,21 @@ export default function ParticleBackground() {
     function initParticles() {
       const c = getCount();
       const isDark = document.documentElement.classList.contains("dark");
-      particles = Array.from({ length: c }, () => ({
-        x: Math.random() * (canvas?.width || window.innerWidth),
-        y: Math.random() * (canvas?.height || window.innerHeight),
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
-        size: Math.random() * 3 + 1.5,
-        opacity: isDark ? Math.random() * 0.5 + 0.3 : Math.random() * 0.5 + 0.4,
-        color: isDark ? "148, 163, 184" : "75, 85, 99",
-      }));
+      particles = Array.from({ length: c }, () => {
+        const base = isDark ? Math.random() * 0.5 + 0.3 : Math.random() * 0.5 + 0.4;
+        return {
+          x: Math.random() * (canvas?.width || window.innerWidth),
+          y: Math.random() * (canvas?.height || window.innerHeight),
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: (Math.random() - 0.5) * 0.3,
+          size: Math.random() * 3 + 1.5,
+          opacity: base,
+          baseOpacity: base,
+          color: isDark ? "148, 163, 184" : "75, 85, 99",
+          twinkleSpeed: Math.random() * 0.004 + 0.002,
+          twinklePhase: Math.random() * Math.PI * 2,
+        };
+      });
     }
 
     function resize() {
@@ -49,7 +58,7 @@ export default function ParticleBackground() {
       initParticles();
     }
 
-    function animate() {
+    function animate(now: number) {
       ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
 
       for (const p of particles) {
@@ -61,9 +70,12 @@ export default function ParticleBackground() {
         if (p.y < 0) p.y = canvas!.height;
         if (p.y > canvas!.height) p.y = 0;
 
+        const twinkle = 0.8 + 0.2 * Math.sin(now * p.twinkleSpeed + p.twinklePhase);
+        const opacity = p.baseOpacity * twinkle;
+
         ctx!.beginPath();
         ctx!.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx!.fillStyle = `rgba(${p.color}, ${p.opacity})`;
+        ctx!.fillStyle = `rgba(${p.color}, ${opacity})`;
         ctx!.fill();
       }
 
@@ -76,9 +88,11 @@ export default function ParticleBackground() {
     const observer = new MutationObserver(() => {
       const isDark = document.documentElement.classList.contains("dark");
       for (const p of particles) {
-        p.opacity = isDark
+        const base = isDark
           ? Math.random() * 0.5 + 0.3
           : Math.random() * 0.5 + 0.4;
+        p.baseOpacity = base;
+        p.opacity = base;
         p.color = isDark ? "148, 163, 184" : "75, 85, 99";
       }
     });
@@ -87,7 +101,7 @@ export default function ParticleBackground() {
       attributeFilter: ["class"],
     });
 
-    animate();
+    animate(performance.now());
 
     return () => {
       cancelAnimationFrame(animId);
@@ -99,7 +113,7 @@ export default function ParticleBackground() {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed pointer-events-none z-10"
+      className="fixed pointer-events-none -z-10"
       style={{ top: 0, right: 0, bottom: 0, left: 0, width: "100vw", height: "100vh" }}
     />
   );
