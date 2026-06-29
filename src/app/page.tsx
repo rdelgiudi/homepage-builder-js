@@ -1,5 +1,6 @@
 import Tabs from "@/components/Tabs";
 import VisitorCounter from "@/components/VisitorCounter";
+import EffectsController from "@/components/EffectsController";
 import { Suspense } from "react";
 import fs from "fs";
 import path from "path";
@@ -8,12 +9,20 @@ export const dynamic = "force-dynamic";
 
 const CONFIG_PATH = path.join(process.cwd(), "src/config/homepage.json");
 
+interface EffectsConfig {
+  particleBackground?: boolean;
+  gradientBorders?: boolean;
+  tabTransitions?: boolean;
+  customScrollbar?: boolean;
+}
+
 interface GradientConfig {
   name: string;
   tagline: string;
   titleGradient?: string[];
   taglineGradient?: string[];
   backgroundColor?: { light?: string; dark?: string };
+  effects?: EffectsConfig;
   tabs: unknown[];
 }
 
@@ -38,7 +47,7 @@ function TabsFallback() {
 }
 
 export default async function Home() {
-  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, backgroundColor, tabs = [] } = await loadConfig();
+  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, backgroundColor, effects, tabs = [] } = await loadConfig();
   const taglineGradient = rawTaglineGradient?.length ? rawTaglineGradient : titleGradient;
 
   const bgVars = backgroundColor?.light || backgroundColor?.dark
@@ -46,7 +55,8 @@ export default async function Home() {
     : undefined;
 
   return (
-    <main className="min-h-screen bg-page" style={bgVars}>
+    <main className="min-h-screen bg-page relative z-10" style={bgVars}>
+      <EffectsController effects={{ particleBackground: true, customScrollbar: true, ...effects }} />
       <div className="bg-page pt-8 pb-4">
         <div className="w-full max-w-[870px] mx-auto text-center space-y-4">
           <h1
@@ -62,7 +72,7 @@ export default async function Home() {
 
       <div className="w-full max-w-[870px] mx-auto px-8 pb-8">
         <Suspense fallback={<TabsFallback />}>
-          <Tabs tabs={tabs as Parameters<typeof Tabs>[0]["tabs"]} />
+          <Tabs tabs={tabs as Parameters<typeof Tabs>[0]["tabs"]} enableGradientBorders={effects?.gradientBorders ?? true} enableTransitions={effects?.tabTransitions ?? true} />
         </Suspense>
       </div>
 

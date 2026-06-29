@@ -12,7 +12,7 @@ interface Meme {
   nsfw: boolean;
 }
 
-export default function MemeWidget() {
+export default function MemeWidget({ enableGradientBorders }: { enableGradientBorders?: boolean }) {
   const [meme, setMeme] = useState<Meme | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -82,7 +82,7 @@ export default function MemeWidget() {
       <button
         onClick={fetchMeme}
         disabled={refreshing}
-        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm flex items-center gap-2"
+        className={`px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-lg transition-all text-sm flex items-center gap-2 hover:scale-105${enableGradientBorders ? ' gradient-border-card' : ''}`}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"

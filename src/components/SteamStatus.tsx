@@ -133,7 +133,7 @@ function GameSection({ title, games }: { title: string; games: SteamGame[] }) {
   );
 }
 
-export default function SteamStatus() {
+export default function SteamStatus({ enableGradientBorders }: { enableGradientBorders?: boolean }) {
   const [data, setData] = useState<SteamData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -213,7 +213,7 @@ export default function SteamStatus() {
           href={`https://steamcommunity.com/profiles/${player.steamid}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="ml-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
+          className={`ml-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-all hover:scale-105${enableGradientBorders ? ' gradient-border-card' : ''}`}
         >
           View Profile
         </a>

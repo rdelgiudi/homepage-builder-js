@@ -148,7 +148,7 @@ interface TabItem {
 
 type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection;
 
-function renderSection(section: Section, index: number) {
+function renderSection(section: Section, index: number, enableGradientBorders?: boolean) {
   const sa = sectionAlign(section);
   switch (section.type) {
     case "header":
@@ -174,7 +174,7 @@ function renderSection(section: Section, index: number) {
             <a
               key={i}
               href={item.url}
-              className="flex items-center gap-2 px-5 py-3 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 hover:-translate-y-0.5 hover:shadow-md text-gray-800 dark:text-white rounded-lg transition-all duration-200"
+              className={`flex items-center gap-2 px-5 py-3 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 hover:-translate-y-0.5 hover:shadow-md hover:scale-105 text-gray-800 dark:text-white rounded-lg transition-all duration-200${enableGradientBorders ? ' gradient-border-card' : ''}`}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -192,7 +192,7 @@ function renderSection(section: Section, index: number) {
             <a
               key={i}
               href={item.url}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+              className={`flex items-center gap-2 px-6 py-3 rounded-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:scale-105${enableGradientBorders ? ' gradient-border-card' : ''} ${
                 item.style === "primary"
                   ? "bg-blue-600 hover:bg-blue-700 text-white"
                   : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white"
@@ -242,7 +242,7 @@ function renderSection(section: Section, index: number) {
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          <SteamStatus />
+          <SteamStatus enableGradientBorders={enableGradientBorders} />
         </div>
       );
 
@@ -275,7 +275,7 @@ function renderSection(section: Section, index: number) {
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          <MemeWidget />
+          <MemeWidget enableGradientBorders={enableGradientBorders} />
         </div>
       );
 
@@ -288,7 +288,7 @@ function renderSection(section: Section, index: number) {
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          <GitHubProjects repos={section.repos} />
+          <GitHubProjects repos={section.repos} enableGradientBorders={enableGradientBorders} />
         </div>
       );
 
@@ -299,29 +299,44 @@ function renderSection(section: Section, index: number) {
 
 interface TabsProps {
   tabs: TabItem[];
+  enableGradientBorders?: boolean;
+  enableTransitions?: boolean;
 }
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
-export default function Tabs({ tabs }: TabsProps) {
+export default function Tabs({ tabs, enableGradientBorders, enableTransitions }: TabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState(0);
+  const [mountedTab, setMountedTab] = useState(0);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam) {
       const index = tabs.findIndex((t) => slugify(t.label) === tabParam);
-      if (index !== -1) {
+      if (index !== -1 && index !== mountedTab) {
         setActiveTab(index);
+        setMountedTab(index);
       }
     }
-  }, [searchParams, tabs]);
+  }, [searchParams, tabs, mountedTab]);
 
   const handleTabClick = (index: number) => {
+    if (index === mountedTab) return;
     setActiveTab(index);
+    if (enableTransitions) {
+      setVisible(false);
+      setTimeout(() => {
+        setMountedTab(index);
+        setVisible(true);
+      }, 200);
+    } else {
+      setMountedTab(index);
+    }
     const newUrl = `${window.location.pathname}?tab=${slugify(tabs[index].label)}`;
     router.push(newUrl, { scroll: false });
   };
@@ -340,7 +355,7 @@ export default function Tabs({ tabs }: TabsProps) {
               className={`flex items-center gap-2 px-4 py-2 transition-all duration-200 ${
                 activeTab === index
                   ? "text-blue-600 dark:text-white border-b-2 border-blue-600 dark:border-blue-400"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white hover:scale-105"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white hover:scale-105 gradient-tab"
               }`}
             >
               {tab.icon && <Icon icon={tab.icon} invertDark={tab.invertDark} />}
@@ -350,10 +365,18 @@ export default function Tabs({ tabs }: TabsProps) {
         </div>
       </div>
 
-      <div className="space-y-8 pt-4">
-        {tabs[activeTab].sections.map((section, index) => (
-          <div key={`section-${activeTab}-${index}`} className="animate-fade-in-up" style={{ animationDelay: `${index * 0.07}s` }}>
-            {renderSection(section, index)}
+      <div
+        className={`space-y-8 pt-4${enableTransitions ? ' transition-all duration-150 ease-out' : ''} ${
+          visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
+        }`}
+      >
+        {tabs[mountedTab].sections.map((section, index) => (
+          <div
+            key={`section-${mountedTab}-${index}`}
+            className={enableTransitions && visible ? "animate-fade-in-up" : ""}
+            style={enableTransitions && visible ? { animationDelay: `${index * 0.07}s` } : undefined}
+          >
+            {renderSection(section, index, enableGradientBorders)}
           </div>
         ))}
       </div>

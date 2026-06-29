@@ -68,7 +68,7 @@ function timeAgo(iso: string): string {
   return `${years}yr ago`;
 }
 
-function RepoCard({ config, data }: { config: RepoConfig; data: RepoData }) {
+function RepoCard({ config, data, enableGradientBorders }: { config: RepoConfig; data: RepoData; enableGradientBorders?: boolean }) {
   const langColor = languageColors[data.language || ""] || "#6b7280";
 
   return (
@@ -76,7 +76,7 @@ function RepoCard({ config, data }: { config: RepoConfig; data: RepoData }) {
       href={data.html_url}
       target="_blank"
       rel="noopener noreferrer"
-      className="block bg-white dark:bg-[#2b2d31] rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:-translate-y-0.5 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200"
+      className={`block bg-white dark:bg-[#2b2d31] rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:-translate-y-0.5 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 hover:scale-105 transition-all duration-200${enableGradientBorders ? ' gradient-border-card' : ''}`}
     >
       <div className="flex items-start gap-3">
         <svg className="w-5 h-5 mt-0.5 flex-shrink-0 text-gray-400" viewBox="0 0 16 16" fill="currentColor">
@@ -131,7 +131,7 @@ function RepoCard({ config, data }: { config: RepoConfig; data: RepoData }) {
   );
 }
 
-export default function GitHubProjects({ repos }: { repos: RepoConfig[] }) {
+export default function GitHubProjects({ repos, enableGradientBorders }: { repos: RepoConfig[]; enableGradientBorders?: boolean }) {
   const [repoData, setRepoData] = useState<Record<string, RepoData>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -235,7 +235,7 @@ export default function GitHubProjects({ repos }: { repos: RepoConfig[] }) {
 
         if (!data) return null;
 
-        return <RepoCard key={i} config={config} data={data} />;
+        return <RepoCard key={i} config={config} data={data} enableGradientBorders={enableGradientBorders} />;
       })}
     </div>
   );

@@ -46,6 +46,12 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
     "light": "#f3f4f6",
     "dark": "#111827"
   },
+  "effects": {
+    "particleBackground": true,
+    "gradientBorders": true,
+    "tabTransitions": true,
+    "customScrollbar": true
+  },
   "tabs": [
     {
       "label": "Home",
@@ -72,6 +78,19 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 - `titleGradient` — Array of color stops for the animated title text gradient. Omit or empty = solid color.
 - `taglineGradient` — Color stops for the tagline gradient. Leave empty or omit to inherit `titleGradient` colors.
 - `backgroundColor` — Object `{ light: "#f3f4f6", dark: "#111827" }` for page background. Omit or set individual values to keep defaults.
+
+### Effects (`effects`)
+
+Toggle visual effects on or off:
+
+| Effect | Description |
+|--------|-------------|
+| `particleBackground` | Floating particles in the background, color-adaptive for light/dark mode |
+| `gradientBorders` | Animated gradient border + subtle scale on hover for link cards, buttons, GitHub project cards, Steam "View Profile", and Meme "New Meme" |
+| `tabTransitions` | Smooth crossfade animation when switching between tabs |
+| `customScrollbar` | Thin, rounded scrollbar matching the theme |
+
+All effects default to `true` if omitted. Set any to `false` to disable.
 
 ### Section Types
 
@@ -299,7 +318,9 @@ Displays a random meme from an external API.
 │   │   ├── MarkdownWidget.tsx       # Markdown renderer
 │   │   ├── VisitorCounter.tsx       # Visitor count
 │   │   ├── GitHubProjects.tsx       # GitHub repo cards
-│   │   └── Tabs.tsx                 # Tab navigation
+│   │   ├── Tabs.tsx                 # Tab navigation
+│   │   ├── ParticleBackground.tsx   # Particle background effect
+│   │   └── EffectsController.tsx    # Conditional effects renderer
 │   ├── hooks/
 │   │   └── useWebSocket.ts          # WebSocket hook (singleton)
 │   └── types/

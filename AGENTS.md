@@ -30,7 +30,9 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── MarkdownWidget.tsx       # Fetches from /api/markdown, renders react-markdown
 │   │   ├── VisitorCounter.tsx       # Visitor count display
 │   │   ├── GitHubProjects.tsx       # GitHub repo cards (public API, no key needed)
-│   │   └── Tabs.tsx                 # Tab navigation w/ header + icon + sections
+│   │   ├── Tabs.tsx                 # Tab navigation w/ header + icon + sections
+│   │   ├── ParticleBackground.tsx   # Canvas floating particles
+│   │   └── EffectsController.tsx    # Conditionally renders effects based on config
 │   ├── config/
 │   │   ├── homepage.json            # ALL site config: name, tagline, favicon, tabs
 │   │   └── homepage.example.json
@@ -78,7 +80,17 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 | `titleGradient` | Array of CSS color stops for title gradient text; omit or empty = solid color |
 | `taglineGradient` | Array of CSS color stops for tagline gradient; empty array or omit = inherits `titleGradient` |
 | `backgroundColor` | Object with `light` and `dark` hex colors for page background (defaults: `#f3f4f6` / `#111827`) |
+| `effects` | Object toggling visual effects — see Effects section below |
 | `tabs` | Array of tab objects |
+
+### Effects Config:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `particleBackground` | boolean | `true` | Floating canvas particles, adapts to light/dark mode |
+| `gradientBorders` | boolean | `true` | Animated gradient border + subtle scale on hover for link cards, buttons, GitHub project cards, Steam "View Profile", and Meme "New Meme" |
+| `tabTransitions` | boolean | `true` | Smooth crossfade when switching tabs |
+| `customScrollbar` | boolean | `true` | Thin rounded scrollbar styling |
 
 ### Tab sections types:
 

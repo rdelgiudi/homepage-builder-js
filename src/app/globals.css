@@ -133,3 +133,95 @@ main, header, footer, section, article, aside, div {
   -webkit-text-fill-color: transparent;
   animation: gradient-shift 4s ease infinite;
 }
+
+/* ===== Custom Scrollbar ===== */
+html.custom-scrollbar ::-webkit-scrollbar {
+  width: 8px;
+}
+
+html.custom-scrollbar ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html.custom-scrollbar ::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+
+html.custom-scrollbar ::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
+}
+
+html.dark.custom-scrollbar ::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.5);
+}
+
+html.dark.custom-scrollbar ::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.7);
+}
+
+/* Firefox scrollbar */
+html.custom-scrollbar * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+}
+
+html.dark.custom-scrollbar * {
+  scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
+}
+
+/* ===== Gradient Border Cards ===== */
+.gradient-border-card {
+  position: relative;
+}
+
+.gradient-border-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 25%, #f472b6 50%, #a78bfa 75%, #60a5fa 100%);
+  background-size: 200% 200%;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  animation: gradient-shift 4s ease infinite;
+}
+
+.gradient-border-card:hover::before {
+  opacity: 1;
+}
+
+/* ===== Gradient Tab Bottom Border ===== */
+.gradient-tab {
+  position: relative;
+}
+
+.gradient-tab::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%) scaleX(0);
+  width: calc(100% - 2rem);
+  height: 2px;
+  background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 25%, #f472b6 50%, #a78bfa 75%, #60a5fa 100%);
+  background-size: 200% 200%;
+  border-radius: 9999px;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
+  animation: gradient-shift 4s ease infinite;
+}
+
+.gradient-tab:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) scaleX(1);
+}
