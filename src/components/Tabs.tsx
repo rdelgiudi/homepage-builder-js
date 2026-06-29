@@ -341,7 +341,7 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions }:
           setVisible(true);
           transitioning.current = false;
         });
-      }, 150);
+      }, 200);
     } else {
       setMountedTab(index);
     }

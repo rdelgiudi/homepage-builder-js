@@ -141,28 +141,23 @@ export default function GitHubProjects({ repos, enableGradientBorders }: { repos
 
     async function fetchAll() {
       setLoading(true);
-      const results = await Promise.allSettled(
-        repos.map(async ({ owner, repo }) => {
-          const key = `${owner}/${repo}`;
-          const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const data: RepoData = await res.json();
-          return { key, data };
-        })
-      );
+      const keys = repos.map((r) => `${r.owner}/${r.repo}`);
+      const res = await fetch(`/api/github?repos=${encodeURIComponent(JSON.stringify(repos.map(({ owner, repo }) => ({ owner, repo }))))}`);
+      if (!res.ok) throw new Error(`API responded with ${res.status}`);
+      const json = await res.json();
 
       if (cancelled) return;
 
       const newData: Record<string, RepoData> = {};
       const newErrors: Record<string, string> = {};
-      for (const result of results) {
-        if (result.status === "fulfilled") {
-          newData[result.value.key] = result.value.data;
+      for (const key of keys) {
+        const entry = json.repos[key];
+        if (!entry) {
+          newErrors[key] = "No data";
+        } else if (entry.error) {
+          newErrors[key] = entry.error;
         } else {
-          const err = result.reason?.message || "Failed to load";
-          const match = err.match(/https:\/\/api\.github\.com\/repos\/([^/]+\/[^/]+)/);
-          const key = match?.[1] || "unknown";
-          newErrors[key] = err;
+          newData[key] = entry as RepoData;
         }
       }
       setRepoData(newData);
@@ -193,14 +188,6 @@ export default function GitHubProjects({ repos, enableGradientBorders }: { repos
     );
   }
 
-  if (Object.keys(repoData).length === 0 && Object.keys(errors).length > 0) {
-    return (
-      <p className="text-gray-500 dark:text-gray-400 text-sm">
-        Failed to load GitHub projects.
-      </p>
-    );
-  }
-
   return (
     <div className="space-y-3">
       {repos.map((config, i) => {
@@ -210,14 +197,14 @@ export default function GitHubProjects({ repos, enableGradientBorders }: { repos
 
         if (error) {
           return (
-            <div key={i} className="bg-white dark:bg-[#2b2d31] rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div key={i} className={`bg-white dark:bg-[#2b2d31] rounded-lg border border-gray-200 dark:border-gray-700 p-4${enableGradientBorders ? ' gradient-border-card' : ''}`}>
               <div className="flex items-start gap-3">
                 <svg className="w-5 h-5 mt-0.5 flex-shrink-0 text-gray-400" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
                 </svg>
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
-                    {config.label || `${config.owner}/${config.repo}`}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {config.label || key}
                   </p>
                   {config.note && (
                     <p className="text-xs text-blue-500 dark:text-blue-400 mt-0.5 italic">
@@ -225,7 +212,7 @@ export default function GitHubProjects({ repos, enableGradientBorders }: { repos
                     </p>
                   )}
                   <p className="text-xs text-red-400 mt-1">
-                    {error.includes("404") ? "Not found or private" : error}
+                    {error.includes("404") ? "Not found or private" : "Failed to load"}
                   </p>
                 </div>
               </div>
