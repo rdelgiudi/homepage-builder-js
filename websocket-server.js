@@ -7,8 +7,6 @@ const dev = process.env.NODE_ENV !== 'production';
 
 const hostname = process.env.HOST || 'localhost';
 const port = parseInt(process.env.PORT, 10) || 3000;
-const presencePort = parseInt(process.env.PRESENCE_PORT, 10) || 3001;
-const PRESENCE_WS = `ws://localhost:${presencePort}`;
 const DISCORD_API = 'https://discord.com/api/v10';
 const PROFILE_CACHE_TTL = 300000;
 
@@ -754,55 +752,47 @@ app.prepare().then(() => {
     console.log(`[${new Date().toISOString()}] > Ready on http://${hostname}:${port}`);
   });
 
-  let presenceWs = null;
-  let reconnectTimer = null;
+  let presenceUnsubscribe = null;
+  const presenceModule = require('./discord-presence');
 
-  function connectPresence() {
-    const ws = new (require('ws'))(PRESENCE_WS);
+  let enrichmentInFlight = false;
+  let enrichmentQueued = false;
 
-    ws.on('open', async () => {
-      console.log(`[${new Date().toISOString()}] [Discord User] Connected to presence service`);
-      presenceWs = ws;
-      const initialPresence = await fetchProfile().then(() => null);
-      // Send cached data if available after reconnect
-      if (enrichedData) {
-        const count = broadcast(enrichedData);
-        if (count > 0) {
-          console.log(`[${new Date().toISOString()}] [Discord User] Sent cached data to ${count} browser client(s)`);
-        }
+  async function processRawPresence(raw) {
+    if (enrichmentInFlight) {
+      enrichmentQueued = true;
+      return;
+    }
+    enrichmentInFlight = true;
+    const t0 = Date.now();
+    try {
+      await enrichPresence(raw);
+      const enriched = enrichedData;
+      if (enriched) {
+        const count = broadcast(enriched);
+        console.log(`[${new Date().toISOString()}] [Discord User] Relayed to ${count} browser client(s) in ${Date.now() - t0}ms`);
       }
-    });
-
-    ws.on('message', async (raw) => {
-      try {
-        const msg = JSON.parse(raw.toString());
-        if (msg.type === 'presence') {
-          const t0 = Date.now();
-          await enrichPresence(msg.data);
-          const enriched = enrichedData;
-          if (enriched) {
-            const count = broadcast(enriched);
-            console.log(`[${new Date().toISOString()}] [Discord User] Relayed to ${count} browser client(s) in ${Date.now() - t0}ms`);
-          }
-        }
-      } catch (e) {
-        console.error(`[${new Date().toISOString()}] [Discord User] WS message error:`, e);
+    } catch (e) {
+      console.error(`[${new Date().toISOString()}] [Discord User] Enrichment error:`, e);
+    } finally {
+      enrichmentInFlight = false;
+      if (enrichmentQueued) {
+        enrichmentQueued = false;
+        const latest = presenceModule.getCurrentPresence();
+        if (latest) processRawPresence(latest);
       }
-    });
-
-    ws.on('close', () => {
-      console.log(`[${new Date().toISOString()}] [Discord User] Disconnected, reconnecting in 5s...`);
-      presenceWs = null;
-      reconnectTimer = setTimeout(connectPresence, 5000);
-    });
-
-    ws.on('error', (err) => {
-      console.error(`[${new Date().toISOString()}] [Discord User] WS error:`, err.message);
-      ws.close();
-    });
+    }
   }
 
-  connectPresence();
+  if (presenceModule && typeof presenceModule.onPresenceUpdate === 'function') {
+    presenceUnsubscribe = presenceModule.onPresenceUpdate(processRawPresence);
+  }
+
+  if (presenceModule && typeof presenceModule.start === 'function') {
+    presenceModule.start().catch((e) => {
+      console.error(`[${new Date().toISOString()}] [Discord Presence] Start error:`, e);
+    });
+  }
 
   refreshSteam();
   setInterval(refreshSteam, 10000);

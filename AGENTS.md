@@ -5,9 +5,9 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 ## Architecture
 
 - **Frontend**: Next.js 15 App Router (`src/app/`), React 19, Tailwind CSS
-- **Backend**: Custom Node.js WebSocket server (`websocket-server.js`) — wraps Next.js, adds WebSocket on same port
-- **Presence Bot**: `discord-presence.js` — Discord.js bot that tracks user presence, pushes to WebSocket server via `ws://localhost:<port>`
-- **Single container deploys both** — entrypoint runs presence bot in background, then execs websocket-server in foreground
+- **Backend**: Custom Node.js WebSocket server (`websocket-server.js`) — wraps Next.js, adds WebSocket on same port, in-process requires `discord-presence.js`
+- **Presence Module**: `discord-presence.js` — Discord.js bot, exports `start()` / `onPresenceUpdate()` / `getCurrentPresence()`. Websocket-server calls `start()` to begin tracking, subscribes via `onPresenceUpdate()` to receive raw presence in-process (no localhost WS hop).
+- **Single container**: `docker-entrypoint.sh` runs only `websocket-server.js` in the foreground; the presence bot runs in-process.
 
 ## File Layout
 
@@ -16,19 +16,20 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── github/route.ts      # GitHub repo data with 6h cache, 10m error cache
-│   │   │   ├── markdown/route.ts    # Reads markdown from src/content/ at runtime
+│   │   │   ├── markdown/route.ts    # Reads markdown from src/content/ at runtime, renders to HTML
 │   │   │   ├── meme/route.ts        # Random meme from external API
-│   │   │   └── visitors/route.ts    # Visitor counter (SQLite)
+│   │   │   └── visitors/route.ts    # Visitor counter (SQLite, write-behind queue)
 │   │   ├── globals.css
 │   │   ├── layout.tsx               # Root layout, generateMetadata reads homepage.json
+│   │   ├── loading.tsx              # Cold-load skeleton
 │   │   └── page.tsx                 # Homepage — reads homepage.json at runtime via fs
 │   ├── components/
-│   │   ├── DiscordServer.tsx        # Discord server widget
+│   │   ├── DiscordServer.tsx        # Discord server widget (client-side cache)
 │   │   ├── DiscordUser.tsx          # Discord user presence (WebSocket subscriber, mobile indicator)
 │   │   ├── SteamStatus.tsx          # Steam profile & games
 │   │   ├── OverwatchStatus.tsx      # Overwatch 2 stats
 │   │   ├── MemeWidget.tsx           # Random meme display
-│   │   ├── MarkdownWidget.tsx       # Fetches from /api/markdown, renders react-markdown
+│   │   ├── MarkdownWidget.tsx       # Renders pre-rendered HTML from /api/markdown
 │   │   ├── VisitorCounter.tsx       # Visitor count display
 │   │   ├── GitHubProjects.tsx       # GitHub repo cards (public API, no key needed)
 │   │   ├── Tabs.tsx                 # Tab navigation w/ header + icon + sections
@@ -41,13 +42,15 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── about.md                 # Runtime markdown (not bundled)
 │   │   └── about-example.md
 │   ├── hooks/
-│   │   └── useWebSocket.ts          # Singleton WebSocket hook
+│   │   └── useWebSocket.ts          # Singleton WebSocket hook (rAF-coalesced)
+│   ├── lib/
+│   │   └── config.ts                # mtime-cached homepage.json loader
 │   └── types/
 │       ├── gray-matter.d.ts
 │       └── quantize.d.ts
-├── discord-presence.js              # Discord.js bot
+├── discord-presence.js              # Discord.js bot (in-process; exports start/onPresenceUpdate)
 ├── websocket-server.js              # Custom Next.js server + WebSocket
-├── docker-entrypoint.sh             # Starts presence bg, execs websocket-server
+├── docker-entrypoint.sh             # Execs websocket-server (presence runs in-process)
 ├── Dockerfile                       # Multi-stage: deps → builder → runner
 ├── docker-compose-example.yml
 ├── .env.example
@@ -62,7 +65,6 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 |---|---|
 | `HOST` | Server bind address (default: `0.0.0.0`) |
 | `PORT` | Web server port (default: `3000`) |
-| `PRESENCE_PORT` | Internal WebSocket port for presence data (default: `3001`) |
 | `DISCORD_SERVER_ID` | Discord server widget ID |
 | `DISCORD_USER_ID` | User to track for presence |
 | `DISCORD_BOT_TOKEN` | Discord bot token (needs Presence Intent + Server Members Intent) |
@@ -117,10 +119,10 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 ### `HOST` vs `HOSTNAME`
 - `HOSTNAME` is a standard Unix env var set to the machine's hostname (e.g. `bazzite`). **Do not use it** as a config key.
 - The bind address env var is called `HOST`.
-- `PRESENCE_WS` URL must use `localhost`, not `HOST` (which is `0.0.0.0` — not a valid connect address).
 
 ### homepage.json is runtime, not bundled
-- Read via `fs.readFileSync` in `src/app/page.tsx` and `src/app/layout.tsx`.
+- Read via `fs.readFileSync` in `src/lib/config.ts` (mtime-cached; re-parsed only when the file's mtime changes).
+- Imported by `src/app/page.tsx` and `src/app/layout.tsx`.
 - `export const dynamic = "force-dynamic"` prevents static prerendering.
 - Allows editing without rebuild; can be volume-mounted in Docker.
 
@@ -138,7 +140,9 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 
 ### Markdown files are runtime, not bundled
 - API route `/api/markdown` reads `src/content/` via `fs.readFileSync` at request time.
-- Not imported/bundled.
+- Renders to HTML server-side via `src/lib/markdown.ts` (using `marked`); mtime-cached.
+- Sets `Cache-Control: public, max-age=300` and `export const revalidate = 300`.
+- Client renders the returned HTML via `dangerouslySetInnerHTML` — `react-markdown` / `remark-gfm` are not in the client bundle.
 
 ### GitHub API caching
 - `/api/github` fetches repo data server-side and caches successfully in-memory for 6 hours.
@@ -211,9 +215,10 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 
 ### WebSocket data flow
 1. `discord-presence.js` connects to Discord Gateway, receives presence events.
-2. Pushes JSON via WebSocket client to `ws://localhost:PRESENCE_PORT`.
-3. `websocket-server.js` relays to all connected browser clients.
+2. Calls registered callbacks in-process (no localhost WS hop).
+3. `websocket-server.js` enriches + relays to all connected browser clients.
 4. React components (`DiscordUser`, `SteamStatus`, `OverwatchStatus`) subscribe via `useWebSocket` hook.
+5. `useWebSocket` coalesces messages per `type` within a `requestAnimationFrame` tick, so a burst of updates results in a single React render per subscriber.
 
 ### Mobile presence detection
 - `discord-presence.js` passes `clientStatus` from Discord's API.
@@ -256,17 +261,14 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Next.js dev with WebSocket server, no presence bot |
-| `npm run dev:full` | Both dev server + presence bot |
-| `npm run presence` | Presence bot only |
+| `npm run dev` | Next.js dev with WebSocket server (presence bot in-process if env set) |
 | `npm run build` | Next.js production build |
 | `npm run start` | Production start (websocket-server.js) |
-| `npm run docker` | `docker compose up --build` |
 
 ## Docker
 
 - Single container, multi-stage build.
-- `docker-entrypoint.sh`: starts discord-presence.js in background, then exec websocket-server.js in foreground.
+- `docker-entrypoint.sh` execs `websocket-server.js` in the foreground; `discord-presence.js` runs in-process.
 - `docker-compose-example.yml` includes named volume for `visitors.db` and optional bind mounts for config/content.
 - Traefik recommended as reverse proxy.
 - `.dockerignore` includes node_modules, .next, .env, visitors.db.

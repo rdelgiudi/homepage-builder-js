@@ -5,8 +5,11 @@ import crypto from "crypto";
 const DB_PATH = path.join(process.cwd(), "visitors.db");
 const COOKIE_NAME = "visitor_id";
 const SALT = process.env.VISITOR_SALT || "default-salt";
+const FLUSH_INTERVAL_MS = 2000;
 
 let db: import("better-sqlite3").Database | null = null;
+let pendingWrites = new Set<string>();
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 function getDb(): NonNullable<typeof db> {
   if (!db) {
@@ -45,6 +48,37 @@ function getVisitorIdFromCookie(cookieHeader: string | null): string | null {
   return null;
 }
 
+function scheduleFlush() {
+  if (flushTimer) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    flushPending();
+  }, FLUSH_INTERVAL_MS);
+}
+
+function flushPending() {
+  if (pendingWrites.size === 0) return;
+  const batch = Array.from(pendingWrites);
+  pendingWrites = new Set();
+  try {
+    const database = getDb();
+    const insert = database.prepare(
+      "INSERT OR IGNORE INTO visitors (visitor_id) VALUES (?)"
+    );
+    const tx = database.transaction((ids: string[]) => {
+      for (const id of ids) insert.run(id);
+    });
+    tx(batch);
+  } catch (err) {
+    console.error("Visitor flush error:", err);
+  }
+}
+
+function enqueueVisitor(hashedId: string) {
+  pendingWrites.add(hashedId);
+  scheduleFlush();
+}
+
 export async function GET(request: Request) {
   try {
     const database = getDb();
@@ -55,12 +89,12 @@ export async function GET(request: Request) {
 
     if (isNew === false) {
       const count = database.prepare("SELECT COUNT(*) as count FROM visitors").get() as { count: number };
-      return NextResponse.json({ count: count.count, isNew: false });
+      return NextResponse.json({ count: count.count + pendingWrites.size, isNew: false });
     }
 
     if (isNew === true) {
       const count = database.prepare("SELECT COUNT(*) as count FROM visitors").get() as { count: number };
-      return NextResponse.json({ count: count.count, isNew: true });
+      return NextResponse.json({ count: count.count + pendingWrites.size, isNew: true });
     }
 
     return NextResponse.json({ count: 0, isNew: null });
@@ -84,13 +118,13 @@ export async function POST(request: Request) {
 
     const existing = database.prepare("SELECT id FROM visitors WHERE visitor_id = ?").get(hashedId);
     if (!existing) {
-      database.prepare("INSERT INTO visitors (visitor_id) VALUES (?)").run(hashedId);
+      enqueueVisitor(hashedId);
       isNew = true;
     }
 
     const count = database.prepare("SELECT COUNT(*) as count FROM visitors").get() as { count: number };
 
-    const response = NextResponse.json({ count: count.count, isNew });
+    const response = NextResponse.json({ count: count.count + pendingWrites.size, isNew });
 
     response.cookies.set(COOKIE_NAME, visitorId, {
       httpOnly: true,

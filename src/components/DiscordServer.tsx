@@ -9,16 +9,38 @@ interface DiscordWidget {
   presence_count: number;
 }
 
+const CACHE_TTL_MS = 60_000;
+let cachedWidget: { serverId: string; data: DiscordWidget; expires: number } | null = null;
+
 export default function DiscordServer({ serverId }: { serverId?: string }) {
-  const [widget, setWidget] = useState<DiscordWidget | null>(null);
+  const [widget, setWidget] = useState<DiscordWidget | null>(() => {
+    if (cachedWidget && cachedWidget.serverId === serverId && cachedWidget.expires > Date.now()) {
+      return cachedWidget.data;
+    }
+    return null;
+  });
 
   useEffect(() => {
     if (!serverId) return;
+    if (cachedWidget && cachedWidget.serverId === serverId && cachedWidget.expires > Date.now()) {
+      setWidget(cachedWidget.data);
+      return;
+    }
+    let cancelled = false;
     fetch(`https://discord.com/api/guilds/${serverId}/widget.json`)
       .then((res) => res.ok ? res.json() : null)
-      .then((data) => setWidget(data))
-      .catch(() => setWidget(null));
-  }, []);
+      .then((data) => {
+        if (cancelled || !data) return;
+        cachedWidget = { serverId, data, expires: Date.now() + CACHE_TTL_MS };
+        setWidget(data);
+      })
+      .catch(() => {
+        if (!cancelled) setWidget(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [serverId]);
 
   if (!widget) {
     return (

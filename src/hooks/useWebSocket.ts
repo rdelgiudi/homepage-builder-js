@@ -12,6 +12,34 @@ let subscriberCount = 0;
 const listeners = new Set<(data: unknown) => void>();
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
+let pendingByType = new Map<string, unknown>();
+let flushScheduled = false;
+
+function scheduleFlush() {
+  if (flushScheduled) return;
+  flushScheduled = true;
+  const flush = () => {
+    flushScheduled = false;
+    if (pendingByType.size === 0) return;
+    const batch = pendingByType;
+    pendingByType = new Map();
+    for (const listener of listeners) {
+      for (const msg of batch.values()) {
+        try {
+          listener(msg);
+        } catch (e) {
+          console.error("WebSocket listener error:", e);
+        }
+      }
+    }
+  };
+  if (typeof requestAnimationFrame !== "undefined") {
+    requestAnimationFrame(flush);
+  } else {
+    setTimeout(flush, 16);
+  }
+}
+
 function createConnection() {
   if (typeof window === "undefined") return;
 
@@ -23,9 +51,9 @@ function createConnection() {
   ws.onmessage = (event) => {
     try {
       const msg = JSON.parse(event.data);
-      for (const listener of listeners) {
-        listener(msg);
-      }
+      const type = (msg && typeof msg === "object" && "type" in msg) ? String(msg.type) : "_";
+      pendingByType.set(type, msg);
+      scheduleFlush();
     } catch {}
   };
 

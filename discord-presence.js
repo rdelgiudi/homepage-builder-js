@@ -1,24 +1,12 @@
 const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
-const { WebSocketServer } = require('ws');
 require('dotenv').config();
-
-const PORT = parseInt(process.env.PRESENCE_PORT, 10) || 3001;
 
 let userId = process.env.DISCORD_USER_ID || '';
 const botToken = process.env.DISCORD_BOT_TOKEN || '';
 
-if (!userId || !botToken || userId === 'YOUR_DISCORD_USER_ID') {
-  console.error(`[${new Date().toISOString()}] Invalid config: set DISCORD_USER_ID and DISCORD_BOT_TOKEN env vars`);
-  process.exit(1);
-}
-
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildPresences,
-    GatewayIntentBits.GuildMembers,
-  ],
-});
+const presenceCallbacks = new Set();
+let client = null;
+let userPresence = null;
 
 function emptyPresence() {
   return {
@@ -32,9 +20,6 @@ function emptyPresence() {
   };
 }
 
-let userPresence = emptyPresence();
-let wss = null;
-
 function buildPresenceFromMember(member, previousNickname) {
   const customStatusActivity = member.presence?.activities.find(
     a => a.type === ActivityType.Custom
@@ -44,7 +29,7 @@ function buildPresenceFromMember(member, previousNickname) {
   );
 
   const isOnline = member.presence?.status && member.presence.status !== 'offline';
-  const lastSeenTimestamp = isOnline ? null : (userPresence.lastSeen || new Date().toISOString());
+  const lastSeenTimestamp = isOnline ? null : (userPresence?.lastSeen || new Date().toISOString());
 
   return {
     status: member.presence?.status || 'offline',
@@ -78,14 +63,26 @@ function buildPresenceFromMember(member, previousNickname) {
   };
 }
 
+function emitPresence() {
+  if (!userPresence) return;
+  for (const cb of presenceCallbacks) {
+    try {
+      cb(userPresence);
+    } catch (e) {
+      console.error(`[${new Date().toISOString()}] Presence callback error:`, e);
+    }
+  }
+}
+
 async function fetchUserPresence() {
+  if (!client) return;
   for (const guild of client.guilds.cache.values()) {
     try {
       const member = await guild.members.fetch(userId);
       if (member) {
-        userPresence = buildPresenceFromMember(member, userPresence.nickname);
+        userPresence = buildPresenceFromMember(member, userPresence?.nickname);
         console.log(`[${new Date().toISOString()}] [Discord Presence] Fetched initial presence`);
-        broadcastPresence();
+        emitPresence();
         return;
       }
     } catch (err) {
@@ -95,61 +92,82 @@ async function fetchUserPresence() {
   console.warn(`[${new Date().toISOString()}] User ${userId} not found in any shared guild`);
 }
 
-function broadcastPresence() {
-  if (!wss) return;
-  const message = JSON.stringify({ type: 'presence', data: userPresence });
-  let count = 0;
-  wss.clients.forEach((ws) => {
-    if (ws.readyState === 1) {
-      ws.send(message);
-      count++;
-    }
-  });
-  console.log(`[${new Date().toISOString()}] [Discord Presence] Relayed to ${count} server(s)`);
+function onPresenceUpdate(callback) {
+  presenceCallbacks.add(callback);
+  return () => presenceCallbacks.delete(callback);
 }
 
-client.on('clientReady', async () => {
-  console.log(`[${new Date().toISOString()}] Discord bot logged in as ${client.user.tag}`);
+function getCurrentPresence() {
+  return userPresence;
+}
 
-  wss = new WebSocketServer({ port: PORT });
-  console.log(`[${new Date().toISOString()}] Presence WebSocket server running on port ${PORT}`);
+async function start() {
+  if (!userId || !botToken || userId === 'YOUR_DISCORD_USER_ID') {
+    console.warn(`[${new Date().toISOString()}] [Discord Presence] DISCORD_USER_ID or DISCORD_BOT_TOKEN not set; presence tracking disabled`);
+    return;
+  }
 
-  wss.on('connection', (ws) => {
-    console.log(`[${new Date().toISOString()}] [Discord Presence] Server connected (${wss.clients.size} total)`);
-    if (userPresence.lastUpdated) {
-      ws.send(JSON.stringify({ type: 'presence', data: userPresence }));
-    }
-    ws.on('close', () => {
-      console.log(`[${new Date().toISOString()}] [Discord Presence] Server disconnected (${wss.clients.size} remaining)`);
-    });
+  if (client) return;
+
+  userPresence = emptyPresence();
+
+  client = new Client({
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildPresences,
+      GatewayIntentBits.GuildMembers,
+    ],
   });
 
-  await fetchUserPresence();
-
-  setInterval(async () => {
+  client.on('clientReady', async () => {
+    console.log(`[${new Date().toISOString()}] Discord bot logged in as ${client.user.tag}`);
     await fetchUserPresence();
-  }, 30000);
-});
+    setInterval(fetchUserPresence, 30000);
+  });
 
-client.on('presenceUpdate', (oldPresence, newPresence) => {
-  if (newPresence.userId === userId) {
-    const member = newPresence.member;
-    if (member) {
-      userPresence = buildPresenceFromMember(member, userPresence.nickname);
-      broadcastPresence();
+  client.on('presenceUpdate', (oldPresence, newPresence) => {
+    if (newPresence.userId === userId) {
+      const member = newPresence.member;
+      if (member && userPresence) {
+        userPresence = buildPresenceFromMember(member, userPresence.nickname);
+        emitPresence();
+      }
     }
+  });
+
+  client.on('guildMemberUpdate', (oldMember, newMember) => {
+    if (newMember.userId === userId && userPresence) {
+      userPresence.nickname = newMember.nickname || null;
+      emitPresence();
+    }
+  });
+
+  client.on('error', (error) => {
+    console.error(`[${new Date().toISOString()}] Discord client error:`, error);
+  });
+
+  try {
+    await client.login(botToken);
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] Discord login failed:`, err.message);
   }
-});
+}
 
-client.on('guildMemberUpdate', (oldMember, newMember) => {
-  if (newMember.userId === userId) {
-    userPresence.nickname = newMember.nickname || null;
-    broadcastPresence();
+async function stop() {
+  if (client) {
+    try {
+      await client.destroy();
+    } catch {}
+    client = null;
   }
-});
+  presenceCallbacks.clear();
+  userPresence = null;
+}
 
-client.on('error', (error) => {
-  console.error(`[${new Date().toISOString()}] Discord client error:`, error);
-});
+module.exports = { start, stop, onPresenceUpdate, getCurrentPresence };
 
-client.login(botToken).catch(console.error);
+if (require.main === module) {
+  start().catch((e) => {
+    console.error(`[${new Date().toISOString()}] [Discord Presence] Start error:`, e);
+  });
+}

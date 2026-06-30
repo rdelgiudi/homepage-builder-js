@@ -26,7 +26,7 @@ A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integ
 
 ```bash
 npm install
-npm run dev:full  # or "npm run dev" if discord presence bot is not needed
+npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view your homepage.
@@ -177,7 +177,7 @@ Displays detailed Discord user presence including online status, current activit
 **Real-time updates:**
 - Presence data pushed via WebSocket — instant updates, no polling
 - Profile data cached on server for 5 minutes
-- Changing `userId` in config automatically re-initializes the presence bot
+- The presence bot runs in-process with the Next.js server (no separate WebSocket hop)
 
 **Banner color extraction:**
 - Extracts the dominant color using Discord's own algorithm (reverse-engineered by [Vendicated](https://gist.github.com/Vendicated/ad803e9341e9c1110639361f17b58b5b))
@@ -328,28 +328,31 @@ Displays a random meme from an external API.
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── github/route.ts      # GitHub repo data (6h cache)
-│   │   │   ├── markdown/route.ts    # Markdown API
+│   │   │   ├── markdown/route.ts    # Markdown API (server-rendered HTML, mtime-cached)
 │   │   │   ├── meme/route.ts        # Random meme
-│   │   │   └── visitors/route.ts    # Visitor counter (SQLite)
+│   │   │   └── visitors/route.ts    # Visitor counter (SQLite, write-behind)
 │   │   ├── globals.css
 │   │   ├── layout.tsx
+│   │   ├── loading.tsx              # Cold-load skeleton
 │   │   └── page.tsx
 │   ├── components/
-│   │   ├── DiscordServer.tsx        # Discord server widget
+│   │   ├── DiscordServer.tsx        # Discord server widget (60s client cache)
 │   │   ├── DiscordUser.tsx          # Discord user presence
 │   │   ├── SteamStatus.tsx          # Steam profile & games
 │   │   ├── OverwatchStatus.tsx      # Overwatch stats
 │   │   ├── MemeWidget.tsx           # Random meme
-│   │   ├── MarkdownWidget.tsx       # Markdown renderer
+│   │   ├── MarkdownWidget.tsx       # Renders pre-rendered HTML
 │   │   ├── VisitorCounter.tsx       # Visitor count
 │   │   ├── GitHubProjects.tsx       # GitHub repo cards
 │   │   ├── Tabs.tsx                 # Tab navigation
 │   │   ├── ParticleBackground.tsx   # Canvas particle effect (stars/comet modes)
 │   │   └── EffectsController.tsx    # Conditional effects renderer
 │   ├── hooks/
-│   │   └── useWebSocket.ts          # WebSocket hook (singleton)
-│   └── types/
-├── discord-presence.js              # Discord.js bot
+│   │   └── useWebSocket.ts          # WebSocket hook (rAF-coalesced per type)
+│   └── lib/
+│       ├── config.ts                # mtime-cached homepage.json loader
+│       └── markdown.ts              # Server-side markdown → HTML (marked)
+├── discord-presence.js              # Discord.js bot (in-process module)
 ├── websocket-server.js              # Custom server + WebSocket
 ├── docker-entrypoint.sh
 ├── Dockerfile
@@ -361,12 +364,12 @@ Displays a random meme from an external API.
 ## Docker
 
 ```bash
-npm run docker
+cp docker-compose-example.yml docker-compose.yml
+docker compose up --build
 ```
 
 Single container with:
-- Discord presence bot (background)
-- WebSocket server + Next.js (foreground)
+- WebSocket server + Next.js + Discord presence bot (all in one Node process)
 - Named volume for `visitors.db` persistence
 - Optional bind mounts for `src/config/` and `src/content/`
 

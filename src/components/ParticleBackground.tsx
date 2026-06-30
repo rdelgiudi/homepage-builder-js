@@ -24,20 +24,18 @@ interface CometParticle {
   baseSize: number;
   brightness: number;
   color: string;
+  r: number;
+  g: number;
+  b: number;
 }
 
 type Particle = StarsParticle | CometParticle;
 
-function drawComet(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number, brightness: number, color: string, dirAngle: number, stretch: number) {
+function drawComet(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number, brightness: number, baseR: number, baseG: number, baseB: number, dirAngle: number, stretch: number) {
   const spikes = 4;
   const headLen = 0.7 + 0.3 * (1 - stretch);
   const tailLen = 1 + 1.5 * stretch;
   const sideLen = 1 + 0.3 * stretch;
-
-  const parts = color.split(", ");
-  const baseR = parseInt(parts[0]);
-  const baseG = parseInt(parts[1]);
-  const baseB = parseInt(parts[2]);
 
   ctx.save();
   ctx.translate(x, y);
@@ -103,8 +101,8 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let animId: number;
-    let particles: Particle[] = [];
+  let animId: number;
+  let particles: Particle[] = [];
 
     function getCount() {
       const isMobile = window.innerWidth < 640;
@@ -138,6 +136,8 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
     function initComets() {
       const c = getCount();
       const isDark = document.documentElement.classList.contains("dark");
+      const color = isDark ? "148, 163, 184" : "75, 85, 99";
+      const [r, g, b] = color.split(", ").map(s => parseInt(s));
       particles = Array.from({ length: c }, () => ({
         x: (Math.random() - 0.5) * 1.6,
         y: (Math.random() - 0.5) * 1.6,
@@ -145,7 +145,10 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
         speed: Math.random() * 0.006 + 0.004,
         baseSize: Math.random() * 0.025 + 0.005,
         brightness: isDark ? Math.random() * 0.7 + 0.3 : Math.random() * 0.6 + 0.4,
-        color: isDark ? "148, 163, 184" : "75, 85, 99",
+        color,
+        r: r!,
+        g: g!,
+        b: b!,
       })) satisfies CometParticle[];
     }
 
@@ -209,7 +212,7 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
         const radialDist = Math.sqrt(cp.x * cp.x + cp.y * cp.y);
         const stretch = Math.min(1, radialDist / 0.4);
 
-        drawComet(ctx!, sx, sy, size, edgeAlpha, starBrightness, cp.color, dirAngle, stretch);
+        drawComet(ctx!, sx, sy, size, edgeAlpha, starBrightness, cp.r, cp.g, cp.b, dirAngle, stretch);
       }
 
       animId = requestAnimationFrame(animateComets);
@@ -237,15 +240,20 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
 
     const observer = new MutationObserver(() => {
       const isDark = document.documentElement.classList.contains("dark");
+      const newColor = isDark ? "148, 163, 184" : "75, 85, 99";
+      const [nr, ng, nb] = newColor.split(", ").map(s => parseInt(s));
       for (const p of particles) {
         if (mode === "comet") {
           const cp = p as CometParticle;
           cp.brightness = isDark ? Math.random() * 0.7 + 0.3 : Math.random() * 0.6 + 0.4;
+          cp.r = nr!;
+          cp.g = ng!;
+          cp.b = nb!;
         } else {
           const sp = p as StarsParticle;
           sp.baseOpacity = isDark ? Math.random() * 0.5 + 0.3 : Math.random() * 0.5 + 0.4;
         }
-        p.color = isDark ? "148, 163, 184" : "75, 85, 99";
+        p.color = newColor;
       }
     });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });

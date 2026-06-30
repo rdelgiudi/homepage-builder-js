@@ -1,35 +1,42 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useState, useEffect, useMemo } from "react";
 
 interface MarkdownWidgetProps {
   file: string;
 }
 
 export default function MarkdownWidget({ file }: MarkdownWidgetProps) {
-  const [content, setContent] = useState<string>("");
+  const [html, setHtml] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const url = useMemo(() => `/api/markdown?file=${encodeURIComponent(file)}`, [file]);
+
   useEffect(() => {
-    async function fetchMarkdown() {
-      try {
-        const res = await fetch(`/api/markdown?file=${encodeURIComponent(file)}`);
-        const data = await res.json();
-        if (data.content) {
-          setContent(data.content);
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetch(url)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.html) {
+          setHtml(data.html);
         } else {
-          setContent("*Markdown file not found*");
+          setError(data.error || "Markdown file not found");
         }
-      } catch {
-        setContent("*Failed to load markdown*");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchMarkdown();
-  }, [file]);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Failed to load markdown");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
 
   if (loading) {
     return (
@@ -41,9 +48,18 @@ export default function MarkdownWidget({ file }: MarkdownWidgetProps) {
     );
   }
 
+  if (error) {
+    return (
+      <p className="italic text-gray-500 dark:text-gray-400">
+        {error}
+      </p>
+    );
+  }
+
   return (
-    <div className="prose prose-gray dark:prose-invert max-w-none">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-    </div>
+    <div
+      className="prose prose-gray dark:prose-invert max-w-none"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }

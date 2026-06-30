@@ -2,43 +2,9 @@ import Tabs from "@/components/Tabs";
 import VisitorCounter from "@/components/VisitorCounter";
 import EffectsController from "@/components/EffectsController";
 import { Suspense } from "react";
-import fs from "fs";
-import path from "path";
+import { getConfig } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
-
-const CONFIG_PATH = path.join(process.cwd(), "src/config/homepage.json");
-
-interface EffectsConfig {
-  particleBackground?: boolean;
-  particleEffect?: string;
-  gradientBorders?: boolean;
-  tabTransitions?: boolean;
-  customScrollbar?: boolean;
-  progressGradient?: boolean;
-  progressGradientColors?: string[];
-  widgetFrame?: boolean;
-  widgetFrameWidth?: number;
-}
-
-interface GradientConfig {
-  name: string;
-  tagline: string;
-  titleGradient?: string[];
-  taglineGradient?: string[];
-  backgroundColor?: { light?: string; dark?: string };
-  effects?: EffectsConfig;
-  tabs: unknown[];
-}
-
-async function loadConfig(): Promise<GradientConfig> {
-  try {
-    const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
-    return JSON.parse(raw) as GradientConfig;
-  } catch {
-    return { name: "Homepage", tagline: "Welcome", tabs: [] };
-  }
-}
 
 function TabsFallback() {
   return (
@@ -52,7 +18,7 @@ function TabsFallback() {
 }
 
 export default async function Home() {
-  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, backgroundColor, effects, tabs = [] } = await loadConfig();
+  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, backgroundColor, effects, tabs = [] } = getConfig();
   const taglineGradient = rawTaglineGradient?.length ? rawTaglineGradient : titleGradient;
 
   const bgVars = backgroundColor?.light || backgroundColor?.dark
