@@ -158,19 +158,27 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - Image cooldown keys use the image URL (`album-${url}`, `small-${url}`) instead of activity key, so new album art isn't blocked by a previous failed load.
 
 ### Leaving activity lifecycle
-- 0–800ms: `animate-shrink` class plays (vertical shrink first, then horizontal).
-- 800–1100ms: `collapsedKeys` state set — card is `width: 0px` with inline `transform: scale(0,0)`; `animate-shrink` class stays throughout to prevent pop-back from lost `forwards` fill.
-- At 1100ms: card removed from DOM, new data applied, new activities get `animate-enlarge`.
-- `pendingDataRef` guards mid-transition WebSocket messages — latest data stored, activity processing skipped until current animation completes.
+- 0–800ms: `animate-shrink` class plays — CSS keyframes `shrink` (700ms ease-in, `forwards` fill): shrinks horizontally first (30%), then vertically to 0.
+- 800–1100ms: `collapsedKeys` state set — card gets inline `width: 0px` with `transition: width 0.3s ease-out` and `transform: scale(0,0)`. The `animate-shrink` class stays throughout to prevent pop-back.
+- At 1100ms: `collapsedKeys` cleared, `leavingActivities` entry removed, stashed data applied, entering keys computed.
+- `pendingDataRef` guards mid-transition WebSocket messages — latest data stored, processing skipped until current animation completes. Only the latest pending message is applied (overwrites on subsequent messages).
 - Width calculation uses `activeCards` (non-collapsed cards only), so remaining cards smoothly expand into vacated space during the collapse phase.
 - **Critical**: activities must render in their **original flex order** (one `allActivities.map()`). Never split into separate `nonLeaving` and `leavingActivities` groups — that moves the leaving card to the end of the flex container, causing remaining cards to jump position before the collapse animation plays. Each card checks `leavingKeySet.has(key)` to decide its animation, preserving DOM order.
-- First data load skips entering animations via `isFirstDataRef`.
 
-### Crossfade text uses absolute positioning
-- During crossfade (song change within same app), old and new details/state text are both rendered to achieve fade-out/fade-in.
-- Old text is wrapped in `absolute inset-0 pointer-events-none` inside a `relative` container so it overlays the new text without affecting layout height.
-- New text flows naturally, providing the layout height. Old text fades out on top.
-- Album art uses the same pattern: old image is `absolute inset-0` inside the `relative w-14` container, new image renders below it.
+### Entering activity lifecycle
+- New activities get `animate-enlarge` class — CSS keyframes `enlarge` (700ms ease-out, `forwards` fill): starts at scale(0,0), expands vertically first (70%), then horizontally to full size.
+- `enteringKeys` state holds the keys for 800ms, then cleared.
+- First data load skips entering animations entirely via `isFirstDataRef` — initial connection has no enter animations.
+
+### Crossfade content update (same activity, changed content)
+- Triggered when details, state, or album URL change for a stable activity (not leaving, entering, or collapsed).
+- Only fires when no crossfade is already active for that key (prevents stacking).
+- Timing: old content fades out (250ms), then new content fades in (300ms). Total: 550ms, then crossfade data cleaned up.
+- Old details/state text rendered in `absolute inset-0 pointer-events-none` inside a `relative` container (overlays new text without affecting layout height).
+- New text flows naturally providing layout height. Old text fades out on top.
+- Album art uses same pattern: old image `absolute inset-0` inside `relative w-16 h-16`, new image renders below it.
+- `prevContentRef` is NOT updated during a crossfade — keeps the "from" state until crossfade completes.
+- Progress bar gets `transition: width 0.5s ease-out` (and sparkle position `transition: left 0.5s ease-out`) during crossfade to smoothly shrink from old position. Normal ticks use `transition: none`.
 
 ### Progress bar gradient + sparkles
 - Music activities (type 2 or "youtube music") with timestamps get an animated gradient progress bar.
@@ -181,6 +189,14 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - Progress percentage extracted as `progressPct` local variable to keep fill width and sparkle position aligned.
 - **Diminish on track change**: When a new song starts (crossfade), the progress bar fill gets `transition: width 0.5s ease-out` and the sparkle container gets `transition: left 0.5s ease-out` so both smoothly animate from the old position to the new (usually ~0%). Normal per-second ticks have `transition: none` to avoid lag.
 - **Burst sparkles**: During crossfade, 6 additional one-shot burst particles (`sparkle-burst` / `sparkle-burst-alt` keyframes, 0.6–0.7s ease-out, not `infinite`) explode outward from the progress position for an intense spark effect as the bar shrinks.
+
+### Activity card layout
+- Card is `h-20` (80px) with `p-2` (8px), so content area is 64px.
+- Activity image is `w-16 h-16` (64px square), filling the entire content area height.
+- Card uses `flex items-start` so text aligns to top; image stays anchored to top via fixed `h-16`.
+- Images use `object-contain` to show the entire asset without cropping, preserving aspect ratio inside the square container.
+- All text elements (name, details, state) use `truncate` for `text-overflow: ellipsis` — text never wraps.
+- Text that overflows gets `...` instead of changing the image's square shape.
 
 ### npm overrides
 - `package.json` overrides `undici@^6.27.0` to fix high-severity vulns without breaking `discord.js`.

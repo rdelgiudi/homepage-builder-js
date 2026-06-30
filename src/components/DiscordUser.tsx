@@ -638,8 +638,8 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
     }
 
     return (
-      <div key={activityKey} className={`dark:bg-[#2b2d31] bg-[#ebedef] rounded-md p-2 flex items-stretch gap-2 flex-shrink-0 min-w-0 overflow-hidden${isEntering ? ' animate-enlarge' : ''}${isLeaving ? ' animate-shrink' : ''}`} style={{ width: isCollapsed ? '0px' : cardWidth, transform: isLeaving && isCollapsed ? 'scale(0,0)' : undefined, transition: 'width 0.3s ease-out, transform 0s' }}>
-        <div className="relative w-14 aspect-square rounded flex-shrink-0 dark:bg-[#1e1f22] bg-white">
+      <div key={activityKey} className={`dark:bg-[#2b2d31] bg-[#ebedef] rounded-md p-2 flex items-start gap-2 flex-shrink-0 min-w-0 overflow-hidden h-20${isEntering ? ' animate-enlarge' : ''}${isLeaving ? ' animate-shrink' : ''}`} style={{ width: isCollapsed ? '0px' : cardWidth, transform: isLeaving && isCollapsed ? 'scale(0,0)' : undefined, transition: 'width 0.3s ease-out, transform 0s' }}>
+        <div className="relative w-16 h-16 rounded flex-shrink-0 dark:bg-[#1e1f22] bg-white overflow-hidden">
           {crossfadeData?.oldAlbumUrl && !isOnCooldown(`album-${crossfadeData.oldAlbumUrl}`, activityImageErrors) ? (
             <div className="absolute inset-0 animate-crossfade-out">
               <Image
