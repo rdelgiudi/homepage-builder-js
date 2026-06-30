@@ -104,6 +104,21 @@
       ]
     },
     {
+      "label": "Projects",
+      "icon": "📂",
+      "sections": [
+        {
+          "type": "github",
+          "repos": [
+            { "owner": "vercel", "repo": "next.js", "label": "Next.js", "note": "The React Framework" },
+            { "owner": "facebook", "repo": "react", "label": "React", "note": "A JavaScript library" },
+            { "owner": "tailwindlabs", "repo": "tailwindcss", "label": "Tailwind CSS", "note": "Utility-first CSS" },
+            { "owner": "nodejs", "repo": "node", "label": "Node.js", "note": "JavaScript runtime" }
+          ]
+        }
+      ]
+    },
+    {
       "label": "Widgets",
       "icon": "🧩",
       "sections": [

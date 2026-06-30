@@ -693,7 +693,7 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
           </div>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="dark:text-white text-gray-900 text-xs font-medium truncate">
+          <p className="dark:text-white text-gray-900 text-sm font-bold truncate">
             {activity.name}
           </p>
           {crossfadeData ? (
@@ -737,7 +737,7 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
           )}
           {!isLeaving && ((activity.type === 2) || (activity.name && activity.name.toLowerCase().includes("youtube music"))) && activity.timestamps?.end && activity.timestamps?.start ? (
               <div className="flex items-center gap-1 mt-0.5">
-                <span className="dark:text-[#b5bac1] text-gray-500 text-[8px]">
+                <span className="dark:text-[#b5bac1] text-gray-500 text-[11px]">
                   {elapsedStr}
                 </span>
                 <div className="flex-1 h-1 relative">
@@ -778,12 +778,12 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
                     </div>
                   )}
                 </div>
-                <span className="dark:text-[#b5bac1] text-gray-500 text-[8px]">
+                <span className="dark:text-[#b5bac1] text-gray-500 text-[11px]">
                   {formatTimeRemaining(activity.timestamps.end - activity.timestamps.start)}
                 </span>
               </div>
             ) : !isLeaving && startTime ? (
-              <p className="dark:text-[#b5bac1] text-gray-500 text-[10px]">
+              <p className="dark:text-[#b5bac1] text-gray-500 text-xs">
                 {elapsedStr}
               </p>
             ) : null}
