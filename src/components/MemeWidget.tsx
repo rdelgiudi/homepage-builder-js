@@ -12,7 +12,14 @@ interface Meme {
   nsfw: boolean;
 }
 
-export default function MemeWidget({ enableGradientBorders }: { enableGradientBorders?: boolean }) {
+interface MemeWidgetProps {
+  enableGradientBorders?: boolean;
+  widgetFrameEnabled?: boolean;
+  widgetFrameWidth?: number;
+  widgetFrameGradient?: string[];
+}
+
+export default function MemeWidget({ enableGradientBorders, widgetFrameEnabled, widgetFrameWidth, widgetFrameGradient }: MemeWidgetProps) {
   const [meme, setMeme] = useState<Meme | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,7 +70,7 @@ export default function MemeWidget({ enableGradientBorders }: { enableGradientBo
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="relative w-full max-w-md bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+      <div className={`relative w-full max-w-md bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden${widgetFrameEnabled ? ' gradient-frame' : ''}`} style={widgetFrameEnabled ? { '--gf-width': `${widgetFrameWidth ?? 2}px`, '--gf-gradient': widgetFrameGradient?.length ? `linear-gradient(135deg, ${widgetFrameGradient.join(', ')})` : 'linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6, #a78bfa, #60a5fa)' } as React.CSSProperties : undefined}>
         <img
           src={meme.url}
           alt={meme.title}

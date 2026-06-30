@@ -294,7 +294,7 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          {maybeWrapFrame(<MemeWidget enableGradientBorders={enableGradientBorders} />, section.widgetFrame ?? widgetFrame, titleGradient, widgetFrameWidth)}
+          <MemeWidget enableGradientBorders={enableGradientBorders} widgetFrameEnabled={section.widgetFrame ?? widgetFrame} widgetFrameWidth={widgetFrameWidth} widgetFrameGradient={titleGradient} />
         </div>
       );
 

@@ -10,6 +10,7 @@
   },
   "effects": {
     "particleBackground": true,
+    "particleEffect": "comet",
     "gradientBorders": true,
     "tabTransitions": true,
     "customScrollbar": true,

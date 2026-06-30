@@ -11,6 +11,7 @@ const CONFIG_PATH = path.join(process.cwd(), "src/config/homepage.json");
 
 interface EffectsConfig {
   particleBackground?: boolean;
+  particleEffect?: string;
   gradientBorders?: boolean;
   tabTransitions?: boolean;
   customScrollbar?: boolean;

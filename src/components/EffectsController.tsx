@@ -5,6 +5,7 @@ import ParticleBackground from "@/components/ParticleBackground";
 
 interface EffectsConfig {
   particleBackground?: boolean;
+  particleEffect?: string;
   gradientBorders?: boolean;
   tabTransitions?: boolean;
   customScrollbar?: boolean;
@@ -25,7 +26,7 @@ export default function EffectsController({ effects }: EffectsControllerProps) {
 
   return (
     <>
-      {effects?.particleBackground && <ParticleBackground />}
+      {effects?.particleBackground && <ParticleBackground mode={(effects?.particleEffect as "stars" | "comet") || "stars"} />}
     </>
   );
 }

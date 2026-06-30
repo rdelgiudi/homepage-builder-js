@@ -88,7 +88,8 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `particleBackground` | boolean | `true` | Floating canvas particles with star-like twinkle, adapts to light/dark mode |
+| `particleBackground` | boolean | `true` | Canvas particle effect — master toggle |
+| `particleEffect` | string | `"stars"` | Particle visual mode: `"stars"` (flickering drifting circles) or `"comet"` (3D comet starfield with motion trails) |
 | `gradientBorders` | boolean | `true` | Animated gradient border + subtle scale on hover for link cards, buttons, GitHub project cards, Steam "View Profile", and Meme "New Meme" |
 | `tabTransitions` | boolean | `true` | Smooth crossfade when switching tabs |
 | `customScrollbar` | boolean | `true` | Thin rounded scrollbar styling |

@@ -2,26 +2,104 @@
 
 import { useEffect, useRef } from "react";
 
-interface Particle {
+type ParticleMode = "stars" | "comet";
+
+interface StarsParticle {
   x: number;
   y: number;
   vx: number;
   vy: number;
   size: number;
-  opacity: number;
   baseOpacity: number;
   color: string;
   twinkleSpeed: number;
   twinklePhase: number;
 }
 
-export default function ParticleBackground() {
+interface CometParticle {
+  x: number;
+  y: number;
+  z: number;
+  speed: number;
+  baseSize: number;
+  brightness: number;
+  color: string;
+}
+
+type Particle = StarsParticle | CometParticle;
+
+function drawComet(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number, brightness: number, color: string, dirAngle: number, stretch: number) {
+  const spikes = 4;
+  const headLen = 0.7 + 0.3 * (1 - stretch);
+  const tailLen = 1 + 1.5 * stretch;
+  const sideLen = 1 + 0.3 * stretch;
+
+  const parts = color.split(", ");
+  const baseR = parseInt(parts[0]);
+  const baseG = parseInt(parts[1]);
+  const baseB = parseInt(parts[2]);
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(dirAngle);
+
+  const spread = size * 0.15;
+  const tailTip = -(size * tailLen);
+  const headTip = size * headLen;
+
+  const fadeStart = 0.5 * (1 - stretch);
+  const grad = ctx.createLinearGradient(tailTip, 0, headTip, 0);
+  const cDim = stretch > 0.01
+    ? `rgba(${Math.round(baseR * brightness * 0.15)}, ${Math.round(baseG * brightness * 0.15)}, ${Math.round(baseB * brightness * 0.15)}, ${alpha * 0.3})`
+    : `rgba(${Math.round(baseR * brightness)}, ${Math.round(baseG * brightness)}, ${Math.round(baseB * brightness)}, ${alpha})`;
+  const cMid = `rgba(${Math.round(baseR * brightness)}, ${Math.round(baseG * brightness)}, ${Math.round(baseB * brightness)}, ${alpha})`;
+  grad.addColorStop(0, cDim);
+  grad.addColorStop(fadeStart, cMid);
+  grad.addColorStop(1, cMid);
+
+  ctx.beginPath();
+
+  for (let i = 0; i < spikes * 2; i++) {
+    const spikeAngle = (Math.PI * i) / spikes - Math.PI / 2;
+    const isOuter = i % 2 === 0;
+    const cosA = Math.cos(spikeAngle);
+
+    let baseLen: number;
+    if (cosA > 0.8) baseLen = headLen;
+    else if (cosA < -0.8) baseLen = tailLen;
+    else baseLen = sideLen;
+
+    const len = isOuter ? size * baseLen : size * baseLen * 0.3;
+    const w = isOuter ? spread * (0.3 + 0.7 * (1 - Math.abs(Math.sin(spikeAngle)))) : spread * 0.3;
+    const px = len * Math.cos(spikeAngle);
+    const py = w * Math.sin(spikeAngle);
+
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.restore();
+}
+
+const FOCAL = 400;
+const MIN_Z = 0.05;
+const FAR_Z = 3;
+const TRAIL_ALPHA = 0.3;
+
+function project(w: number, h: number, px: number, py: number, z: number) {
+  const scale = FOCAL / z;
+  return { sx: w / 2 + px * scale, sy: h / 2 + py * scale, scale };
+}
+
+export default function ParticleBackground({ mode = "stars" }: { mode?: ParticleMode }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -32,83 +110,135 @@ export default function ParticleBackground() {
       return Math.min(Math.floor(window.innerWidth * 0.04), 60);
     }
 
-    function initParticles() {
+    function trailColor() {
+      return document.documentElement.classList.contains("dark")
+        ? "17, 24, 39" : "243, 244, 246";
+    }
+
+    function initStars() {
       const c = getCount();
       const isDark = document.documentElement.classList.contains("dark");
-      particles = Array.from({ length: c }, () => {
-        const base = isDark ? Math.random() * 0.5 + 0.3 : Math.random() * 0.5 + 0.4;
-        return {
-          x: Math.random() * (canvas?.width || window.innerWidth),
-          y: Math.random() * (canvas?.height || window.innerHeight),
-          vx: (Math.random() - 0.5) * 0.3,
-          vy: (Math.random() - 0.5) * 0.3,
-          size: Math.random() * 3 + 1.5,
-          opacity: base,
-          baseOpacity: base,
-          color: isDark ? "148, 163, 184" : "75, 85, 99",
-          twinkleSpeed: Math.random() * 0.004 + 0.002,
-          twinklePhase: Math.random() * Math.PI * 2,
-        };
-      });
+      particles = Array.from({ length: c }, () => ({
+        x: Math.random() * (canvas?.width || window.innerWidth),
+        y: Math.random() * (canvas?.height || window.innerHeight),
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        size: Math.random() * 2.5 + 1,
+        baseOpacity: isDark ? Math.random() * 0.5 + 0.3 : Math.random() * 0.5 + 0.4,
+        color: isDark ? "148, 163, 184" : "75, 85, 99",
+        twinkleSpeed: Math.random() * 0.004 + 0.002,
+        twinklePhase: Math.random() * Math.PI * 2,
+      })) satisfies StarsParticle[];
+    }
+
+    function initComets() {
+      const c = getCount();
+      const isDark = document.documentElement.classList.contains("dark");
+      particles = Array.from({ length: c }, () => ({
+        x: (Math.random() - 0.5) * 1.6,
+        y: (Math.random() - 0.5) * 1.6,
+        z: Math.random() * (FAR_Z - 0.3) + 0.3,
+        speed: Math.random() * 0.006 + 0.004,
+        baseSize: Math.random() * 0.025 + 0.005,
+        brightness: isDark ? Math.random() * 0.7 + 0.3 : Math.random() * 0.6 + 0.4,
+        color: isDark ? "148, 163, 184" : "75, 85, 99",
+      })) satisfies CometParticle[];
     }
 
     function resize() {
       canvas!.width = window.innerWidth;
       canvas!.height = window.innerHeight;
-      initParticles();
+      if (mode === "comet") initComets();
+      else initStars();
     }
 
-    function animate(now: number) {
+    function animateStars(now: number) {
       ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
 
       for (const p of particles) {
-        p.x += p.vx;
-        p.y += p.vy;
+        const sp = p as StarsParticle;
+        sp.x += sp.vx;
+        sp.y += sp.vy;
+        if (sp.x < 0) sp.x = canvas!.width;
+        if (sp.x > canvas!.width) sp.x = 0;
+        if (sp.y < 0) sp.y = canvas!.height;
+        if (sp.y > canvas!.height) sp.y = 0;
 
-        if (p.x < 0) p.x = canvas!.width;
-        if (p.x > canvas!.width) p.x = 0;
-        if (p.y < 0) p.y = canvas!.height;
-        if (p.y > canvas!.height) p.y = 0;
-
-        const twinkle = 0.8 + 0.2 * Math.sin(now * p.twinkleSpeed + p.twinklePhase);
-        const opacity = p.baseOpacity * twinkle;
+        const twinkle = 0.8 + 0.2 * Math.sin(now * sp.twinkleSpeed + sp.twinklePhase);
+        const opacity = sp.baseOpacity * twinkle;
 
         ctx!.beginPath();
-        ctx!.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx!.fillStyle = `rgba(${p.color}, ${opacity})`;
+        ctx!.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2);
+        ctx!.fillStyle = `rgba(${sp.color}, ${opacity})`;
         ctx!.fill();
       }
 
-      animId = requestAnimationFrame(animate);
+      animId = requestAnimationFrame(animateStars);
+    }
+
+    function animateComets(now: number) {
+      const w = canvas!.width;
+      const h = canvas!.height;
+
+      ctx!.fillStyle = `rgba(${trailColor()}, ${TRAIL_ALPHA})`;
+      ctx!.fillRect(0, 0, w, h);
+
+      for (const p of particles) {
+        const cp = p as CometParticle;
+        cp.z -= cp.speed;
+
+        if (cp.z < MIN_Z) {
+          cp.z = Math.random() * (FAR_Z - 0.5) + 0.5;
+          cp.x = (Math.random() - 0.5) * 1.6;
+          cp.y = (Math.random() - 0.5) * 1.6;
+          cp.baseSize = Math.random() * 0.025 + 0.005;
+          continue;
+        }
+
+        const { sx, sy, scale } = project(w, h, cp.x, cp.y, cp.z);
+        if (sx < -100 || sx > w + 100 || sy < -100 || sy > h + 100) continue;
+
+        const size = cp.baseSize * scale;
+        const edgeAlpha = Math.min(1, (cp.z - MIN_Z) / 0.3);
+        const starBrightness = cp.brightness;
+        const dirAngle = Math.atan2(sy - h / 2, sx - w / 2);
+        const radialDist = Math.sqrt(cp.x * cp.x + cp.y * cp.y);
+        const stretch = Math.min(1, radialDist / 0.4);
+
+        drawComet(ctx!, sx, sy, size, edgeAlpha, starBrightness, cp.color, dirAngle, stretch);
+      }
+
+      animId = requestAnimationFrame(animateComets);
     }
 
     resize();
+
+    if (mode === "comet") animateComets(performance.now());
+    else animateStars(performance.now());
+
     window.addEventListener("resize", resize);
 
     const observer = new MutationObserver(() => {
       const isDark = document.documentElement.classList.contains("dark");
       for (const p of particles) {
-        const base = isDark
-          ? Math.random() * 0.5 + 0.3
-          : Math.random() * 0.5 + 0.4;
-        p.baseOpacity = base;
-        p.opacity = base;
+        if (mode === "comet") {
+          const cp = p as CometParticle;
+          cp.brightness = isDark ? Math.random() * 0.7 + 0.3 : Math.random() * 0.6 + 0.4;
+        } else {
+          const sp = p as StarsParticle;
+          sp.baseOpacity = isDark ? Math.random() * 0.5 + 0.3 : Math.random() * 0.5 + 0.4;
+        }
         p.color = isDark ? "148, 163, 184" : "75, 85, 99";
       }
     });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-
-    animate(performance.now());
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
 
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener("resize", resize);
       observer.disconnect();
     };
-  }, []);
+  }, [mode]);
 
   return (
     <canvas

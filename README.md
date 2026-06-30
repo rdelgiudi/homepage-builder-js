@@ -48,11 +48,14 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
   },
   "effects": {
     "particleBackground": true,
+    "particleEffect": "comet",
     "gradientBorders": true,
     "tabTransitions": true,
     "customScrollbar": true,
     "progressGradient": true,
-    "progressGradientColors": []
+    "progressGradientColors": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
+    "widgetFrame": false,
+    "widgetFrameWidth": 3
   },
   "tabs": [
     {
@@ -85,34 +88,39 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 
 Toggle visual effects on or off:
 
-| Effect | Description |
-|--------|-------------|
-| `particleBackground` | Floating particles with star-like twinkle, color-adaptive for light/dark mode |
-| `gradientBorders` | Animated gradient border + subtle scale on hover for link cards, buttons, GitHub project cards, Steam "View Profile", and Meme "New Meme" |
-| `tabTransitions` | Smooth crossfade animation when switching between tabs |
-| `customScrollbar` | Thin, rounded scrollbar matching the theme |
-| `progressGradient` | Animated gradient fill on music activity progress bar with sparkle particles |
-| `progressGradientColors` | Custom gradient color stops for the progress bar (falls back to `titleGradient`, then default blue→purple→pink) |
+| Effect | Type | Default | Description |
+|--------|------|---------|-------------|
+| `particleBackground` | boolean | `true` | Canvas particle effect — master toggle |
+| `particleEffect` | string | `"stars"` | Particle visual mode: `"stars"` (flickering drifting circles) or `"comet"` (3D comet starfield with motion trails) |
+| `gradientBorders` | boolean | `true` | Animated gradient border + subtle scale on hover for link cards, buttons, GitHub project cards, Steam "View Profile", and Meme "New Meme" |
+| `tabTransitions` | boolean | `true` | Smooth crossfade animation when switching between tabs |
+| `customScrollbar` | boolean | `true` | Thin, rounded scrollbar matching the theme |
+| `progressGradient` | boolean | `true` | Animated gradient fill on music activity progress bar with sparkle particles |
+| `progressGradientColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the progress bar (falls back to `titleGradient`, then default blue→purple→pink) |
+| `widgetFrame` | boolean | `false` | Animated gradient frame around widget sections using title gradient colors |
+| `widgetFrameWidth` | number | `2` | Border width in pixels for the widget gradient frame |
 
-All effects default to `true` if omitted. Set any to `false` to disable.
+All effects default to `true` if omitted (except `widgetFrame`/`widgetFrameWidth`). Set any to `false` to disable.
 
 `progressGradientColors` accepts an array of CSS color strings. When unset it inherits `titleGradient` colors, falling back to a default blue→purple→pink gradient. On track change, the progress bar smoothly shrinks to the new position with burst sparkle particles.
 
+`widgetFrame` can be set globally in effects or overridden per-section by adding `"widgetFrame": true` to individual section objects (discord-server, discord-user, steam, overwatch, markdown, meme, github).
+
 ### Section Types
 
-| Type | Description |
-|------|-------------|
-| `header` | Big title with icon |
-| `text` | Paragraph with icon |
-| `links` | Row of link cards |
-| `buttons` | Action buttons (primary/secondary) |
-| `discord-server` | Discord server widget |
-| `discord-user` | Discord user presence with activity, status, custom status, elapsed time, and mobile indicator |
-| `steam` | Steam profile, recently played, and top games |
-| `overwatch` | Overwatch 2 stats with competitive ranks, hero stats, and performance metrics |
-| `markdown` | Renders a markdown file from `content/` directory |
-| `meme` | Shows a random meme |
-| `github` | GitHub project cards from public repos |
+| Type | Description | Supports `widgetFrame` |
+|------|-------------|------------------------|
+| `header` | Big title with icon | no |
+| `text` | Paragraph with icon | no |
+| `links` | Row of link cards | no |
+| `buttons` | Action buttons (primary/secondary) | no |
+| `discord-server` | Discord server widget | yes |
+| `discord-user` | Discord user presence with activity, status, custom status, elapsed time, and mobile indicator | yes (adds top padding to separate gradient border from banner) |
+| `steam` | Steam profile, recently played, and top games | yes |
+| `overwatch` | Overwatch 2 stats with competitive ranks, hero stats, and performance metrics | yes |
+| `markdown` | Renders a markdown file from `content/` directory | yes |
+| `meme` | Shows a random meme | yes (frame wraps only the image, not the button) |
+| `github` | GitHub project cards from public repos | yes |
 
 ## Components Reference
 
@@ -336,7 +344,7 @@ Displays a random meme from an external API.
 │   │   ├── VisitorCounter.tsx       # Visitor count
 │   │   ├── GitHubProjects.tsx       # GitHub repo cards
 │   │   ├── Tabs.tsx                 # Tab navigation
-│   │   ├── ParticleBackground.tsx   # Particle background effect
+│   │   ├── ParticleBackground.tsx   # Canvas particle effect (stars/comet modes)
 │   │   └── EffectsController.tsx    # Conditional effects renderer
 │   ├── hooks/
 │   │   └── useWebSocket.ts          # WebSocket hook (singleton)
