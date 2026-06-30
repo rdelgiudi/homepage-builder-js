@@ -107,7 +107,9 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
     let particles: Particle[] = [];
 
     function getCount() {
-      return Math.min(Math.floor(window.innerWidth * 0.04), 60);
+      const isMobile = window.innerWidth < 640;
+      const multiplier = isMobile ? 0.025 : 0.04;
+      return Math.min(Math.floor(window.innerWidth * multiplier), isMobile ? 30 : 60);
     }
 
     function trailColor() {
@@ -117,10 +119,12 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
 
     function initStars() {
       const c = getCount();
+      const w = canvas!.width;
+      const h = canvas!.height;
       const isDark = document.documentElement.classList.contains("dark");
       particles = Array.from({ length: c }, () => ({
-        x: Math.random() * (canvas?.width || window.innerWidth),
-        y: Math.random() * (canvas?.height || window.innerHeight),
+        x: Math.random() * w,
+        y: Math.random() * h,
         vx: (Math.random() - 0.5) * 0.3,
         vy: (Math.random() - 0.5) * 0.3,
         size: Math.random() * 2.5 + 1,
@@ -211,12 +215,25 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
       animId = requestAnimationFrame(animateComets);
     }
 
-    resize();
+    function startLoop() {
+      if (mode === "comet") animateComets(performance.now());
+      else animateStars(performance.now());
+    }
 
-    if (mode === "comet") animateComets(performance.now());
-    else animateStars(performance.now());
+    resize();
+    startLoop();
 
     window.addEventListener("resize", resize);
+
+    const visibilityHandler = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(animId);
+        animId = 0;
+      } else if (!animId) {
+        startLoop();
+      }
+    };
+    document.addEventListener("visibilitychange", visibilityHandler);
 
     const observer = new MutationObserver(() => {
       const isDark = document.documentElement.classList.contains("dark");
@@ -236,6 +253,7 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener("resize", resize);
+      document.removeEventListener("visibilitychange", visibilityHandler);
       observer.disconnect();
     };
   }, [mode]);
@@ -244,7 +262,7 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
     <canvas
       ref={canvasRef}
       className="fixed pointer-events-none -z-10"
-      style={{ top: 0, right: 0, bottom: 0, left: 0, width: "100vw", height: "100vh" }}
+      style={{ top: 0, right: 0, bottom: 0, left: 0, width: "100vw", height: "100vh", transform: "translate3d(0,0,0)" }}
     />
   );
 }

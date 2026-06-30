@@ -341,6 +341,7 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions, e
   const transitioning = useRef(false);
 
   useEffect(() => {
+    if (transitioning.current) return;
     const tabParam = searchParams.get("tab");
     if (tabParam) {
       const index = tabs.findIndex((t) => slugify(t.label) === tabParam);
@@ -363,8 +364,10 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions, e
       setTimeout(() => {
         setMountedTab(index);
         requestAnimationFrame(() => {
-          setVisible(true);
-          transitioning.current = false;
+          requestAnimationFrame(() => {
+            setVisible(true);
+            transitioning.current = false;
+          });
         });
       }, 200);
     } else {

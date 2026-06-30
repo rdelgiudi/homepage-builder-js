@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
-import ParticleBackground from "@/components/ParticleBackground";
 import fs from "fs";
 import path from "path";
 
@@ -34,7 +33,6 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="antialiased">
-        <ParticleBackground />
         {children}
         <ThemeSwitcher />
       </body>
