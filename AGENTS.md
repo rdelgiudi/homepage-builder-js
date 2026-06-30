@@ -23,7 +23,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── layout.tsx               # Root layout, generateMetadata reads homepage.json
 │   │   └── page.tsx                 # Homepage — reads homepage.json at runtime via fs
 │   ├── components/
-│   │   ├── DiscordStatus.tsx        # Discord server widget
+│   │   ├── DiscordServer.tsx        # Discord server widget
 │   │   ├── DiscordUser.tsx          # Discord user presence (WebSocket subscriber, mobile indicator)
 │   │   ├── SteamStatus.tsx          # Steam profile & games
 │   │   ├── OverwatchStatus.tsx      # Overwatch 2 stats
@@ -101,7 +101,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - **text** — Paragraph with icon, optional `align` (left/center/right)
 - **links** — Row of link cards (items: label, url, icon, invertDark)
 - **buttons** — Action buttons (items: label, url, icon, style: primary/secondary)
-- **discord** — Discord server widget (uses DISCORD_SERVER_ID)
+- **discord-server** — Discord server widget (uses DISCORD_SERVER_ID)
 - **discord-user** — Discord user presence (WebSocket subscriber, shows phone icon on mobile)
 - **steam** — Steam profile & games
 - **overwatch** — Overwatch 2 competitive stats

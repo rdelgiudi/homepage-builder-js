@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import DiscordStatus from "@/components/DiscordStatus";
+import DiscordServer from "@/components/DiscordServer";
 import DiscordUser from "@/components/DiscordUser";
 import SteamStatus from "@/components/SteamStatus";
 import OverwatchStatus from "@/components/OverwatchStatus";
@@ -79,7 +79,7 @@ interface HeaderSection {
 }
 
 interface DiscordSection {
-  type: "discord";
+  type: "discord-server";
   icon?: string;
   text?: string;
   align?: Align;
@@ -148,7 +148,7 @@ interface TabItem {
 
 type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection;
 
-function renderSection(section: Section, index: number, enableGradientBorders?: boolean, enableProgressGradient?: boolean, progressGradientColors?: string[], titleGradient?: string[]) {
+function renderSection(section: Section, index: number, enableGradientBorders?: boolean, enableProgressGradient?: boolean, progressGradientColors?: string[], titleGradient?: string[], discordServerId?: string) {
   const sa = sectionAlign(section);
   switch (section.type) {
     case "header":
@@ -207,7 +207,7 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
         </div>
       );
 
-    case "discord":
+    case "discord-server":
       return (
         <div key={index}>
           {(section.icon || section.text) && (
@@ -216,7 +216,7 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          <DiscordStatus />
+          <DiscordServer serverId={discordServerId} />
         </div>
       );
 
@@ -304,13 +304,14 @@ interface TabsProps {
   enableProgressGradient?: boolean;
   progressGradientColors?: string[];
   titleGradient?: string[];
+  discordServerId?: string;
 }
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
-export default function Tabs({ tabs, enableGradientBorders, enableTransitions, enableProgressGradient, progressGradientColors, titleGradient }: TabsProps) {
+export default function Tabs({ tabs, enableGradientBorders, enableTransitions, enableProgressGradient, progressGradientColors, titleGradient, discordServerId }: TabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState(0);
@@ -385,7 +386,7 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions, e
             className={enableTransitions && visible ? "animate-fade-in-up" : ""}
             style={enableTransitions && visible ? { animationDelay: `${index * 0.07}s` } : undefined}
           >
-            {renderSection(section, index, enableGradientBorders, enableProgressGradient, progressGradientColors, titleGradient)}
+            {renderSection(section, index, enableGradientBorders, enableProgressGradient, progressGradientColors, titleGradient, discordServerId)}
           </div>
         ))}
       </div>

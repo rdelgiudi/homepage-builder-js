@@ -106,7 +106,7 @@ All effects default to `true` if omitted. Set any to `false` to disable.
 | `text` | Paragraph with icon |
 | `links` | Row of link cards |
 | `buttons` | Action buttons (primary/secondary) |
-| `discord` | Discord server widget |
+| `discord-server` | Discord server widget |
 | `discord-user` | Discord user presence with activity, status, custom status, elapsed time, and mobile indicator |
 | `steam` | Steam profile, recently played, and top games |
 | `overwatch` | Overwatch 2 stats with competitive ranks, hero stats, and performance metrics |
@@ -116,7 +116,7 @@ All effects default to `true` if omitted. Set any to `false` to disable.
 
 ## Components Reference
 
-### DiscordStatus (`discord`)
+### DiscordServer (`discord-server`)
 
 Displays a Discord server widget showing member count and online presence.
 
@@ -327,7 +327,7 @@ Displays a random meme from an external API.
 │   │   ├── layout.tsx
 │   │   └── page.tsx
 │   ├── components/
-│   │   ├── DiscordStatus.tsx        # Discord server widget
+│   │   ├── DiscordServer.tsx        # Discord server widget
 │   │   ├── DiscordUser.tsx          # Discord user presence
 │   │   ├── SteamStatus.tsx          # Steam profile & games
 │   │   ├── OverwatchStatus.tsx      # Overwatch stats

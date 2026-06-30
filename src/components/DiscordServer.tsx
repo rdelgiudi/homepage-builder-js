@@ -1,4 +1,6 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
 
 interface DiscordWidget {
   id: string;
@@ -7,22 +9,16 @@ interface DiscordWidget {
   presence_count: number;
 }
 
-async function getDiscordWidget(serverId: string): Promise<DiscordWidget | null> {
-  try {
-    const res = await fetch(
-      `https://discord.com/api/guilds/${serverId}/widget.json`,
-      { next: { revalidate: 60 } }
-    );
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
+export default function DiscordServer({ serverId }: { serverId?: string }) {
+  const [widget, setWidget] = useState<DiscordWidget | null>(null);
 
-export default async function DiscordStatus() {
-  const serverId = process.env.DISCORD_SERVER_ID || '';
-  const widget = await getDiscordWidget(serverId);
+  useEffect(() => {
+    if (!serverId) return;
+    fetch(`https://discord.com/api/guilds/${serverId}/widget.json`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => setWidget(data))
+      .catch(() => setWidget(null));
+  }, []);
 
   if (!widget) {
     return (

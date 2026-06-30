@@ -108,7 +108,7 @@
       "icon": "🧩",
       "sections": [
         {
-          "type": "discord",
+          "type": "discord-server",
           "icon": "💬",
           "text": "Discord Server Widget"
         }
