@@ -373,9 +373,10 @@ interface DiscordUserProps {
   enableGradient?: boolean;
   gradientColors?: string[];
   titleGradientColors?: string[];
+  framed?: boolean;
 }
 
-export default function DiscordUser({ enableGradient = true, gradientColors, titleGradientColors }: DiscordUserProps) {
+export default function DiscordUser({ enableGradient = true, gradientColors, titleGradientColors, framed }: DiscordUserProps) {
   const resolvedGradient = gradientColors ?? titleGradientColors;
   const [data, setData] = useState<DiscordUserData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -525,7 +526,7 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
 
   if (loading && !lastDisplayNameRef.current) {
     return (
-      <div className="bg-white dark:bg-[#313338] rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className={`bg-white dark:bg-[#313338] rounded-xl overflow-hidden shadow-sm${framed ? '' : ' border border-gray-200 dark:border-gray-700'}`} style={framed ? { paddingTop: 'var(--gf-width, 2px)' } as React.CSSProperties : undefined}>
         <div className="h-28 bg-gray-200 dark:bg-[#2b2d31] relative overflow-hidden animate-shimmer" />
         <div className="px-4 pb-4 pt-16 relative">
           <div className="relative -mt-20 mb-2 w-20 h-20">
@@ -540,7 +541,7 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
 
   if ((!data || data.error || !data.username) && !lastDisplayNameRef.current) {
     return (
-      <div className="bg-white dark:bg-[#313338] rounded-xl p-6 flex items-center gap-4 border border-gray-200 dark:border-gray-700">
+      <div className={`bg-white dark:bg-[#313338] rounded-xl p-6 flex items-center gap-4${framed ? '' : ' border border-gray-200 dark:border-gray-700'}`}>
         <div className="w-12 h-12 rounded-full bg-[#5865F2] flex items-center justify-center">
           <span className="text-2xl">👤</span>
         </div>
@@ -793,7 +794,7 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
   }
 
   return (
-    <div className="bg-white dark:bg-[#313338] rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700">
+    <div className={`bg-white dark:bg-[#313338] rounded-xl overflow-hidden shadow-sm${framed ? '' : ' border border-gray-200 dark:border-gray-700'}`} style={framed ? { paddingTop: 'var(--gf-width, 2px)' } as React.CSSProperties : undefined}>
       <div className="relative h-28">
         {bannerUrl && !imgError ? (
           <Image

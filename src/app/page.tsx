@@ -16,6 +16,8 @@ interface EffectsConfig {
   customScrollbar?: boolean;
   progressGradient?: boolean;
   progressGradientColors?: string[];
+  widgetFrame?: boolean;
+  widgetFrameWidth?: number;
 }
 
 interface GradientConfig {
@@ -74,7 +76,7 @@ export default async function Home() {
 
       <div className="w-full max-w-[870px] mx-auto px-8 pb-8">
         <Suspense fallback={<TabsFallback />}>
-          <Tabs tabs={tabs as Parameters<typeof Tabs>[0]["tabs"]} enableGradientBorders={effects?.gradientBorders ?? true} enableTransitions={effects?.tabTransitions ?? true} enableProgressGradient={effects?.progressGradient ?? true} progressGradientColors={effects?.progressGradientColors} titleGradient={titleGradient} discordServerId={process.env.DISCORD_SERVER_ID} />
+          <Tabs tabs={tabs as Parameters<typeof Tabs>[0]["tabs"]} enableGradientBorders={effects?.gradientBorders ?? true} enableTransitions={effects?.tabTransitions ?? true} enableProgressGradient={effects?.progressGradient ?? true} progressGradientColors={effects?.progressGradientColors} titleGradient={titleGradient} discordServerId={process.env.DISCORD_SERVER_ID} widgetFrame={effects?.widgetFrame} widgetFrameWidth={effects?.widgetFrameWidth} />
         </Suspense>
       </div>
 

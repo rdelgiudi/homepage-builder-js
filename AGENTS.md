@@ -94,6 +94,8 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 | `customScrollbar` | boolean | `true` | Thin rounded scrollbar styling |
 | `progressGradient` | boolean | `true` | Animated gradient fill on music activity progress bar + tiny sparkle particles at the current position |
 | `progressGradientColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the progress bar; falls back to `titleGradient` colors, then to a default blue→purple→pink gradient |
+| `widgetFrame` | boolean | `false` | Animated gradient frame around widget sections (discord-server, discord-user, steam, overwatch, markdown, meme, github) using title gradient colors. Can be overridden per section with a `widgetFrame` field on the section object. |
+| `widgetFrameWidth` | number | `2` | Border width in pixels for the widget gradient frame |
 
 ### Tab sections types:
 
@@ -219,6 +221,15 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 ### Docker persistence
 - `visitors.db` is ephemeral in the container — `docker-compose-example.yml` mounts a named volume to persist it.
 - `src/config/` and `src/content/` can be bind-mounted at runtime for live config edits without rebuild.
+
+### Gradient widget frame stacking
+- `.gradient-frame::before` needs `z-index: 1` and `.gradient-frame` needs `isolation: isolate` because Next.js `Image fill` uses `position: absolute`, putting it in the same stacking level as the `::before`. Without these, the image renders on top of the gradient border at the left/right edges of full-width content like the Discord banner.
+- When `widgetFrame` is enabled on a `discord-user` section, DiscordUser receives a `framed` prop. When `framed`, it removes its own inner `border` (redundant with the gradient frame) and adds `paddingTop: var(--gf-width, 2px)` so the widget's background creates a clean gap between the gradient border and the full-width banner at the top.
+
+### `framed` prop on DiscordUser
+- `DiscordUser` accepts a `framed` boolean prop. When `true`: no `border` classes applied, and `paddingTop: var(--gf-width, 2px)` added via inline style. The CSS variable cascades from the `.gradient-frame` wrapper which sets `--gf-width`.
+- Passed from `Tabs.tsx` as `framed={section.widgetFrame ?? widgetFrame}`.
+- The loading skeleton, error fallback, and main render all handle `framed` identically.
 
 ## Commands
 

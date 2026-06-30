@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import DiscordServer from "@/components/DiscordServer";
@@ -84,6 +84,7 @@ interface DiscordSection {
   text?: string;
   align?: Align;
   invertDark?: boolean;
+  widgetFrame?: boolean;
 }
 
 interface DiscordUserSection {
@@ -92,6 +93,7 @@ interface DiscordUserSection {
   text?: string;
   align?: Align;
   invertDark?: boolean;
+  widgetFrame?: boolean;
 }
 
 interface SteamSection {
@@ -100,6 +102,7 @@ interface SteamSection {
   text?: string;
   align?: Align;
   invertDark?: boolean;
+  widgetFrame?: boolean;
 }
 
 interface OverwatchSection {
@@ -108,11 +111,13 @@ interface OverwatchSection {
   text?: string;
   align?: Align;
   invertDark?: boolean;
+  widgetFrame?: boolean;
 }
 
 interface MarkdownSection {
   type: "markdown";
   file: string;
+  widgetFrame?: boolean;
 }
 
 interface MemeSection {
@@ -121,6 +126,7 @@ interface MemeSection {
   text?: string;
   align?: Align;
   invertDark?: boolean;
+  widgetFrame?: boolean;
 }
 
 interface RepoItem {
@@ -137,6 +143,7 @@ interface GitHubSection {
   text?: string;
   align?: Align;
   invertDark?: boolean;
+  widgetFrame?: boolean;
 }
 
 interface TabItem {
@@ -148,7 +155,19 @@ interface TabItem {
 
 type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection;
 
-function renderSection(section: Section, index: number, enableGradientBorders?: boolean, enableProgressGradient?: boolean, progressGradientColors?: string[], titleGradient?: string[], discordServerId?: string) {
+function maybeWrapFrame(content: ReactNode, enabled: boolean | undefined, gradientColors: string[] | undefined, gradientWidth: number | undefined): ReactNode {
+  if (!enabled) return content;
+  const gradient = gradientColors?.length
+    ? `linear-gradient(135deg, ${gradientColors.join(', ')})`
+    : 'linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6, #a78bfa, #60a5fa)';
+  return (
+    <div className="gradient-frame rounded-xl overflow-hidden" style={{ '--gf-width': `${gradientWidth ?? 2}px`, '--gf-gradient': gradient } as React.CSSProperties}>
+      {content}
+    </div>
+  );
+}
+
+function renderSection(section: Section, index: number, enableGradientBorders?: boolean, enableProgressGradient?: boolean, progressGradientColors?: string[], titleGradient?: string[], discordServerId?: string, widgetFrame?: boolean, widgetFrameWidth?: number) {
   const sa = sectionAlign(section);
   switch (section.type) {
     case "header":
@@ -216,7 +235,7 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          <DiscordServer serverId={discordServerId} />
+          {maybeWrapFrame(<DiscordServer serverId={discordServerId} />, section.widgetFrame ?? widgetFrame, titleGradient, widgetFrameWidth)}
         </div>
       );
 
@@ -229,7 +248,7 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          <DiscordUser enableGradient={enableProgressGradient} gradientColors={progressGradientColors} titleGradientColors={titleGradient} />
+          {maybeWrapFrame(<DiscordUser enableGradient={enableProgressGradient} gradientColors={progressGradientColors} titleGradientColors={titleGradient} framed={section.widgetFrame ?? widgetFrame} />, section.widgetFrame ?? widgetFrame, titleGradient, widgetFrameWidth)}
         </div>
       );
 
@@ -242,7 +261,7 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          <SteamStatus enableGradientBorders={enableGradientBorders} />
+          {maybeWrapFrame(<SteamStatus enableGradientBorders={enableGradientBorders} />, section.widgetFrame ?? widgetFrame, titleGradient, widgetFrameWidth)}
         </div>
       );
 
@@ -255,14 +274,14 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          <OverwatchStatus />
+          {maybeWrapFrame(<OverwatchStatus />, section.widgetFrame ?? widgetFrame, titleGradient, widgetFrameWidth)}
         </div>
       );
 
     case "markdown":
       return (
         <div key={index}>
-          <MarkdownWidget file={section.file} />
+          {maybeWrapFrame(<MarkdownWidget file={section.file} />, section.widgetFrame ?? widgetFrame, titleGradient, widgetFrameWidth)}
         </div>
       );
 
@@ -275,7 +294,7 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          <MemeWidget enableGradientBorders={enableGradientBorders} />
+          {maybeWrapFrame(<MemeWidget enableGradientBorders={enableGradientBorders} />, section.widgetFrame ?? widgetFrame, titleGradient, widgetFrameWidth)}
         </div>
       );
 
@@ -288,7 +307,7 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          <GitHubProjects repos={section.repos} enableGradientBorders={enableGradientBorders} />
+          {maybeWrapFrame(<GitHubProjects repos={section.repos} enableGradientBorders={enableGradientBorders} />, section.widgetFrame ?? widgetFrame, titleGradient, widgetFrameWidth)}
         </div>
       );
 
@@ -305,13 +324,15 @@ interface TabsProps {
   progressGradientColors?: string[];
   titleGradient?: string[];
   discordServerId?: string;
+  widgetFrame?: boolean;
+  widgetFrameWidth?: number;
 }
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
-export default function Tabs({ tabs, enableGradientBorders, enableTransitions, enableProgressGradient, progressGradientColors, titleGradient, discordServerId }: TabsProps) {
+export default function Tabs({ tabs, enableGradientBorders, enableTransitions, enableProgressGradient, progressGradientColors, titleGradient, discordServerId, widgetFrame, widgetFrameWidth }: TabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState(0);
@@ -386,7 +407,7 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions, e
             className={enableTransitions && visible ? "animate-fade-in-up" : ""}
             style={enableTransitions && visible ? { animationDelay: `${index * 0.07}s` } : undefined}
           >
-            {renderSection(section, index, enableGradientBorders, enableProgressGradient, progressGradientColors, titleGradient, discordServerId)}
+            {renderSection(section, index, enableGradientBorders, enableProgressGradient, progressGradientColors, titleGradient, discordServerId, widgetFrame, widgetFrameWidth)}
           </div>
         ))}
       </div>
