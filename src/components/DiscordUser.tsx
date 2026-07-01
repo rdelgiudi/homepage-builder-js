@@ -7,7 +7,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 
 const DEFAULT_GRADIENT_COLORS = ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"];
 
-function ProgressSparkles({ progressPct, gradientColors, crossfadeData }: { progressPct: number; gradientColors: string[] | undefined; crossfadeData: unknown }) {
+function ProgressSparkles({ progressPct, gradientColors, crossfadeData }: { progressPct: number; gradientColors: string[] | undefined; crossfadeData: object | undefined }) {
   const [sparks, setSparks] = useState<Array<{id: number; x: number; y: number; size: number; color: string; delay: number}>>([]);
   const idRef = useRef(0);
 
