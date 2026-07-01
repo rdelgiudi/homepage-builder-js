@@ -288,22 +288,10 @@ html.dark.custom-scrollbar * {
   animation: gradient-shift 3s ease infinite;
 }
 
-@keyframes sparkle {
-  0% { transform: translate(0, 0) scale(1); opacity: 0.9; }
-  100% { transform: translate(14px, -12px) scale(0); opacity: 0; }
+@keyframes spark-particle {
+  0% { transform: translate(0, 0) scale(1.2); opacity: 1; }
+  100% { transform: translate(var(--spark-x, 20px), var(--spark-y, -16px)) scale(0); opacity: 0; }
 }
-
-@keyframes sparkle-alt {
-  0% { transform: translate(0, 0) scale(1); opacity: 0.9; }
-  100% { transform: translate(-8px, -14px) scale(0); opacity: 0; }
-}
-
-.animate-sparkle-1 { animation: sparkle 1.6s ease-out infinite; }
-.animate-sparkle-2 { animation: sparkle 1.6s ease-out infinite 0.35s; }
-.animate-sparkle-3 { animation: sparkle 1.6s ease-out infinite 0.7s; }
-.animate-sparkle-4 { animation: sparkle-alt 1.8s ease-out infinite 0.15s; }
-.animate-sparkle-5 { animation: sparkle-alt 1.8s ease-out infinite 0.5s; }
-.animate-sparkle-6 { animation: sparkle 1.6s ease-out infinite 0.85s; }
 
 @keyframes track-update {
   0% { opacity: 0.5; }
@@ -342,3 +330,125 @@ html.dark.custom-scrollbar * {
 .animate-sparkle-burst-4 { animation: sparkle-burst-alt 0.6s ease-out 0.15s; }
 .animate-sparkle-burst-5 { animation: sparkle-burst 0.7s ease-out 0.2s; }
 .animate-sparkle-burst-6 { animation: sparkle-burst-alt 0.7s ease-out 0.25s; }
+
+@keyframes spark-blaze-1 {
+  0% { transform: translate(0, 0) scale(2); opacity: 1; }
+  100% { transform: translate(28px, -24px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-2 {
+  0% { transform: translate(0, 0) scale(1.8); opacity: 1; }
+  100% { transform: translate(-18px, -30px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-3 {
+  0% { transform: translate(0, 0) scale(2.2); opacity: 1; }
+  100% { transform: translate(35px, -15px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-4 {
+  0% { transform: translate(0, 0) scale(1.6); opacity: 1; }
+  100% { transform: translate(-30px, -22px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-5 {
+  0% { transform: translate(0, 0) scale(2); opacity: 1; }
+  100% { transform: translate(12px, -35px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-6 {
+  0% { transform: translate(0, 0) scale(1.9); opacity: 1; }
+  100% { transform: translate(-8px, -28px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-7 {
+  0% { transform: translate(0, 0) scale(2.1); opacity: 1; }
+  100% { transform: translate(40px, -8px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-8 {
+  0% { transform: translate(0, 0) scale(1.7); opacity: 1; }
+  100% { transform: translate(-25px, -35px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-9 {
+  0% { transform: translate(0, 0) scale(2.3); opacity: 1; }
+  100% { transform: translate(20px, -40px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-10 {
+  0% { transform: translate(0, 0) scale(1.5); opacity: 1; }
+  100% { transform: translate(-40px, -12px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-11 {
+  0% { transform: translate(0, 0) scale(2); opacity: 1; }
+  100% { transform: translate(5px, -32px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-12 {
+  0% { transform: translate(0, 0) scale(1.8); opacity: 1; }
+  100% { transform: translate(-15px, -38px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-13 {
+  0% { transform: translate(0, 0) scale(2.2); opacity: 1; }
+  100% { transform: translate(32px, -25px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-14 {
+  0% { transform: translate(0, 0) scale(1.6); opacity: 1; }
+  100% { transform: translate(-38px, -30px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-15 {
+  0% { transform: translate(0, 0) scale(2.4); opacity: 1; }
+  100% { transform: translate(45px, -5px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-16 {
+  0% { transform: translate(0, 0) scale(1.4); opacity: 1; }
+  100% { transform: translate(-45px, -18px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-17 {
+  0% { transform: translate(0, 0) scale(2.1); opacity: 1; }
+  100% { transform: translate(22px, -42px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-18 {
+  0% { transform: translate(0, 0) scale(1.9); opacity: 1; }
+  100% { transform: translate(-5px, -45px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-19 {
+  0% { transform: translate(0, 0) scale(2); opacity: 1; }
+  100% { transform: translate(38px, -32px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-20 {
+  0% { transform: translate(0, 0) scale(1.7); opacity: 1; }
+  100% { transform: translate(-32px, -40px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-21 {
+  0% { transform: translate(0, 0) scale(2.3); opacity: 1; }
+  100% { transform: translate(15px, -48px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-22 {
+  0% { transform: translate(0, 0) scale(1.5); opacity: 1; }
+  100% { transform: translate(-48px, -8px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-23 {
+  0% { transform: translate(0, 0) scale(2); opacity: 1; }
+  100% { transform: translate(50px, -20px) scale(0); opacity: 0; }
+}
+@keyframes spark-blaze-24 {
+  0% { transform: translate(0, 0) scale(1.8); opacity: 1; }
+  100% { transform: translate(-20px, -50px) scale(0); opacity: 0; }
+}
+
+.spark-blaze-1 { animation: spark-blaze-1 0.5s ease-out; }
+.spark-blaze-2 { animation: spark-blaze-2 0.55s ease-out 0.02s; }
+.spark-blaze-3 { animation: spark-blaze-3 0.45s ease-out 0.04s; }
+.spark-blaze-4 { animation: spark-blaze-4 0.6s ease-out 0.06s; }
+.spark-blaze-5 { animation: spark-blaze-5 0.5s ease-out 0.08s; }
+.spark-blaze-6 { animation: spark-blaze-6 0.55s ease-out 0.1s; }
+.spark-blaze-7 { animation: spark-blaze-7 0.4s ease-out 0.12s; }
+.spark-blaze-8 { animation: spark-blaze-8 0.6s ease-out 0.14s; }
+.spark-blaze-9 { animation: spark-blaze-9 0.5s ease-out 0.16s; }
+.spark-blaze-10 { animation: spark-blaze-10 0.55s ease-out 0.18s; }
+.spark-blaze-11 { animation: spark-blaze-11 0.45s ease-out 0.2s; }
+.spark-blaze-12 { animation: spark-blaze-12 0.6s ease-out 0.22s; }
+.spark-blaze-13 { animation: spark-blaze-13 0.5s ease-out 0.24s; }
+.spark-blaze-14 { animation: spark-blaze-14 0.55s ease-out 0.26s; }
+.spark-blaze-15 { animation: spark-blaze-15 0.4s ease-out 0.28s; }
+.spark-blaze-16 { animation: spark-blaze-16 0.6s ease-out 0.3s; }
+.spark-blaze-17 { animation: spark-blaze-17 0.5s ease-out 0.32s; }
+.spark-blaze-18 { animation: spark-blaze-18 0.55s ease-out 0.34s; }
+.spark-blaze-19 { animation: spark-blaze-19 0.45s ease-out 0.36s; }
+.spark-blaze-20 { animation: spark-blaze-20 0.6s ease-out 0.38s; }
+.spark-blaze-21 { animation: spark-blaze-21 0.5s ease-out 0.4s; }
+.spark-blaze-22 { animation: spark-blaze-22 0.55s ease-out 0.42s; }
+.spark-blaze-23 { animation: spark-blaze-23 0.45s ease-out 0.44s; }
+.spark-blaze-24 { animation: spark-blaze-24 0.6s ease-out 0.46s; }

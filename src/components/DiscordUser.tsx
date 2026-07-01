@@ -5,6 +5,95 @@ import Image from "next/image";
 import quantize from "quantize";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
+const DEFAULT_GRADIENT_COLORS = ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"];
+
+function ProgressSparkles({ progressPct, gradientColors, crossfadeData }: { progressPct: number; gradientColors: string[] | undefined; crossfadeData: unknown }) {
+  const [sparks, setSparks] = useState<Array<{id: number; x: number; y: number; size: number; color: string; delay: number}>>([]);
+  const idRef = useRef(0);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+
+    const spawn = () => {
+      const angle = -(Math.random() * 80 + 10) * (Math.PI / 180);
+      const distance = 18 + Math.random() * 28;
+      const x = Math.cos(angle) * distance;
+      const y = Math.sin(angle) * distance;
+      const size = 2 + Math.random() * 2.5;
+      const colors = gradientColors?.length ? gradientColors : DEFAULT_GRADIENT_COLORS;
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const delay = Math.random() * 0.1;
+
+      const id = ++idRef.current;
+      setSparks(prev => [...prev, { id, x, y, size, color, delay }]);
+
+      setTimeout(() => {
+        setSparks(prev => prev.filter(s => s.id !== id));
+      }, 1000);
+
+      timer = setTimeout(spawn, 150 + Math.random() * 250);
+    };
+
+    for (let i = 0; i < 2; i++) setTimeout(spawn, i * 80);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [gradientColors]);
+
+  const c = gradientColors?.length ? gradientColors : DEFAULT_GRADIENT_COLORS;
+
+  return (
+    <div className="absolute top-0 h-full pointer-events-none overflow-visible" style={{ left: `${progressPct}%`, transition: crossfadeData ? 'left 0.5s ease-out' : 'none' }}>
+      <div className="relative h-full w-4">
+        {sparks.map(s => (
+          <div
+            key={s.id}
+            className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full"
+            style={{
+              width: s.size,
+              height: s.size,
+              backgroundColor: s.color,
+              animation: `spark-particle 0.85s ease-out forwards`,
+              animationDelay: `${s.delay}s`,
+              ['--spark-x' as string]: `${s.x}px`,
+              ['--spark-y' as string]: `${s.y}px`,
+            }}
+          />
+        ))}
+        {crossfadeData && (
+          <>
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[4px] rounded-full spark-blaze-1" style={{ backgroundColor: c[0] || '#60a5fa' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full spark-blaze-2" style={{ backgroundColor: c[2] || '#c084fc' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[5px] h-[5px] rounded-full spark-blaze-3" style={{ backgroundColor: c[4] || '#f472b6' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-[2.5px] rounded-full spark-blaze-4" style={{ backgroundColor: c[1] || '#a78bfa' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[4px] rounded-full spark-blaze-5" style={{ backgroundColor: c[0] || '#60a5fa' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full spark-blaze-6" style={{ backgroundColor: c[3] || '#a78bfa' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[5px] h-[5px] rounded-full spark-blaze-7" style={{ backgroundColor: c[2] || '#c084fc' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-[2.5px] rounded-full spark-blaze-8" style={{ backgroundColor: c[4] || '#f472b6' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[4px] rounded-full spark-blaze-9" style={{ backgroundColor: c[1] || '#a78bfa' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full spark-blaze-10" style={{ backgroundColor: c[0] || '#60a5fa' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[5px] h-[5px] rounded-full spark-blaze-11" style={{ backgroundColor: c[2] || '#c084fc' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-[2.5px] rounded-full spark-blaze-12" style={{ backgroundColor: c[4] || '#f472b6' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[4px] rounded-full spark-blaze-13" style={{ backgroundColor: c[3] || '#a78bfa' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full spark-blaze-14" style={{ backgroundColor: c[0] || '#60a5fa' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[5px] h-[5px] rounded-full spark-blaze-15" style={{ backgroundColor: c[2] || '#c084fc' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-[2.5px] rounded-full spark-blaze-16" style={{ backgroundColor: c[1] || '#a78bfa' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[4px] rounded-full spark-blaze-17" style={{ backgroundColor: c[4] || '#f472b6' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full spark-blaze-18" style={{ backgroundColor: c[0] || '#60a5fa' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[5px] h-[5px] rounded-full spark-blaze-19" style={{ backgroundColor: c[3] || '#a78bfa' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-[2.5px] rounded-full spark-blaze-20" style={{ backgroundColor: c[2] || '#c084fc' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[4px] rounded-full spark-blaze-21" style={{ backgroundColor: c[4] || '#f472b6' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full spark-blaze-22" style={{ backgroundColor: c[1] || '#a78bfa' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[5px] h-[5px] rounded-full spark-blaze-23" style={{ backgroundColor: c[0] || '#60a5fa' }} />
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-[2.5px] rounded-full spark-blaze-24" style={{ backgroundColor: c[2] || '#c084fc' }} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface DiscordActivity {
   type: number;
   name: string;
@@ -366,8 +455,6 @@ async function getVibrantColorFromImage(url: string): Promise<string | null> {
     img.src = url;
   });
 }
-
-const DEFAULT_GRADIENT_COLORS = ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"];
 
 interface DiscordUserProps {
   enableGradient?: boolean;
@@ -757,26 +844,7 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
                     />
                   </div>
                   {enableGradient && (
-                    <div className="absolute top-0 h-full pointer-events-none overflow-visible" style={{ left: `${progressPct}%`, transition: crossfadeData ? 'left 0.5s ease-out' : 'none' }}>
-                      <div className="relative h-full w-4">
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full animate-sparkle-1" style={{ backgroundColor: resolvedGradient?.[2] || '#c084fc' }} />
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[2px] rounded-full animate-sparkle-2" style={{ backgroundColor: resolvedGradient?.[1] || '#a78bfa', animationDelay: '0.35s' }} />
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[2px] rounded-full animate-sparkle-3" style={{ backgroundColor: resolvedGradient?.[4] || '#f472b6', animationDelay: '0.7s' }} />
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[2px] rounded-full animate-sparkle-4" style={{ backgroundColor: resolvedGradient?.[0] || '#60a5fa', animationDelay: '0.15s' }} />
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full animate-sparkle-5" style={{ backgroundColor: resolvedGradient?.[3] || '#a78bfa', animationDelay: '0.5s' }} />
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[1.5px] h-[1.5px] rounded-full animate-sparkle-6" style={{ backgroundColor: resolvedGradient?.[2] || '#c084fc', animationDelay: '0.85s' }} />
-                        {crossfadeData && (
-                          <>
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[4px] rounded-full animate-sparkle-burst-1" style={{ backgroundColor: resolvedGradient?.[2] || '#c084fc' }} />
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full animate-sparkle-burst-2" style={{ backgroundColor: resolvedGradient?.[0] || '#60a5fa' }} />
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[3px] rounded-full animate-sparkle-burst-3" style={{ backgroundColor: resolvedGradient?.[4] || '#f472b6' }} />
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[4px] rounded-full animate-sparkle-burst-4" style={{ backgroundColor: resolvedGradient?.[1] || '#a78bfa' }} />
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[2px] rounded-full animate-sparkle-burst-5" style={{ backgroundColor: resolvedGradient?.[3] || '#a78bfa' }} />
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[2px] rounded-full animate-sparkle-burst-6" style={{ backgroundColor: resolvedGradient?.[2] || '#c084fc' }} />
-                          </>
-                        )}
-                      </div>
-                    </div>
+                    <ProgressSparkles progressPct={progressPct} gradientColors={resolvedGradient} crossfadeData={crossfadeData} />
                   )}
                 </div>
                 <span className="dark:text-[#b5bac1] text-gray-500 text-[11px]">

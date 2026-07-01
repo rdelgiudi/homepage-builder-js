@@ -194,10 +194,10 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - `animate-gradient-bar` class: horizontal gradient shifted via `gradient-shift` 3s animation.
 - Colors come from `effects.progressGradientColors` → `titleGradient` → default blue→purple→pink.
 - When `progressGradient` is `false`, falls back to solid `bg-[#5865F2]` (Discord blurple) with no sparkles.
-- 6 sparkle particles at the current position: 3 white/purple/pink dots (up-right burst via `sparkle` keyframe), 2 blue/light-purple (up-left burst via `sparkle-alt`), 1 tiny white dot filling gaps. Staggered delays 0–0.85s, looping every 1.6–1.8s.
+- Continuous random spark particles via the `ProgressSparkles` component (defined in `DiscordUser.tsx`): spawns at random intervals (60–200ms via recursive `setTimeout`) with random angle in the right-side half-circle range (-10° to -90° from horizontal), random distance (18–46px), random size (2–4.5px), random color from the gradient palette. Trajectory driven by CSS custom properties `--spark-x` / `--spark-y` on a single `spark-particle` keyframe. Each spark self-removes after 1s.
 - Progress percentage extracted as `progressPct` local variable to keep fill width and sparkle position aligned.
 - **Diminish on track change**: When a new song starts (crossfade), the progress bar fill gets `transition: width 0.5s ease-out` and the sparkle container gets `transition: left 0.5s ease-out` so both smoothly animate from the old position to the new (usually ~0%). Normal per-second ticks have `transition: none` to avoid lag.
-- **Burst sparkles**: During crossfade, 6 additional one-shot burst particles (`sparkle-burst` / `sparkle-burst-alt` keyframes, 0.6–0.7s ease-out, not `infinite`) explode outward from the progress position for an intense spark effect as the bar shrinks.
+- **Burst sparkles**: During crossfade, 24 one-shot burst particles (`spark-blaze-1` through `spark-blaze-24` keyframes in globals.css, 0.4–0.6s ease-out, not `infinite`) explode outward from the progress position in varied directions with sizes 2.5–5px and staggered delays 0.02–0.46s for an intense spark effect as the bar shrinks.
 
 ### Activity card layout
 - Card is `h-20` (80px) with `p-2` (8px), so content area is 64px.
