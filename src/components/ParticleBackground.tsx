@@ -27,6 +27,9 @@ interface CometParticle {
   r: number;
   g: number;
   b: number;
+  prevSx: number;
+  prevSy: number;
+  hasPrev: boolean;
 }
 
 type Particle = StarsParticle | CometParticle;
@@ -85,8 +88,6 @@ function drawComet(ctx: CanvasRenderingContext2D, x: number, y: number, size: nu
 const FOCAL = 400;
 const MIN_Z = 0.05;
 const FAR_Z = 3;
-const TRAIL_ALPHA = 0.3;
-
 function project(w: number, h: number, px: number, py: number, z: number) {
   const scale = FOCAL / z;
   return { sx: w / 2 + px * scale, sy: h / 2 + py * scale, scale };
@@ -108,11 +109,6 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
       const isMobile = window.innerWidth < 640;
       const multiplier = isMobile ? 0.025 : 0.04;
       return Math.min(Math.floor(window.innerWidth * multiplier), isMobile ? 30 : 60);
-    }
-
-    function trailColor() {
-      return document.documentElement.classList.contains("dark")
-        ? "17, 24, 39" : "243, 244, 246";
     }
 
     function initStars() {
@@ -149,6 +145,9 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
         r: r!,
         g: g!,
         b: b!,
+        prevSx: 0,
+        prevSy: 0,
+        hasPrev: false,
       })) satisfies CometParticle[];
     }
 
@@ -187,8 +186,7 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
       const w = canvas!.width;
       const h = canvas!.height;
 
-      ctx!.fillStyle = `rgba(${trailColor()}, ${TRAIL_ALPHA})`;
-      ctx!.fillRect(0, 0, w, h);
+      ctx!.clearRect(0, 0, w, h);
 
       for (const p of particles) {
         const cp = p as CometParticle;
@@ -199,11 +197,27 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
           cp.x = (Math.random() - 0.5) * 1.6;
           cp.y = (Math.random() - 0.5) * 1.6;
           cp.baseSize = Math.random() * 0.025 + 0.005;
+          cp.hasPrev = false;
           continue;
         }
 
         const { sx, sy, scale } = project(w, h, cp.x, cp.y, cp.z);
-        if (sx < -100 || sx > w + 100 || sy < -100 || sy > h + 100) continue;
+        if (sx < -100 || sx > w + 100 || sy < -100 || sy > h + 100) {
+          cp.hasPrev = false;
+          continue;
+        }
+
+        if (cp.hasPrev) {
+          ctx!.beginPath();
+          ctx!.moveTo(cp.prevSx, cp.prevSy);
+          ctx!.lineTo(sx, sy);
+          ctx!.strokeStyle = `rgba(${cp.r * cp.brightness | 0}, ${cp.g * cp.brightness | 0}, ${cp.b * cp.brightness | 0}, 0.4)`;
+          ctx!.lineWidth = 1.5;
+          ctx!.stroke();
+        }
+        cp.prevSx = sx;
+        cp.prevSy = sy;
+        cp.hasPrev = true;
 
         const size = cp.baseSize * scale;
         const edgeAlpha = Math.min(1, (cp.z - MIN_Z) / 0.3);
