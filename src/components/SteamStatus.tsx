@@ -78,29 +78,71 @@ const GAME_CARD_WIDTH = 96;
 const GAME_GAP = 12;
 
 function GameCard({ game }: { game: SteamGame }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [rotateX, setRotateX] = useState(0);
+  const [rotateY, setRotateY] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    setRotateX(((y - centerY) / centerY) * -15);
+    setRotateY(((x - centerX) / centerX) * 15);
+  }, []);
+
+  const handleMouseEnter = useCallback(() => setIsHovered(true), []);
+  const handleMouseLeave = useCallback(() => {
+    setIsHovered(false);
+    setRotateX(0);
+    setRotateY(0);
+  }, []);
+
   return (
-    <a
-      href={`https://store.steampowered.com/app/${game.appid}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex-shrink-0 w-24 group"
-      title={game.name}
+    <div
+      ref={cardRef}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className="flex-shrink-0 w-24 relative"
+      style={{ perspective: "500px", zIndex: isHovered ? 50 : 0 }}
     >
-      <div className="relative rounded-lg overflow-hidden bg-gray-300 dark:bg-gray-700 aspect-[3/4]">
-        <Image
-          src={`https://steamcdn-a.akamaihd.net/steam/apps/${game.appid}/library_600x900.jpg`}
-          alt={game.name}
-          fill
-          className="object-cover group-hover:opacity-80 transition-opacity"
-          sizes="96px"
-        />
+      <div
+        style={{
+          transform: isHovered
+            ? `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.25) translateZ(30px)`
+            : "rotateX(0deg) rotateY(0deg) scale(1) translateZ(0px)",
+          transition: "transform 0.15s ease-out",
+          transformStyle: "preserve-3d",
+        }}
+      >
+        <a
+          href={`https://store.steampowered.com/app/${game.appid}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block group"
+          title={game.name}
+        >
+          <div className="relative rounded-lg overflow-hidden bg-gray-300 dark:bg-gray-700 aspect-[3/4]">
+            <Image
+              src={`https://steamcdn-a.akamaihd.net/steam/apps/${game.appid}/library_600x900.jpg`}
+              alt={game.name}
+              fill
+              className="object-cover"
+              sizes="512px"
+            />
+          </div>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate pr-1">{game.name}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-500">{formatPlaytime(game.playtime_forever)}</p>
+          {game.playtime_2weeks !== undefined && game.playtime_2weeks > 0 && (
+            <p className="text-xs text-gray-400 dark:text-gray-500">2w: {formatPlaytime(game.playtime_2weeks)}</p>
+          )}
+        </a>
       </div>
-      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate pr-1">{game.name}</p>
-      <p className="text-xs text-gray-500 dark:text-gray-500">{formatPlaytime(game.playtime_forever)}</p>
-      {game.playtime_2weeks !== undefined && game.playtime_2weeks > 0 && (
-        <p className="text-xs text-gray-400 dark:text-gray-500">2w: {formatPlaytime(game.playtime_2weeks)}</p>
-      )}
-    </a>
+    </div>
   );
 }
 
@@ -124,7 +166,7 @@ function GameSection({ title, games }: { title: string; games: SteamGame[] }) {
   return (
     <div ref={sectionRef} className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{title}</p>
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <div className="flex gap-3 pb-2">
         {games.slice(0, maxGames).map((game) => (
           <GameCard key={game.appid} game={game} />
         ))}
