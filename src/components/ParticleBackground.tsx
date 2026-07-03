@@ -34,8 +34,42 @@ interface CometParticle {
 
 type Particle = StarsParticle | CometParticle;
 
-function drawComet(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number, brightness: number, baseR: number, baseG: number, baseB: number, dirAngle: number, stretch: number) {
+// Pre-computed spike vertices (no trig in hot loop)
+const SPIKE_VERTICES = (() => {
   const spikes = 4;
+  const verts: { cos: number; sin: number; outer: boolean; head: boolean; tail: boolean; sinAbs: number }[] = [];
+  for (let i = 0; i < spikes * 2; i++) {
+    const angle = (Math.PI * i) / spikes - Math.PI / 2;
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    verts.push({
+      cos: cosA, sin: sinA,
+      outer: i % 2 === 0,
+      head: cosA > 0.8,
+      tail: cosA < -0.8,
+      sinAbs: 1 - Math.abs(sinA),
+    });
+  }
+  return verts;
+})();
+
+const MIN_COMET_SIZE = 1; // draw dot instead of full shape below this
+const TRAIL_Z_MAX = 1.5;  // skip trail lines for distant particles
+
+function drawComet(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number, brightness: number, baseR: number, baseG: number, baseB: number, dirAngle: number, stretch: number) {
+  const r = Math.round(baseR * brightness);
+  const g = Math.round(baseG * brightness);
+  const b = Math.round(baseB * brightness);
+
+  // Tiny comets: just a circle — fast path
+  if (size < MIN_COMET_SIZE) {
+    ctx.beginPath();
+    ctx.arc(x, y, Math.max(1, size), 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    ctx.fill();
+    return;
+  }
+
   const headLen = 0.7 + 0.3 * (1 - stretch);
   const tailLen = 1 + 1.5 * stretch;
   const sideLen = 1 + 0.3 * stretch;
@@ -45,42 +79,21 @@ function drawComet(ctx: CanvasRenderingContext2D, x: number, y: number, size: nu
   ctx.rotate(dirAngle);
 
   const spread = size * 0.15;
-  const tailTip = -(size * tailLen);
-  const headTip = size * headLen;
 
-  const fadeStart = 0.5 * (1 - stretch);
-  const grad = ctx.createLinearGradient(tailTip, 0, headTip, 0);
-  const cDim = stretch > 0.01
-    ? `rgba(${Math.round(baseR * brightness * 0.15)}, ${Math.round(baseG * brightness * 0.15)}, ${Math.round(baseB * brightness * 0.15)}, ${alpha * 0.3})`
-    : `rgba(${Math.round(baseR * brightness)}, ${Math.round(baseG * brightness)}, ${Math.round(baseB * brightness)}, ${alpha})`;
-  const cMid = `rgba(${Math.round(baseR * brightness)}, ${Math.round(baseG * brightness)}, ${Math.round(baseB * brightness)}, ${alpha})`;
-  grad.addColorStop(0, cDim);
-  grad.addColorStop(fadeStart, cMid);
-  grad.addColorStop(1, cMid);
-
+  // Solid fill instead of LinearGradient — eliminates per-particle gradient creation
+  ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
   ctx.beginPath();
-
-  for (let i = 0; i < spikes * 2; i++) {
-    const spikeAngle = (Math.PI * i) / spikes - Math.PI / 2;
-    const isOuter = i % 2 === 0;
-    const cosA = Math.cos(spikeAngle);
-
-    let baseLen: number;
-    if (cosA > 0.8) baseLen = headLen;
-    else if (cosA < -0.8) baseLen = tailLen;
-    else baseLen = sideLen;
-
-    const len = isOuter ? size * baseLen : size * baseLen * 0.3;
-    const w = isOuter ? spread * (0.3 + 0.7 * (1 - Math.abs(Math.sin(spikeAngle)))) : spread * 0.3;
-    const px = len * Math.cos(spikeAngle);
-    const py = w * Math.sin(spikeAngle);
-
+  for (let i = 0; i < SPIKE_VERTICES.length; i++) {
+    const v = SPIKE_VERTICES[i];
+    const baseLen = v.head ? headLen : v.tail ? tailLen : sideLen;
+    const len = v.outer ? size * baseLen : size * baseLen * 0.3;
+    const wVal = v.outer ? spread * (0.3 + 0.7 * v.sinAbs) : spread * 0.3;
+    const px = len * v.cos;
+    const py = wVal * v.sin;
     if (i === 0) ctx.moveTo(px, py);
     else ctx.lineTo(px, py);
   }
-
   ctx.closePath();
-  ctx.fillStyle = grad;
   ctx.fill();
   ctx.restore();
 }
@@ -138,7 +151,7 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
         x: (Math.random() - 0.5) * 1.6,
         y: (Math.random() - 0.5) * 1.6,
         z: Math.random() * (FAR_Z - 0.3) + 0.3,
-        speed: Math.random() * 0.006 + 0.004,
+        speed: Math.random() * 0.012 + 0.003,
         baseSize: Math.random() * 0.025 + 0.005,
         brightness: isDark ? Math.random() * 0.7 + 0.3 : Math.random() * 0.6 + 0.4,
         color,
@@ -161,8 +174,8 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
     function animateStars(now: number) {
       ctx!.clearRect(0, 0, canvas!.width, canvas!.height);
 
-      for (const p of particles) {
-        const sp = p as StarsParticle;
+      const c = particles as StarsParticle[];
+      for (const sp of c) {
         sp.x += sp.vx;
         sp.y += sp.vy;
         if (sp.x < 0) sp.x = canvas!.width;
@@ -182,51 +195,67 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
       animId = requestAnimationFrame(animateStars);
     }
 
+    let lastTime = 0;
     function animateComets(now: number) {
       const w = canvas!.width;
       const h = canvas!.height;
 
+      const dt = lastTime ? Math.min((now - lastTime) / (1000 / 60), 3) : 1;
+      lastTime = now;
+
       ctx!.clearRect(0, 0, w, h);
 
-      for (const p of particles) {
-        const cp = p as CometParticle;
-        cp.z -= cp.speed;
+      const c = particles as CometParticle[];
+
+      // Phase 1: update positions and batch trail lines
+      ctx!.beginPath();
+      let hasTrails = false;
+      for (const cp of c) {
+        cp.z -= cp.speed * dt;
 
         if (cp.z < MIN_Z) {
           cp.z = Math.random() * (FAR_Z - 0.5) + 0.5;
           cp.x = (Math.random() - 0.5) * 1.6;
           cp.y = (Math.random() - 0.5) * 1.6;
+          cp.speed = Math.random() * 0.012 + 0.003;
           cp.baseSize = Math.random() * 0.025 + 0.005;
           cp.hasPrev = false;
           continue;
         }
 
-        const { sx, sy, scale } = project(w, h, cp.x, cp.y, cp.z);
+        const { sx, sy } = project(w, h, cp.x, cp.y, cp.z);
         if (sx < -100 || sx > w + 100 || sy < -100 || sy > h + 100) {
           cp.hasPrev = false;
           continue;
         }
 
-        if (cp.hasPrev) {
-          ctx!.beginPath();
+        if (cp.hasPrev && cp.z <= TRAIL_Z_MAX) {
           ctx!.moveTo(cp.prevSx, cp.prevSy);
           ctx!.lineTo(sx, sy);
-          ctx!.strokeStyle = `rgba(${cp.r * cp.brightness | 0}, ${cp.g * cp.brightness | 0}, ${cp.b * cp.brightness | 0}, 0.4)`;
-          ctx!.lineWidth = 1.5;
-          ctx!.stroke();
+          hasTrails = true;
         }
         cp.prevSx = sx;
         cp.prevSy = sy;
         cp.hasPrev = true;
+      }
 
+      if (hasTrails) {
+        ctx!.strokeStyle = `rgba(148, 163, 184, 0.3)`;
+        ctx!.lineWidth = 1;
+        ctx!.stroke();
+      }
+
+      // Phase 2: draw comet shapes
+      for (const cp of c) {
+        if (!cp.hasPrev) continue;
+        const { sx, sy, scale } = project(w, h, cp.x, cp.y, cp.z);
         const size = cp.baseSize * scale;
         const edgeAlpha = Math.min(1, (cp.z - MIN_Z) / 0.3);
-        const starBrightness = cp.brightness;
         const dirAngle = Math.atan2(sy - h / 2, sx - w / 2);
         const radialDist = Math.sqrt(cp.x * cp.x + cp.y * cp.y);
         const stretch = Math.min(1, radialDist / 0.4);
 
-        drawComet(ctx!, sx, sy, size, edgeAlpha, starBrightness, cp.r, cp.g, cp.b, dirAngle, stretch);
+        drawComet(ctx!, sx, sy, size, edgeAlpha, cp.brightness, cp.r, cp.g, cp.b, dirAngle, stretch);
       }
 
       animId = requestAnimationFrame(animateComets);
