@@ -58,7 +58,12 @@ export function getConfig(): HomepageConfig {
 
 export function getMetadata() {
   const c = loadConfigSync();
-  return { name: c.name, tagline: c.tagline, favicon: c.favicon || "" };
+  return {
+    name: c.name,
+    tagline: c.tagline,
+    favicon: c.favicon || "",
+    titleGradient: c.titleGradient || [],
+  };
 }
 
 export type { HomepageConfig, EffectsConfig };
