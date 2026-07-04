@@ -286,17 +286,14 @@ function getActivityKey(activity: DiscordActivity): string {
   return `${appId}-${activity.name}`;
 }
 
-function getActivityTypeIcon(type: number): string {
-  switch (type) {
-    case 0: return "🎮";
-    case 2: return "🎵";
-    case 1: return "📺";
-    case 3: return "🎵";
-    case 4: return "💬";
-    case 5: return "📺";
-    default: return "🕹️";
-  }
-}
+const ACTIVITY_EMOJIS: Record<number, { icon: string; offsetY: number }> = {
+  0: { icon: "🎮", offsetY: -3 },
+  2: { icon: "🎵", offsetY: 0 },
+  1: { icon: "📺", offsetY: 0 },
+  3: { icon: "🎵", offsetY: 0 },
+  4: { icon: "💬", offsetY: 0 },
+  5: { icon: "📺", offsetY: 0 },
+};
 
 const COOLDOWN_MS = 5000;
 
@@ -727,57 +724,60 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
 
     return (
       <div key={activityKey} className={`dark:bg-[#2b2d31] bg-[#ebedef] rounded-md p-2 flex items-start gap-2 flex-shrink-0 min-w-0 overflow-hidden h-20${isEntering ? ' animate-enlarge' : ''}${isLeaving ? ' animate-shrink' : ''}`} style={{ width: isCollapsed ? '0px' : cardWidth, transform: isLeaving && isCollapsed ? 'scale(0,0)' : undefined, transition: 'width 0.3s ease-out, transform 0s' }}>
-        <div className="relative w-16 h-16 rounded flex-shrink-0 dark:bg-[#1e1f22] bg-white overflow-hidden">
-          {crossfadeData?.oldAlbumUrl && !isOnCooldown(`album-${crossfadeData.oldAlbumUrl}`, activityImageErrors) ? (
-            <div className="absolute inset-0 animate-crossfade-out">
-              <Image
-                src={crossfadeData.oldAlbumUrl}
-                alt=""
-                fill
-                className="object-contain rounded"
-                unoptimized={true}
-                referrerPolicy="no-referrer"
-              />
-            </div>
-          ) : null}
-          <div className={`w-full h-full ${crossfadeData ? 'animate-crossfade-in' : ''}`}>
-            {currentAlbumUrl && !isOnCooldown(`album-${currentAlbumUrl}`, activityImageErrors) ? (
-              <Image
-                key={currentAlbumUrl}
-                src={currentAlbumUrl}
-                alt={activity.name}
-                fill
-                className="object-contain rounded"
-                unoptimized={true}
-                referrerPolicy="no-referrer"
-                onError={() => {
-                  setActivityImageErrors(prev => ({ ...prev, [`album-${currentAlbumUrl}`]: Date.now() }));
-                }}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-xl">
-                {activity.type === 0 ? '🎮' : '🎵'}
+        <div className="relative w-16 h-16 rounded flex-shrink-0 dark:bg-[#1e1f22] bg-white">
+          <div className="absolute inset-0 overflow-hidden rounded">
+            {crossfadeData?.oldAlbumUrl && !isOnCooldown(`album-${crossfadeData.oldAlbumUrl}`, activityImageErrors) ? (
+              <div className="absolute inset-0 animate-crossfade-out">
+                <Image
+                  src={crossfadeData.oldAlbumUrl}
+                  alt=""
+                  fill
+                  className="object-contain rounded"
+                  unoptimized={true}
+                  referrerPolicy="no-referrer"
+                />
               </div>
-            )}
-          </div>
-          {smallImageUrl && !isLeaving && !isOnCooldown(`small-${smallImageUrl}`, activityImageErrors) && (
-            <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full overflow-hidden dark:border-[#2b2d31] border-white">
-              <Image
-                key={smallImageUrl}
-                src={smallImageUrl}
-                alt=""
-                fill
-                className="object-contain"
-                unoptimized={true}
-                referrerPolicy="no-referrer"
-                onError={() => setActivityImageErrors(prev => ({ ...prev, [`small-${smallImageUrl}`]: Date.now() }))}
-              />
+            ) : null}
+            <div className={`w-full h-full ${crossfadeData ? 'animate-crossfade-in' : ''}`}>
+              {currentAlbumUrl && !isOnCooldown(`album-${currentAlbumUrl}`, activityImageErrors) ? (
+                <Image
+                  key={currentAlbumUrl}
+                  src={currentAlbumUrl}
+                  alt={activity.name}
+                  fill
+                  className="object-contain rounded"
+                  unoptimized={true}
+                  referrerPolicy="no-referrer"
+                  onError={() => {
+                    setActivityImageErrors(prev => ({ ...prev, [`album-${currentAlbumUrl}`]: Date.now() }));
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-xl">
+                  {activity.type === 0 ? '🎮' : '🎵'}
+                </div>
+              )}
             </div>
-          )}
-          <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 dark:bg-[#2b2d31] bg-white dark:border-[#2b2d31] border-white rounded-full flex items-center justify-center border">
-            <span className="text-sm leading-none">
-              {getActivityTypeIcon(activity.type)}
-            </span>
+          </div>
+          <div className="absolute -bottom-1 -right-1 w-6 h-6 dark:bg-[#2b2d31] bg-white dark:border-[#2b2d31] border-white rounded-full flex items-center justify-center border">
+            {smallImageUrl && !isLeaving && !isOnCooldown(`small-${smallImageUrl}`, activityImageErrors) ? (
+              <div className="w-5 h-5 rounded-full overflow-hidden">
+                <Image
+                  key={smallImageUrl}
+                  src={smallImageUrl}
+                  alt=""
+                  fill
+                  className="object-contain"
+                  unoptimized={true}
+                  referrerPolicy="no-referrer"
+                  onError={() => setActivityImageErrors(prev => ({ ...prev, [`small-${smallImageUrl}`]: Date.now() }))}
+                />
+              </div>
+            ) : (
+              <span className="flex items-center justify-center w-full h-full text-sm leading-none" style={{ transform: `translateY(${ACTIVITY_EMOJIS[activity.type]?.offsetY ?? 0}px)` }}>
+                {ACTIVITY_EMOJIS[activity.type]?.icon ?? "🕹️"}
+              </span>
+            )}
           </div>
         </div>
         <div className="min-w-0 flex-1">

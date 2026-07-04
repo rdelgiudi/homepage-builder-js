@@ -15,6 +15,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 ├── src/
 │   ├── app/
 │   │   ├── api/
+│   │   │   ├── favicon/route.ts     # Serves animated SVG favicon (fallback when no favicon set)
 │   │   │   ├── github/route.ts      # GitHub repo data with 6h cache, 10m error cache
 │   │   │   ├── markdown/route.ts    # Reads markdown from src/content/ at runtime, renders to HTML
 │   │   │   ├── meme/route.ts        # Random meme from external API
@@ -34,7 +35,8 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── GitHubProjects.tsx       # GitHub repo cards (public API, no key needed)
 │   │   ├── Tabs.tsx                 # Tab navigation w/ header + icon + sections
 │   │   ├── ParticleBackground.tsx   # Canvas floating particles
-│   │   └── EffectsController.tsx    # Conditionally renders effects based on config
+│   │   ├── EffectsController.tsx    # Conditionally renders effects based on config
+│   │   └── FaviconAnimation.tsx     # Canvas-based animated favicon (hidden canvas → PNG data URL)
 │   ├── config/
 │   │   ├── homepage.json            # ALL site config: name, tagline, favicon, tabs
 │   │   └── homepage.example.json
@@ -79,7 +81,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 |---|---|
 | `name` | Site title (HTML `<title>`, page h1) |
 | `tagline` | Page subtitle, also used as `<meta name="description">` |
-| `favicon` | URL for favicon (optional, empty = default) |
+| `favicon` | URL for favicon (optional, empty/omit = auto-generated animated gradient ring using `titleGradient` colors) |
 | `titleGradient` | Array of CSS color stops for title gradient text; omit or empty = solid color |
 | `taglineGradient` | Array of CSS color stops for tagline gradient; empty array or omit = inherits `titleGradient` |
 | `backgroundColor` | Object with `light` and `dark` hex colors for page background (defaults: `#f3f4f6` / `#111827`) |
@@ -207,6 +209,27 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - All text elements (name, details, state) use `truncate` for `text-overflow: ellipsis` — text never wraps.
 - Text that overflows gets `...` instead of changing the image's square shape.
 
+### Activity badge (corner icon) positioning
+- The corner badge (`w-6 h-6`, 24px) is positioned at `-bottom-1 -right-1` (4px outside the image container). This centers the badge such that the container corner at (64,64) falls within the 12px radius (distance = √(8²+8²) ≈ 11.31px < 12px).
+- The outer image container (`w-16 h-16`) must NOT have `overflow-hidden` — it's moved to an `absolute inset-0` inner wrapper that clips only the album art images. This lets the badge extend past the container bounds without being clipped.
+
+### Small image nested inside badge
+- The small image overlay (formerly a separate `absolute -bottom-0.5 -right-0.5 w-5 h-5` element) now renders inside the badge div at `w-5 h-5` centered via the badge's `flex items-center justify-center`.
+- When `smallImageUrl` is available, it replaces the emoji icon inside the badge. When unavailable, the emoji fallback shows. This eliminates two overlapping circles at different sizes fighting for the same corner position.
+
+### Emoji centering in activity badge
+- Emojis have inconsistent internal vertical spacing. Per-emoji `offsetY` adjustments are applied via `translateY` on a `flex items-center justify-center w-full h-full` span.
+- Defined in the `ACTIVITY_EMOJIS` lookup table:
+
+  | Type | Emoji | offsetY |
+  |------|-------|---------|
+  | 0 (Game) | 🎮 | -3px |
+  | 2 (Music) | 🎵 | 0 |
+  | 1 (Stream) | 📺 | 0 |
+  | 3 (Music) | 🎵 | 0 |
+  | 4 (Custom) | 💬 | 0 |
+  | 5 (Stream) | 📺 | 0 |
+
 ### npm overrides
 - `package.json` overrides `undici@^6.27.0` to fix high-severity vulns without breaking `discord.js`.
 
@@ -247,6 +270,13 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - `ParticleBackground` is rendered conditionally by `EffectsController` (based on `effects.particleBackground` in `homepage.json`).
 - It must **not** also be rendered unconditionally in `src/app/layout.tsx` — doing so produces two canvas elements animating on top of each other, doubling GPU/CPU cost.
 - `EffectsController` is the single source of truth for when the particle background is active.
+
+### Default favicon animation
+- When `favicon` is empty/omitted in `homepage.json`, the page uses a canvas-based animated favicon that draws a conic-gradient ring using `titleGradient` colors.
+- A hidden `<canvas>` (32×32) renders each frame via `requestAnimationFrame`, converts to a PNG data URL via `canvas.toDataURL("image/png")`, and sets it as `link[rel*="icon"].href` — the same technique as the GeeksForGeeks favicon animation article.
+- A server-side SVG fallback (`/api/favicon`) is set as the initial favicon via metadata, so a favicon exists during SSR before the canvas JS hydrates.
+- The gradient sweeps continuously as the `startAngle` parameter of `createConicGradient` advances per frame. The first color is duplicated at position `1.0` to prevent a hard seam at the gradient wrap point.
+- The `FaviconAnimation` client component receives `titleGradient` as a prop from the server layout. Falls back to `["#60a5fa", "#a78bfa", "#f472b6"]` if no gradient is configured.
 
 ### ParticleBackground mobile performance
 - Canvas uses `transform: translate3d(0,0,0)` in its inline style to promote it to its own GPU compositor layer, so the browser doesn't repaint the page underneath on every frame.

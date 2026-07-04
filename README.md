@@ -14,6 +14,7 @@ A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integ
 - Icon support using emoji or image URLs
 - Responsive design with Tailwind CSS
 - Light/dark mode support
+- Auto-generated animated gradient favicon (when not specified, uses title colors)
 - Easy to customize via JSON config files
 
 ## Getting Started
@@ -39,7 +40,7 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 {
   "name": "Your Name",
   "tagline": "Your tagline or bio goes here",
-  "favicon": "https://example.com/favicon.svg",
+  "favicon": "",  // empty/omit = auto-generated animated gradient ring
   "titleGradient": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
   "taglineGradient": [],
   "backgroundColor": {
@@ -327,6 +328,7 @@ Displays a random meme from an external API.
 │   │   └── about-example.md
 │   ├── app/
 │   │   ├── api/
+│   │   │   ├── favicon/route.ts     # Animated SVG favicon fallback
 │   │   │   ├── github/route.ts      # GitHub repo data (6h cache)
 │   │   │   ├── markdown/route.ts    # Markdown API (server-rendered HTML, mtime-cached)
 │   │   │   ├── meme/route.ts        # Random meme
@@ -346,7 +348,8 @@ Displays a random meme from an external API.
 │   │   ├── GitHubProjects.tsx       # GitHub repo cards
 │   │   ├── Tabs.tsx                 # Tab navigation
 │   │   ├── ParticleBackground.tsx   # Canvas particle effect (stars/comet modes)
-│   │   └── EffectsController.tsx    # Conditional effects renderer
+│   │   ├── EffectsController.tsx    # Conditional effects renderer
+│   │   └── FaviconAnimation.tsx     # Canvas animated favicon
 │   ├── hooks/
 │   │   └── useWebSocket.ts          # WebSocket hook (rAF-coalesced per type)
 │   └── lib/
