@@ -9,7 +9,9 @@
     "lint": "next lint"
   },
   "overrides": {
-    "undici": "^6.27.0"
+    "undici": "^6.27.0",
+    "rimraf": "^6.1.3",
+    "glob": "^13.0.0"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.20",

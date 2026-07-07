@@ -452,3 +452,13 @@ html.dark.custom-scrollbar * {
 .spark-blaze-22 { animation: spark-blaze-22 0.55s ease-out 0.42s; }
 .spark-blaze-23 { animation: spark-blaze-23 0.45s ease-out 0.44s; }
 .spark-blaze-24 { animation: spark-blaze-24 0.6s ease-out 0.46s; }
+
+@keyframes curtain-slide {
+  from {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+}
+.animate-curtain-slide {
+  animation: curtain-slide 0.25s ease-out;
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
@@ -82,6 +83,12 @@ function GameCard({ game }: { game: SteamGame }) {
   const [rotateX, setRotateX] = useState(0);
   const [rotateY, setRotateY] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [popupRect, setPopupRect] = useState<DOMRect | null>(null);
+
+  const updatePopupRect = useCallback(() => {
+    if (!cardRef.current) return;
+    setPopupRect(cardRef.current.getBoundingClientRect());
+  }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!cardRef.current) return;
@@ -94,12 +101,21 @@ function GameCard({ game }: { game: SteamGame }) {
     setRotateY(((x - centerX) / centerX) * 15);
   }, []);
 
-  const handleMouseEnter = useCallback(() => setIsHovered(true), []);
+  const handleMouseEnter = useCallback(() => {
+    setIsHovered(true);
+    updatePopupRect();
+  }, [updatePopupRect]);
+
   const handleMouseLeave = useCallback(() => {
     setIsHovered(false);
+    setPopupRect(null);
     setRotateX(0);
     setRotateY(0);
   }, []);
+
+  const transformStyle = isHovered
+    ? `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.4) translateZ(30px)`
+    : "rotateX(0deg) rotateY(0deg) scale(1) translateZ(0px)";
 
   return (
     <div
@@ -110,21 +126,18 @@ function GameCard({ game }: { game: SteamGame }) {
       className="flex-shrink-0 w-24 relative"
       style={{ perspective: "500px", zIndex: isHovered ? 50 : 0 }}
     >
-      <div
-        style={{
-          transform: isHovered
-            ? `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.25) translateZ(30px)`
-            : "rotateX(0deg) rotateY(0deg) scale(1) translateZ(0px)",
-          transition: "transform 0.15s ease-out",
-          transformStyle: "preserve-3d",
-        }}
+      <a
+        href={`https://store.steampowered.com/app/${game.appid}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block group"
       >
-        <a
-          href={`https://store.steampowered.com/app/${game.appid}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block group"
-          title={game.name}
+        <div
+          style={{
+            transform: transformStyle,
+            transition: "transform 0.15s ease-out",
+            transformStyle: "preserve-3d",
+          }}
         >
           <div className="relative rounded-lg overflow-hidden bg-gray-300 dark:bg-gray-700 aspect-[3/4]">
             <Image
@@ -135,13 +148,45 @@ function GameCard({ game }: { game: SteamGame }) {
               sizes="512px"
             />
           </div>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate pr-1">{game.name}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-500">{formatPlaytime(game.playtime_forever)}</p>
-          {game.playtime_2weeks !== undefined && game.playtime_2weeks > 0 && (
-            <p className="text-xs text-gray-400 dark:text-gray-500">2w: {formatPlaytime(game.playtime_2weeks)}</p>
-          )}
-        </a>
-      </div>
+        </div>
+        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate pr-1">{game.name}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-500">{formatPlaytime(game.playtime_forever)}</p>
+        {game.playtime_2weeks !== undefined && game.playtime_2weeks > 0 && (
+          <p className="text-xs text-gray-400 dark:text-gray-500">2w: {formatPlaytime(game.playtime_2weeks)}</p>
+        )}
+      </a>
+      {isHovered && popupRect && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed z-50 pointer-events-none"
+          style={{
+            left: popupRect.left + popupRect.width / 2,
+            top: popupRect.top + popupRect.width * 4 / 3,
+            perspective: "500px",
+          }}
+        >
+          <div
+            style={{
+              transform: transformStyle,
+              transition: "transform 0.15s ease-out",
+              transformStyle: "preserve-3d",
+              transformOrigin: `0px ${-(popupRect.width * 4 / 3 / 2)}px`,
+            }}
+          >
+            <div className="animate-curtain-slide" style={{ transformOrigin: "top center" }}>
+              <div className="bg-gray-900 dark:bg-gray-700 text-white rounded-lg px-3 py-2 shadow-lg min-w-[140px] -translate-x-1/2">
+                <p className="text-xs font-semibold whitespace-nowrap">{game.name}</p>
+                <div className="flex gap-3 mt-1.5">
+                  <p className="text-[11px] text-gray-300">Total: {formatPlaytime(game.playtime_forever)}</p>
+                  {game.playtime_2weeks !== undefined && game.playtime_2weeks > 0 && (
+                    <p className="text-[11px] text-gray-400">Last 2 weeks: {formatPlaytime(game.playtime_2weeks)}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
