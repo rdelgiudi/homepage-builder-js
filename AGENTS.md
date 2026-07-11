@@ -236,6 +236,15 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 ### Docker build requires native modules
 - `better-sqlite3` and `sharp` need `build-base` + `python3` (already in Dockerfile).
 
+### Discord presence reconnection
+- `discord-presence.js` `start()` is re-entrant — destroys the old client before creating a new one, so it can be safely called again after a failure.
+- `clientReady` stores the `fetchUserPresence` interval in `fetchInterval` and clears any previous one before creating a new, preventing interval leaks across reconnects.
+- `invalidated` event handler triggers `scheduleRestart()` — destroys the client, nulls it, waits 5s, then calls `start()` again.
+- Login failure retries after 30s via `setTimeout(() => start(), 30000)` instead of giving up silently.
+- A 60s health check interval calls `client.isReady()` and triggers `scheduleRestart()` if the client is stuck (connected but not ready).
+- `scheduleRestart()` calls `clearIntervals()`, destroys the client, resets `userPresence` to `emptyPresence()`, then re-calls `start()` after a delay.
+- `stop()` clears both `fetchInterval` and `healthCheckInterval` before destroying the client.
+
 ### WebSocket data flow
 1. `discord-presence.js` connects to Discord Gateway, receives presence events.
 2. Calls registered callbacks in-process (no localhost WS hop).

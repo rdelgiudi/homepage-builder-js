@@ -7,6 +7,8 @@ const botToken = process.env.DISCORD_BOT_TOKEN || '';
 const presenceCallbacks = new Set();
 let client = null;
 let userPresence = null;
+let fetchInterval = null;
+let healthCheckInterval = null;
 
 function emptyPresence() {
   return {
@@ -101,14 +103,47 @@ function getCurrentPresence() {
   return userPresence;
 }
 
+function clearIntervals() {
+  if (fetchInterval) { clearInterval(fetchInterval); fetchInterval = null; }
+  if (healthCheckInterval) { clearInterval(healthCheckInterval); healthCheckInterval = null; }
+}
+
+function scheduleRestart(delayMs = 5000) {
+  clearIntervals();
+  if (client) {
+    try { client.destroy(); } catch {}
+    client = null;
+  }
+  userPresence = emptyPresence();
+  console.log(`[${new Date().toISOString()}] [Discord Presence] Scheduling restart in ${delayMs}ms`);
+  setTimeout(() => start().catch(e => {
+    console.error(`[${new Date().toISOString()}] [Discord Presence] Restart failed:`, e);
+  }), delayMs);
+}
+
+function startHealthCheck() {
+  if (healthCheckInterval) clearInterval(healthCheckInterval);
+  healthCheckInterval = setInterval(() => {
+    if (!client) return;
+    if (!client.isReady()) {
+      console.warn(`[${new Date().toISOString()}] [Discord Presence] Health check: client not ready, restarting`);
+      scheduleRestart();
+    }
+  }, 60000);
+}
+
 async function start() {
   if (!userId || !botToken || userId === 'YOUR_DISCORD_USER_ID') {
     console.warn(`[${new Date().toISOString()}] [Discord Presence] DISCORD_USER_ID or DISCORD_BOT_TOKEN not set; presence tracking disabled`);
     return;
   }
 
-  if (client) return;
+  if (client) {
+    try { await client.destroy(); } catch {}
+    client = null;
+  }
 
+  clearIntervals();
   userPresence = emptyPresence();
 
   client = new Client({
@@ -122,7 +157,9 @@ async function start() {
   client.on('clientReady', async () => {
     console.log(`[${new Date().toISOString()}] Discord bot logged in as ${client.user.tag}`);
     await fetchUserPresence();
-    setInterval(fetchUserPresence, 30000);
+    if (fetchInterval) clearInterval(fetchInterval);
+    fetchInterval = setInterval(fetchUserPresence, 30000);
+    startHealthCheck();
   });
 
   client.on('presenceUpdate', (oldPresence, newPresence) => {
@@ -142,18 +179,38 @@ async function start() {
     }
   });
 
+  client.on('shardDisconnect', (closeEvent) => {
+    console.warn(`[${new Date().toISOString()}] [Discord Presence] Shard disconnected (code: ${closeEvent?.code})`);
+  });
+
+  client.on('shardReconnecting', () => {
+    console.log(`[${new Date().toISOString()}] [Discord Presence] Shard reconnecting...`);
+  });
+
+  client.on('shardReady', async () => {
+    console.log(`[${new Date().toISOString()}] [Discord Presence] Shard ready, re-fetching presence`);
+    await fetchUserPresence();
+  });
+
+  client.on('invalidated', () => {
+    console.error(`[${new Date().toISOString()}] [Discord Presence] Session invalidated, restarting`);
+    scheduleRestart();
+  });
+
   client.on('error', (error) => {
-    console.error(`[${new Date().toISOString()}] Discord client error:`, error);
+    console.error(`[${new Date().toISOString()}] [Discord Presence] Client error:`, error);
   });
 
   try {
     await client.login(botToken);
   } catch (err) {
-    console.error(`[${new Date().toISOString()}] Discord login failed:`, err.message);
+    console.error(`[${new Date().toISOString()}] [Discord Presence] Login failed, retrying in 30s:`, err.message);
+    setTimeout(() => start().catch(() => {}), 30000);
   }
 }
 
 async function stop() {
+  clearIntervals();
   if (client) {
     try {
       await client.destroy();
