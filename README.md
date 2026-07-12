@@ -10,7 +10,7 @@ A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integ
 - Steam integration showing recently played games and game library
 - Overwatch 2 stats integration (ranks, hero stats, performance metrics)
 - GitHub project cards (via public API, no key needed)
-- Fully customizable sections (text, links, buttons, headers)
+- Fully customizable sections (text, links with primary/secondary styles, headers)
 - Icon support using emoji or image URLs
 - Responsive design with Tailwind CSS
 - Light/dark mode support
@@ -113,8 +113,7 @@ All effects default to `true` if omitted (except `widgetFrame`/`widgetFrameWidth
 |------|-------------|------------------------|
 | `header` | Big title with icon | no |
 | `text` | Paragraph with icon | no |
-| `links` | Row of link cards | no |
-| `buttons` | Action buttons (primary/secondary) | no |
+| `links` | Row of link cards (supports primary/secondary styles) | no |
 | `discord-server` | Discord server widget | yes |
 | `discord-user` | Discord user presence with activity, status, custom status, elapsed time, and mobile indicator | yes (adds top padding to separate gradient border from banner) |
 | `steam` | Steam profile, recently played, and top games | yes |
