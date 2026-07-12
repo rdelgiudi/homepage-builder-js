@@ -62,12 +62,18 @@ interface LinksSection {
   type: "links";
   items: LinkItem[];
   align?: Align;
+  text?: string;
+  icon?: string;
+  invertDark?: boolean;
 }
 
 interface ButtonsSection {
   type: "buttons";
   items: ButtonItem[];
   align?: Align;
+  text?: string;
+  icon?: string;
+  invertDark?: boolean;
 }
 
 interface HeaderSection {
@@ -188,41 +194,57 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
 
     case "links":
       return (
-        <div key={index} className={`flex flex-wrap gap-3 ${sa}`}>
-          {section.items.map((item, i) => (
-            <a
-              key={i}
-              href={item.url}
-              className={`flex items-center gap-2 px-5 py-3 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 hover:-translate-y-0.5 hover:shadow-md hover:scale-105 text-gray-800 dark:text-white rounded-lg transition-all duration-200${enableGradientBorders ? ' gradient-border-card' : ''}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {item.icon && <Icon icon={item.icon} invertDark={item.invertDark} />}
-              <span>{item.label}</span>
-            </a>
-          ))}
+        <div key={index}>
+          {(section.icon || section.text) && (
+            <p className={`text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2 ${sa}`}>
+              {section.icon && <Icon icon={section.icon} className="text-xl" width={24} height={24} invertDark={section.invertDark} />}
+              {section.text && <span>{section.text}</span>}
+            </p>
+          )}
+          <div className={`flex flex-wrap gap-3 ${sa}`}>
+            {section.items.map((item, i) => (
+              <a
+                key={i}
+                href={item.url}
+                className={`flex items-center gap-2 px-5 py-3 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 hover:-translate-y-0.5 hover:shadow-md hover:scale-105 text-gray-800 dark:text-white rounded-lg transition-all duration-200${enableGradientBorders ? ' gradient-border-card' : ''}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {item.icon && <Icon icon={item.icon} invertDark={item.invertDark} />}
+                <span>{item.label}</span>
+              </a>
+            ))}
+          </div>
         </div>
       );
 
     case "buttons":
       return (
-        <div key={index} className={`flex flex-wrap gap-3 ${sa}`}>
-          {section.items.map((item, i) => (
-            <a
-              key={i}
-              href={item.url}
-              className={`flex items-center gap-2 px-6 py-3 rounded-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:scale-105${enableGradientBorders ? ' gradient-border-card' : ''} ${
-                item.style === "primary"
-                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                  : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white"
-              }`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {item.icon && <Icon icon={item.icon} invertDark={item.invertDark} />}
-              <span>{item.label}</span>
-            </a>
-          ))}
+        <div key={index}>
+          {(section.icon || section.text) && (
+            <p className={`text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2 ${sa}`}>
+              {section.icon && <Icon icon={section.icon} className="text-xl" width={24} height={24} invertDark={section.invertDark} />}
+              {section.text && <span>{section.text}</span>}
+            </p>
+          )}
+          <div className={`flex flex-wrap gap-3 ${sa}`}>
+            {section.items.map((item, i) => (
+              <a
+                key={i}
+                href={item.url}
+                className={`flex items-center gap-2 px-6 py-3 rounded-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:scale-105${enableGradientBorders ? ' gradient-border-card' : ''} ${
+                  item.style === "primary"
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                    : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white"
+                }`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {item.icon && <Icon icon={item.icon} invertDark={item.invertDark} />}
+                <span>{item.label}</span>
+              </a>
+            ))}
+          </div>
         </div>
       );
 

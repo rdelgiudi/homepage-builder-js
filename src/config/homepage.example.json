@@ -61,6 +61,7 @@
       "sections": [
         {
           "type": "links",
+          "text": "Follow me on social media",
           "align": "right",
           "items": [
             { "label": "GitHub",  "url": "https://github.com/yourusername",  "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/github.svg", "invertDark": true },
