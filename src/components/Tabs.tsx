@@ -15,13 +15,6 @@ interface LinkItem {
   label: string;
   url: string;
   icon?: string;
-  invertDark?: boolean;
-}
-
-interface ButtonItem {
-  label: string;
-  url: string;
-  icon?: string;
   style?: "primary" | "secondary";
   invertDark?: boolean;
 }
@@ -61,15 +54,6 @@ interface TextSection {
 interface LinksSection {
   type: "links";
   items: LinkItem[];
-  align?: Align;
-  text?: string;
-  icon?: string;
-  invertDark?: boolean;
-}
-
-interface ButtonsSection {
-  type: "buttons";
-  items: ButtonItem[];
   align?: Align;
   text?: string;
   icon?: string;
@@ -156,10 +140,10 @@ interface TabItem {
   label: string;
   icon?: string;
   invertDark?: boolean;
-  sections: (TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection)[];
+  sections: (TextSection | LinksSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection)[];
 }
 
-type Section = TextSection | LinksSection | ButtonsSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection;
+type Section = TextSection | LinksSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection;
 
 function maybeWrapFrame(content: ReactNode, enabled: boolean | undefined, gradientColors: string[] | undefined, gradientWidth: number | undefined): ReactNode {
   if (!enabled) return content;
@@ -206,36 +190,10 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
               <a
                 key={i}
                 href={item.url}
-                className={`flex items-center gap-2 px-5 py-3 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 hover:-translate-y-0.5 hover:shadow-md hover:scale-105 text-gray-800 dark:text-white rounded-lg transition-all duration-200${enableGradientBorders ? ' gradient-border-card' : ''}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {item.icon && <Icon icon={item.icon} invertDark={item.invertDark} />}
-                <span>{item.label}</span>
-              </a>
-            ))}
-          </div>
-        </div>
-      );
-
-    case "buttons":
-      return (
-        <div key={index}>
-          {(section.icon || section.text) && (
-            <p className={`text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2 ${sa}`}>
-              {section.icon && <Icon icon={section.icon} className="text-xl" width={24} height={24} invertDark={section.invertDark} />}
-              {section.text && <span>{section.text}</span>}
-            </p>
-          )}
-          <div className={`flex flex-wrap gap-3 ${sa}`}>
-            {section.items.map((item, i) => (
-              <a
-                key={i}
-                href={item.url}
-                className={`flex items-center gap-2 px-6 py-3 rounded-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:scale-105${enableGradientBorders ? ' gradient-border-card' : ''} ${
+                className={`flex items-center gap-2 px-5 py-3 rounded-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:scale-105${enableGradientBorders ? ' gradient-border-card' : ''} ${
                   item.style === "primary"
                     ? "bg-blue-600 hover:bg-blue-700 text-white"
-                    : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white"
+                    : "bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-800 dark:text-white"
                 }`}
                 target="_blank"
                 rel="noopener noreferrer"

@@ -81,7 +81,7 @@
           ]
         },
         {
-          "type": "buttons",
+          "type": "links",
           "items": [
             { "label": "Download Resume", "url": "https://yoursite.com/resume.pdf", "icon": "📄", "style": "primary" },
             { "label": "View Portfolio",  "url": "https://yoursite.com",            "icon": "🎨", "style": "secondary" }
