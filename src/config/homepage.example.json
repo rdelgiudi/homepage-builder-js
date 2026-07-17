@@ -61,6 +61,7 @@
       "sections": [
         {
           "type": "links",
+          "text": "Follow me on social media",
           "align": "right",
           "items": [
             { "label": "GitHub",  "url": "https://github.com/yourusername",  "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/github.svg", "invertDark": true },
@@ -80,7 +81,7 @@
           ]
         },
         {
-          "type": "buttons",
+          "type": "links",
           "items": [
             { "label": "Download Resume", "url": "https://yoursite.com/resume.pdf", "icon": "📄", "style": "primary" },
             { "label": "View Portfolio",  "url": "https://yoursite.com",            "icon": "🎨", "style": "secondary" }

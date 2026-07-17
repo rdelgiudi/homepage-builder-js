@@ -106,8 +106,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 
 - **header** — Big title with icon
 - **text** — Paragraph with icon, optional `align` (left/center/right)
-- **links** — Row of link cards (items: label, url, icon, invertDark)
-- **buttons** — Action buttons (items: label, url, icon, style: primary/secondary)
+- **links** — Row of link cards (items: label, url, icon, style: primary/secondary, invertDark; optional: text, icon, invertDark for section title)
 - **discord-server** — Discord server widget (uses DISCORD_SERVER_ID)
 - **discord-user** — Discord user presence (WebSocket subscriber, shows phone icon on mobile)
 - **steam** — Steam profile & games (includes achievement progress for recent and top games)
