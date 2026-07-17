@@ -104,6 +104,17 @@ function GameCard({ game, achievement }: { game: SteamGame; achievement?: Achiev
     setPopupRect(cardRef.current.getBoundingClientRect());
   }, []);
 
+  useEffect(() => {
+    if (!isHovered) return;
+    updatePopupRect();
+    window.addEventListener("scroll", updatePopupRect, { passive: true, capture: true });
+    window.addEventListener("resize", updatePopupRect);
+    return () => {
+      window.removeEventListener("scroll", updatePopupRect, { capture: true } as EventListenerOptions);
+      window.removeEventListener("resize", updatePopupRect);
+    };
+  }, [isHovered, updatePopupRect]);
+
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
@@ -117,8 +128,7 @@ function GameCard({ game, achievement }: { game: SteamGame; achievement?: Achiev
 
   const handleMouseEnter = useCallback(() => {
     setIsHovered(true);
-    updatePopupRect();
-  }, [updatePopupRect]);
+  }, []);
 
   const handleMouseLeave = useCallback(() => {
     setIsHovered(false);
@@ -201,16 +211,20 @@ function GameCard({ game, achievement }: { game: SteamGame; achievement?: Achiev
             }}
           >
             <div className="animate-curtain-slide" style={{ transformOrigin: "top center" }}>
-              <div className="bg-gray-900 dark:bg-gray-700 text-white rounded-lg px-3 py-2 shadow-lg min-w-[140px] -translate-x-1/2">
+              <div className="bg-gray-900 dark:bg-gray-700 text-white rounded-lg px-3 py-2 shadow-lg min-w-[220px] -translate-x-1/2">
                 <p className="text-xs font-semibold whitespace-nowrap">{game.name}</p>
-                <div className="flex gap-3 mt-1.5">
-                  <p className="text-[11px] text-gray-300">Total: {formatPlaytime(game.playtime_forever)}</p>
-                  {game.playtime_2weeks !== undefined && game.playtime_2weeks > 0 && (
-                    <p className="text-[11px] text-gray-400">Last 2 weeks: {formatPlaytime(game.playtime_2weeks)}</p>
-                  )}
+                <div className="mt-1.5">
+                  <p className="text-[10px] text-gray-500 mb-1">Playtime</p>
+                  <div className="flex gap-3">
+                    <p className="text-[11px] text-gray-300">Total: {formatPlaytime(game.playtime_forever)}</p>
+                    {game.playtime_2weeks !== undefined && game.playtime_2weeks > 0 && (
+                      <p className="text-[11px] text-gray-400">Last 2 weeks: {formatPlaytime(game.playtime_2weeks)}</p>
+                    )}
+                  </div>
                 </div>
                 {achievement && achievement.total > 0 && (
                   <div className="mt-2 border-t border-gray-700 pt-2">
+                    <p className="text-[10px] text-gray-500 mb-1">Achievements</p>
                     <div className="flex items-center gap-2 mb-1">
                       <div className="flex-1 h-1.5 rounded-full bg-gray-700 overflow-hidden">
                         <div

@@ -27,7 +27,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   ├── components/
 │   │   ├── DiscordServer.tsx        # Discord server widget (client-side cache)
 │   │   ├── DiscordUser.tsx          # Discord user presence (WebSocket subscriber, mobile indicator)
-│   │   ├── SteamStatus.tsx          # Steam profile & games
+│   │   ├── SteamStatus.tsx          # Steam profile & games with achievement progress
 │   │   ├── OverwatchStatus.tsx      # Overwatch 2 stats
 │   │   ├── MemeWidget.tsx           # Random meme display
 │   │   ├── MarkdownWidget.tsx       # Renders pre-rendered HTML from /api/markdown
@@ -256,14 +256,35 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - Games are deduplicated by `appid` before fetching — recent and top games often overlap.
 - Achievement data is cached in `steamAchievementCache` Map with a 10-minute TTL per game.
 - Refresh runs on a separate 10-minute interval (independent of the 10s game list refresh).
+- `refreshSteam()` triggers `refreshSteamAchievements()` after the first successful broadcast, ensuring achievements are fetched within ~10s of startup (not 10 minutes).
 - Concurrency-limited to 3 simultaneous API calls to avoid rate-limiting.
-- Failed fetches (game has no achievements, private profile, etc.) silently return `null` and are not cached.
+- Failed fetches (game has no achievements, private profile, etc.) log the error with HTTP status and response body, then return `null` and are not cached.
+- Games without stats/achievements return HTTP 400 (`"Requested app has no stats"`) — these are silently skipped.
+- **Privacy requirement**: The Steam profile's "Game details" must be set to **Public** for the `GetPlayerAchievements` API to work. If private, the API returns HTTP 403 with `{"playerstats":{"error":"Profile is not public","success":false}}` in the response body.
 - Achievement data merges into the existing `{ type: 'steam', data }` WebSocket message — no new message type.
 - `steamData.achievements` is a `Record<number, { total, unlocked, recent }>` keyed by appid.
 - On new client connection, achievement data is included in the initial steam message.
 - `SteamStatus.tsx` displays a thin gradient progress bar + "X/Y unlocked" below each game card.
-- Hover popup shows a larger progress bar with percentage and up to 3 recent achievements (icon + name).
+- Hover popup uses `createPortal` to `document.body` (escapes parent `overflow-hidden` clipping) with `position: fixed`. A `useEffect` listens to `scroll` (capture phase) and `resize` events to recalculate `popupRect` via `getBoundingClientRect`, keeping the popup pinned to the game card during scrolling.
+- Popup has `min-w-[220px]` and shows "Playtime" and "Achievements" subsection titles, a larger progress bar with percentage, and up to 3 recent achievements (icon + name).
 - Progress bar uses the same gradient colors as the music progress bar (`progressGradientColors` → `titleGradient` → default blue→purple→pink).
+
+### Server-side logging
+- All server-side logging uses raw `console.log`/`console.error`/`console.warn` with timestamp prefix: `[${new Date().toISOString()}] [Tag]`.
+- No centralized logging utility or external dependencies (winston, pino, etc.) are used.
+- **`websocket-server.js`** logs cover:
+  - Album cover fetching: source success/failure (iTunes, Deezer, MusicBrainz)
+  - Game icon fetching: Steam Store and RAWG API errors
+  - Steam data: player data fetch errors, recently played/owned games fetch errors, game name lookup failures
+  - Discord enrichment: activity count processed, backpressure queuing
+  - Data refresh: "No changes detected" when hash is unchanged (Steam, Overwatch)
+  - WebSocket: client connect/disconnect, upgrade path routing
+- **`discord-presence.js`** logs cover:
+  - Client lifecycle: login, bot ready, destroy, shutdown
+  - Shard events: disconnect, reconnect, ready
+  - Presence: update received, nickname changes
+  - Callbacks: registered/unregistered with subscriber count
+  - Health checks and restart scheduling
 
 ### Mobile presence detection
 - `discord-presence.js` passes `clientStatus` from Discord's API.
