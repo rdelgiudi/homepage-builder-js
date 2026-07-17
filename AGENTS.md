@@ -110,7 +110,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - **buttons** — Action buttons (items: label, url, icon, style: primary/secondary)
 - **discord-server** — Discord server widget (uses DISCORD_SERVER_ID)
 - **discord-user** — Discord user presence (WebSocket subscriber, shows phone icon on mobile)
-- **steam** — Steam profile & games
+- **steam** — Steam profile & games (includes achievement progress for recent and top games)
 - **overwatch** — Overwatch 2 competitive stats
 - **markdown** — Renders `content/<file>.md` via `/api/markdown?file=<file>`
 - **meme** — Random meme from external API
@@ -251,6 +251,20 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 3. `websocket-server.js` enriches + relays to all connected browser clients.
 4. React components (`DiscordUser`, `SteamStatus`, `OverwatchStatus`) subscribe via `useWebSocket` hook.
 5. `useWebSocket` coalesces messages per `type` within a `requestAnimationFrame` tick, so a burst of updates results in a single React render per subscriber.
+
+### Steam achievements
+- `websocket-server.js` fetches achievement data for all games in both `recentGames` and `ownedGames` via `ISteamUserStats/GetPlayerAchievements/v0001/`.
+- Games are deduplicated by `appid` before fetching — recent and top games often overlap.
+- Achievement data is cached in `steamAchievementCache` Map with a 10-minute TTL per game.
+- Refresh runs on a separate 10-minute interval (independent of the 10s game list refresh).
+- Concurrency-limited to 3 simultaneous API calls to avoid rate-limiting.
+- Failed fetches (game has no achievements, private profile, etc.) silently return `null` and are not cached.
+- Achievement data merges into the existing `{ type: 'steam', data }` WebSocket message — no new message type.
+- `steamData.achievements` is a `Record<number, { total, unlocked, recent }>` keyed by appid.
+- On new client connection, achievement data is included in the initial steam message.
+- `SteamStatus.tsx` displays a thin gradient progress bar + "X/Y unlocked" below each game card.
+- Hover popup shows a larger progress bar with percentage and up to 3 recent achievements (icon + name).
+- Progress bar uses the same gradient colors as the music progress bar (`progressGradientColors` → `titleGradient` → default blue→purple→pink).
 
 ### Mobile presence detection
 - `discord-presence.js` passes `clientStatus` from Discord's API.

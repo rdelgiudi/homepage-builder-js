@@ -20,10 +20,24 @@ interface SteamPlayer {
   gameextrainfo?: string;
 }
 
+interface Achievement {
+  name: string;
+  description: string;
+  icon: string;
+  achieved: number;
+}
+
+interface AchievementData {
+  total: number;
+  unlocked: number;
+  recent: Achievement[];
+}
+
 interface SteamData {
   player: SteamPlayer | null;
   recentGames: SteamGame[];
   ownedGames: SteamGame[];
+  achievements?: Record<number, AchievementData>;
   error?: string;
 }
 
@@ -78,7 +92,7 @@ function getStatus(player: SteamPlayer): { dotColor: string; textColor: string; 
 const GAME_CARD_WIDTH = 96;
 const GAME_GAP = 12;
 
-function GameCard({ game }: { game: SteamGame }) {
+function GameCard({ game, achievement }: { game: SteamGame; achievement?: AchievementData }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [rotateX, setRotateX] = useState(0);
   const [rotateY, setRotateY] = useState(0);
@@ -154,6 +168,20 @@ function GameCard({ game }: { game: SteamGame }) {
         {game.playtime_2weeks !== undefined && game.playtime_2weeks > 0 && (
           <p className="text-xs text-gray-400 dark:text-gray-500">2w: {formatPlaytime(game.playtime_2weeks)}</p>
         )}
+        {achievement && achievement.total > 0 && (
+          <div className="mt-1">
+            <div className="h-1 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${(achievement.unlocked / achievement.total) * 100}%`,
+                  background: 'linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6)',
+                }}
+              />
+            </div>
+            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{achievement.unlocked}/{achievement.total} unlocked</p>
+          </div>
+        )}
       </a>
       {isHovered && popupRect && typeof document !== 'undefined' && createPortal(
         <div
@@ -181,6 +209,33 @@ function GameCard({ game }: { game: SteamGame }) {
                     <p className="text-[11px] text-gray-400">Last 2 weeks: {formatPlaytime(game.playtime_2weeks)}</p>
                   )}
                 </div>
+                {achievement && achievement.total > 0 && (
+                  <div className="mt-2 border-t border-gray-700 pt-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="flex-1 h-1.5 rounded-full bg-gray-700 overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${(achievement.unlocked / achievement.total) * 100}%`,
+                            background: 'linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6)',
+                          }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-400 whitespace-nowrap">{achievement.unlocked}/{achievement.total} ({Math.round((achievement.unlocked / achievement.total) * 100)}%)</p>
+                    </div>
+                    {achievement.recent.length > 0 && (
+                      <div className="mt-1.5">
+                        <p className="text-[10px] text-gray-500 mb-1">Recent:</p>
+                        {achievement.recent.slice(0, 3).map((a, i) => (
+                          <div key={i} className="flex items-center gap-1.5 mb-0.5">
+                            <img src={a.icon} alt="" className="w-4 h-4 rounded-sm" />
+                            <p className="text-[10px] text-gray-300 truncate">{a.name}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -191,7 +246,7 @@ function GameCard({ game }: { game: SteamGame }) {
   );
 }
 
-function GameSection({ title, games }: { title: string; games: SteamGame[] }) {
+function GameSection({ title, games, achievements }: { title: string; games: SteamGame[]; achievements?: Record<number, AchievementData> }) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const [maxGames, setMaxGames] = useState(6);
 
@@ -213,7 +268,7 @@ function GameSection({ title, games }: { title: string; games: SteamGame[] }) {
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{title}</p>
       <div className="flex gap-3 pb-2">
         {games.slice(0, maxGames).map((game) => (
-          <GameCard key={game.appid} game={game} />
+          <GameCard key={game.appid} game={game} achievement={achievements?.[game.appid]} />
         ))}
       </div>
     </div>
@@ -262,7 +317,7 @@ export default function SteamStatus({ enableGradientBorders }: { enableGradientB
     );
   }
 
-  const { player, recentGames, ownedGames } = data;
+  const { player, recentGames, ownedGames, achievements } = data;
   const status = getStatus(player);
 
   const avatarUrl = player.avatarfull;
@@ -307,11 +362,11 @@ export default function SteamStatus({ enableGradientBorders }: { enableGradientB
       </div>
 
       {recentGames.length > 0 && (
-        <GameSection title="Recently Played" games={recentGames} />
+        <GameSection title="Recently Played" games={recentGames} achievements={achievements} />
       )}
 
       {ownedGames.length > 0 && (
-        <GameSection title="Top Games" games={ownedGames} />
+        <GameSection title="Top Games" games={ownedGames} achievements={achievements} />
       )}
     </div>
   );

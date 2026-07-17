@@ -96,7 +96,11 @@ async function fetchUserPresence() {
 
 function onPresenceUpdate(callback) {
   presenceCallbacks.add(callback);
-  return () => presenceCallbacks.delete(callback);
+  console.log(`[${new Date().toISOString()}] [Discord Presence] Callback registered (${presenceCallbacks.size} total)`);
+  return () => {
+    presenceCallbacks.delete(callback);
+    console.log(`[${new Date().toISOString()}] [Discord Presence] Callback unregistered (${presenceCallbacks.size} total)`);
+  };
 }
 
 function getCurrentPresence() {
@@ -139,6 +143,7 @@ async function start() {
   }
 
   if (client) {
+    console.log(`[${new Date().toISOString()}] [Discord Presence] Destroying previous client`);
     try { await client.destroy(); } catch {}
     client = null;
   }
@@ -164,6 +169,7 @@ async function start() {
 
   client.on('presenceUpdate', (oldPresence, newPresence) => {
     if (newPresence.userId === userId) {
+      console.log(`[${new Date().toISOString()}] [Discord Presence] Presence update received`);
       const member = newPresence.member;
       if (member && userPresence) {
         userPresence = buildPresenceFromMember(member, userPresence.nickname);
@@ -174,6 +180,9 @@ async function start() {
 
   client.on('guildMemberUpdate', (oldMember, newMember) => {
     if (newMember.userId === userId && userPresence) {
+      if (oldMember.nickname !== newMember.nickname) {
+        console.log(`[${new Date().toISOString()}] [Discord Presence] Nickname changed: "${oldMember.nickname}" → "${newMember.nickname}"`);
+      }
       userPresence.nickname = newMember.nickname || null;
       emitPresence();
     }
@@ -210,6 +219,7 @@ async function start() {
 }
 
 async function stop() {
+  console.log(`[${new Date().toISOString()}] [Discord Presence] Shutting down`);
   clearIntervals();
   if (client) {
     try {

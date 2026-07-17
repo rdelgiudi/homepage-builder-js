@@ -100,7 +100,9 @@ async function fetchAlbumCoverFromItunes(track, artist) {
     if (best && best.score >= 50) return best;
     if (looseFallback && (containsJapanese(track) || containsJapanese(artist))) return looseFallback;
     return null;
-  } catch {}
+  } catch (e) {
+    console.error(`[${new Date().toISOString()}] [Album Cover] iTunes error for "${track}": ${e.message}`);
+  }
   return null;
 }
 
@@ -138,7 +140,9 @@ async function fetchAlbumCoverFromDeezer(track, artist) {
     if (best && best.score >= 50) return best;
     if (looseFallback && (containsJapanese(track) || containsJapanese(artist))) return looseFallback;
     return null;
-  } catch {}
+  } catch (e) {
+    console.error(`[${new Date().toISOString()}] [Album Cover] Deezer error for "${track}": ${e.message}`);
+  }
   return null;
 }
 
@@ -177,7 +181,9 @@ async function fetchAlbumCoverFromMusicBrainz(track, artist) {
     if (best && best.score >= 50) return best;
     if (looseFallback && (containsJapanese(track) || containsJapanese(artist))) return looseFallback;
     return null;
-  } catch {}
+  } catch (e) {
+    console.error(`[${new Date().toISOString()}] [Album Cover] MusicBrainz error for "${track}": ${e.message}`);
+  }
   return null;
 }
 
@@ -204,10 +210,14 @@ async function fetchAlbumCover(track, artist, preferSpotify = true) {
     for (const source of sources) {
       try {
         const result = await source();
-        if (result?.url) return result.url;
+        if (result?.url) {
+          console.log(`[${new Date().toISOString()}] [Album Cover] Found for "${track}" by "${artist}"`);
+          return result.url;
+        }
       } catch {}
     }
 
+    console.error(`[${new Date().toISOString()}] [Album Cover] No cover found for "${track}" by "${artist}"`);
     return null;
   })();
 
@@ -238,7 +248,10 @@ async function fetchGameIconFromRawg(name) {
       `https://api.rawg.io/api/games?search=${encodeURIComponent(name)}&page_size=5`,
       { signal: AbortSignal.timeout(3000) }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[${new Date().toISOString()}] [Game Icon] RAWG HTTP ${res.status} for "${name}"`);
+      return null;
+    }
     const data = await res.json();
     const results = data?.results || [];
 
@@ -249,7 +262,9 @@ async function fetchGameIconFromRawg(name) {
     }
 
     if (results.length > 0 && results[0].background_image) return results[0].background_image;
-  } catch {}
+  } catch (e) {
+    console.error(`[${new Date().toISOString()}] [Game Icon] RAWG error for "${name}": ${e.message}`);
+  }
   return null;
 }
 
@@ -280,7 +295,9 @@ async function fetchGameIcon(name) {
       const steamIcon = await fetchGameIconFromSteam(best);
       if (steamIcon) return steamIcon;
     }
-  } catch {}
+  } catch (e) {
+    console.error(`[${new Date().toISOString()}] [Game Icon] Steam Store error for "${name}": ${e.message}`);
+  }
 
   return await fetchGameIconFromRawg(name);
 }
@@ -407,6 +424,10 @@ async function enrichPresence(rawPresence) {
     })
   );
 
+  if (activities.length > 0) {
+    console.log(`[${new Date().toISOString()}] [Discord User] Enriched ${activities.length} activity(ies)`);
+  }
+
   const currentIdentities = new Set(activities.map(a => getActivityIdentity(a)));
   for (const key of activityStartTimes.keys()) {
     if (!currentIdentities.has(key)) activityStartTimes.delete(key);
@@ -492,7 +513,9 @@ async function fetchSteamData() {
       );
       const gamesData = await gamesRes.json();
       recentGames = gamesData.response?.games || [];
-    } catch {}
+    } catch (e) {
+      console.error(`[${new Date().toISOString()}] [Steam] Failed to fetch recently played games: ${e.message}`);
+    }
 
     let ownedGames = [];
     try {
@@ -512,7 +535,9 @@ async function fetchSteamData() {
           return { appid: g.appid, name, playtime_forever: g.playtime_forever };
         })
       );
-    } catch {}
+    } catch (e) {
+      console.error(`[${new Date().toISOString()}] [Steam] Failed to fetch owned games: ${e.message}`);
+    }
 
     const playerObj = player ? {
       steamid: player.steamid,
@@ -523,7 +548,8 @@ async function fetchSteamData() {
     } : null;
 
     return { player: playerObj, recentGames, ownedGames };
-  } catch {
+  } catch (e) {
+    console.error(`[${new Date().toISOString()}] [Steam] Failed to fetch player data: ${e.message}`);
     return null;
   }
 }
@@ -533,7 +559,8 @@ async function getGameName(appid) {
     const res = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appid}&filters=basic`);
     const data = await res.json();
     return data[appid]?.data?.name || `App ${appid}`;
-  } catch {
+  } catch (e) {
+    console.error(`[${new Date().toISOString()}] [Steam] Failed to fetch name for appid ${appid}: ${e.message}`);
     return `App ${appid}`;
   }
 }
@@ -560,12 +587,21 @@ async function refreshSteam() {
       const { identityHash, gamesHash } = computeSteamHashes(data);
       const identityChanged = identityHash !== steamIdentityHash;
       const gamesChanged = gamesHash !== steamGamesHash;
-      if (!identityChanged && !gamesChanged) return;
+      if (!identityChanged && !gamesChanged) {
+        console.log(`[${new Date().toISOString()}] [Steam] No changes detected`);
+        return;
+      }
       steamIdentityHash = identityHash;
       steamGamesHash = gamesHash;
       steamData = data;
-      const count = broadcastMessage({ type: 'steam', data, identityHash, gamesHash });
+      const achievements = {};
+      for (const [appid, c] of steamAchievementCache) {
+        achievements[appid] = { total: c.total, unlocked: c.unlocked, recent: c.recent };
+      }
+      steamData.achievements = achievements;
+      const count = broadcastMessage({ type: 'steam', data: { ...steamData, achievements }, identityHash, gamesHash });
       console.log(`[${new Date().toISOString()}] [Steam] Relayed to ${count} browser client(s) in ${Date.now() - t0}ms`);
+      refreshSteamAchievements();
     } catch (e) {
       console.error(`[${new Date().toISOString()}] [Steam] Refresh failed:`, e.message);
     } finally {
@@ -573,6 +609,131 @@ async function refreshSteam() {
     }
   })();
   return steamRefreshPromise;
+}
+
+// --- Steam achievements ---
+
+const steamAchievementCache = new Map();
+const ACHIEVEMENT_REFRESH_INTERVAL = 600000; // 10 minutes
+
+async function fetchSteamAchievements(appid) {
+  const { apiKey, steamId } = steamConfig;
+  if (!apiKey || !steamId) return null;
+
+  const cached = steamAchievementCache.get(appid);
+  if (cached && Date.now() - cached.fetchedAt < ACHIEVEMENT_REFRESH_INTERVAL) {
+    return cached;
+  }
+
+  try {
+    const url = `https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?format=json&appid=${appid}&key=${apiKey}&steamid=${steamId}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) {
+        let body = '';
+        try { body = await res.text(); } catch {}
+        console.error(`[${new Date().toISOString()}] [Steam Achievements] HTTP ${res.status} for appid ${appid}: ${body.slice(0, 300)}`);
+        return null;
+      }
+      const data = await res.json();
+      const stats = data?.playerstats;
+      if (!stats || stats.success === false) {
+        console.error(`[${new Date().toISOString()}] [Steam Achievements] API success=false for appid ${appid}:`, JSON.stringify(data).slice(0, 300));
+        return null;
+      }
+
+    const achievements = stats.achievements || [];
+    const total = achievements.length;
+    const unlocked = achievements.filter(a => a.achieved === 1).length;
+    const recent = achievements
+      .filter(a => a.achieved === 1 && a.achieve_time)
+      .sort((a, b) => b.achieve_time - a.achieve_time)
+      .slice(0, 5)
+      .map(a => ({
+        name: a.name,
+        description: a.description,
+        icon: a.icon,
+        achieved: a.achieve_time,
+      }));
+
+    const result = { total, unlocked, recent, fetchedAt: Date.now() };
+    steamAchievementCache.set(appid, result);
+    console.log(`[${new Date().toISOString()}] [Steam Achievements] appid ${appid}: ${unlocked}/${total} unlocked`);
+    return result;
+  } catch (e) {
+    console.error(`[${new Date().toISOString()}] [Steam Achievements] Fetch error for appid ${appid}:`, e.message);
+    return null;
+  }
+}
+
+function getUniqueAppIds() {
+  if (!steamData) return [];
+  const ids = new Set();
+  for (const g of steamData.recentGames || []) ids.add(g.appid);
+  for (const g of steamData.ownedGames || []) ids.add(g.appid);
+  return [...ids];
+}
+
+async function fetchWithConcurrency(items, fn, limit = 3) {
+  const results = new Map();
+  let index = 0;
+
+  async function worker() {
+    while (index < items.length) {
+      const i = index++;
+      const result = await fn(items[i]);
+      if (result) results.set(items[i], result);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
+}
+
+let steamAchievementRefreshPromise = null;
+
+async function refreshSteamAchievements() {
+  if (!steamData) return;
+  if (steamAchievementRefreshPromise) return steamAchievementRefreshPromise;
+
+  steamAchievementRefreshPromise = (async () => {
+    try {
+      const t0 = Date.now();
+      const appIds = getUniqueAppIds();
+
+      const stale = appIds.filter(id => {
+        const c = steamAchievementCache.get(id);
+        return !c || Date.now() - c.fetchedAt >= ACHIEVEMENT_REFRESH_INTERVAL;
+      });
+
+      if (stale.length === 0) return;
+
+      const results = await fetchWithConcurrency(stale, fetchSteamAchievements, 3);
+
+      let changed = false;
+      for (const [appid, data] of results) {
+        const existing = steamAchievementCache.get(appid);
+        if (!existing || existing.unlocked !== data.unlocked || existing.total !== data.total) {
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        const achievements = {};
+        for (const id of appIds) {
+          const c = steamAchievementCache.get(id);
+          if (c) achievements[id] = { total: c.total, unlocked: c.unlocked, recent: c.recent };
+        }
+        steamData.achievements = achievements;
+        const count = broadcastMessage({ type: 'steam', data: steamData, identityHash: steamIdentityHash, gamesHash: steamGamesHash });
+        console.log(`[${new Date().toISOString()}] [Steam Achievements] Updated ${results.size} games, relayed to ${count} client(s) in ${Date.now() - t0}ms`);
+      }
+    } catch (e) {
+      console.error(`[${new Date().toISOString()}] [Steam Achievements] Refresh failed:`, e.message);
+    } finally {
+      steamAchievementRefreshPromise = null;
+    }
+  })();
+  return steamAchievementRefreshPromise;
 }
 
 // --- Overwatch periodic fetch ---
@@ -696,7 +857,10 @@ async function refreshOverwatch() {
       const t0 = Date.now();
       const data = await fetchOverwatchData();
       const hash = computeOverwatchHash(data);
-      if (hash === overwatchHash) return;
+      if (hash === overwatchHash) {
+        console.log(`[${new Date().toISOString()}] [Overwatch] No changes detected`);
+        return;
+      }
       overwatchHash = hash;
       overwatchData = data;
       const count = broadcastMessage({ type: 'overwatch', data, hash });
@@ -725,7 +889,11 @@ app.prepare().then(() => {
       ws.send(JSON.stringify({ type: 'presence', data: enrichedData }));
     }
     if (steamData) {
-      ws.send(JSON.stringify({ type: 'steam', data: steamData, identityHash: steamIdentityHash, gamesHash: steamGamesHash }));
+      const achievements = {};
+      for (const [appid, c] of steamAchievementCache) {
+        achievements[appid] = { total: c.total, unlocked: c.unlocked, recent: c.recent };
+      }
+      ws.send(JSON.stringify({ type: 'steam', data: { ...steamData, achievements }, identityHash: steamIdentityHash, gamesHash: steamGamesHash }));
     }
     if (overwatchData) {
       ws.send(JSON.stringify({ type: 'overwatch', data: overwatchData, hash: overwatchHash }));
@@ -744,6 +912,7 @@ app.prepare().then(() => {
         wss.emit('connection', ws, req);
       });
     } else {
+      console.log(`[${new Date().toISOString()}] [WS] Upgrade for ${pathname} (delegated to Next.js)`);
       handleUpgrade(req, socket, head);
     }
   });
@@ -761,6 +930,7 @@ app.prepare().then(() => {
   async function processRawPresence(raw) {
     if (enrichmentInFlight) {
       enrichmentQueued = true;
+      console.warn(`[${new Date().toISOString()}] [Discord User] Enrichment queued (backpressure)`);
       return;
     }
     enrichmentInFlight = true;
@@ -796,6 +966,9 @@ app.prepare().then(() => {
 
   refreshSteam();
   setInterval(refreshSteam, 10000);
+
+  refreshSteamAchievements();
+  setInterval(refreshSteamAchievements, ACHIEVEMENT_REFRESH_INTERVAL);
 
   refreshOverwatch();
   setInterval(refreshOverwatch, 30000);
