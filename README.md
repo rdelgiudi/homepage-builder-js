@@ -1,4 +1,4 @@
-# Custom Homepage with Discord, Steam & Overwatch Status
+# Custom Homepage builder with customizable components
 
 A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integration.
 
