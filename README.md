@@ -445,7 +445,7 @@ Single container with:
 
 ## Tech Stack
 
-- **Next.js 15** - React framework
+- **Next.js** - React framework
 - **TypeScript** - Type safety
 - **Tailwind CSS** - Styling
 - **Discord API** - User presence & server widget
