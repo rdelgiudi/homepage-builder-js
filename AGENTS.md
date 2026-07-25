@@ -19,7 +19,8 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │   ├── github/route.ts      # GitHub repo data with 6h cache, 10m error cache
 │   │   │   ├── markdown/route.ts    # Reads markdown from src/content/ at runtime, renders to HTML
 │   │   │   ├── meme/route.ts        # Random meme from external API
-│   │   │   └── visitors/route.ts    # Visitor counter (SQLite, write-behind queue)
+│   │   │   ├── visitors/route.ts    # Visitor counter (SQLite, write-behind queue)
+│   │   │   └── comments/route.ts    # Guestbook comments (SQLite, GET list + POST create)
 │   │   ├── globals.css
 │   │   ├── layout.tsx               # Root layout, generateMetadata reads homepage.json
 │   │   ├── loading.tsx              # Cold-load skeleton
@@ -32,9 +33,11 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── MemeWidget.tsx           # Random meme display
 │   │   ├── MarkdownWidget.tsx       # Renders pre-rendered HTML from /api/markdown
 │   │   ├── VisitorCounter.tsx       # Visitor count display
+│   │   ├── CommentsWidget.tsx       # Guestbook: post + list visitor comments (SQLite)
 │   │   ├── GitHubProjects.tsx       # GitHub repo cards (public API, no key needed)
 │   │   ├── Tabs.tsx                 # Tab navigation w/ header + icon + sections
 │   │   ├── ParticleBackground.tsx   # Canvas floating particles
+│   │   ├── MouseTrail.tsx           # Canvas comet-style mouse trail (gradient line, no draw while stationary)
 │   │   ├── EffectsController.tsx    # Conditionally renders effects based on config
 │   │   └── FaviconAnimation.tsx     # Canvas-based animated favicon (hidden canvas → PNG data URL)
 │   ├── config/
@@ -46,7 +49,9 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   ├── hooks/
 │   │   └── useWebSocket.ts          # Singleton WebSocket hook (rAF-coalesced)
 │   ├── lib/
-│   │   └── config.ts                # mtime-cached homepage.json loader
+│   │   ├── config.ts                # mtime-cached homepage.json loader
+│   │   ├── db.ts                    # Shared better-sqlite3 connection (visitors.db, WAL)
+│   │   └── visitor.ts               # visitor_id cookie + hashing helpers (shared by visitors/comments)
 │   └── types/
 │       ├── gray-matter.d.ts
 │       └── quantize.d.ts
@@ -99,8 +104,10 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 | `customScrollbar` | boolean | `true` | Thin rounded scrollbar styling |
 | `progressGradient` | boolean | `true` | Animated gradient fill on music activity progress bar + tiny sparkle particles at the current position |
 | `progressGradientColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the progress bar; falls back to `titleGradient` colors, then to a default blue→purple→pink gradient |
-| `widgetFrame` | boolean | `false` | Animated gradient frame around widget sections (discord-server, discord-user, steam, overwatch, markdown, meme, github) using title gradient colors. Can be overridden per section with a `widgetFrame` field on the section object. |
+| `widgetFrame` | boolean | `false` | Animated gradient frame around widget sections (discord-server, discord-user, steam, overwatch, markdown, meme, github, comments) using title gradient colors. Can be overridden per section with a `widgetFrame` field on the section object. |
 | `widgetFrameWidth` | number | `2` | Border width in pixels for the widget gradient frame |
+| `mouseTrail` | boolean | `false` | Comet-style mouse trail — continuous tapering gradient line following the cursor (no trail drawn while stationary) |
+| `mouseTrailColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the mouse trail; falls back to `titleGradient` colors, then to a default blue→purple→pink gradient |
 
 ### Tab sections types:
 
@@ -114,6 +121,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - **markdown** — Renders `content/<file>.md` via `/api/markdown?file=<file>`
 - **meme** — Random meme from external API
 - **github** — GitHub project cards (repos: [{ owner, repo, label?, note? }])
+- **comments** — Guestbook widget (repos: none; optional `limit` for max comments fetched, default 50). Posts via `/api/comments`, lists newest-first.
 
 ## Critical Gotchas
 
@@ -296,6 +304,15 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - `visitors.db` is ephemeral in the container — `docker-compose-example.yml` mounts a named volume to persist it.
 - `src/config/` and `src/content/` can be bind-mounted at runtime for live config edits without rebuild.
 
+### Comments guestbook (`comments` section + `/api/comments`)
+- Comments are stored in the **same** `visitors.db` SQLite file as the visitor counter, in a `comments` table (columns: `id`, `name`, `body`, `created_at`). The shared connection lives in `src/lib/db.ts` (WAL mode); both `/api/visitors` and `/api/comments` call `getDb()` so there is exactly one connection per process.
+- `src/lib/visitor.ts` holds the shared `visitor_id` cookie logic (name, salt, hashing, parsing) used by both routes for identification and rate-limiting.
+- **POST `/api/comments`**: body `{ name, body }` (both trimmed, required). Server validates name ≤ 40 chars, body ≤ 500 chars, strips control characters (`\u0000-\u001f`, `\u007f`), and rate-limits per hashed `visitor_id` to one post / 5s. A new `visitor_id` cookie is set if absent. Returns `201` with the created row.
+- **GET `/api/comments?limit=N`**: returns the most recent `N` comments newest-first (`ORDER BY id DESC`), `limit` clamped to 1–200 (default 50).
+- **XSS safety**: `CommentsWidget` renders `name` and `body` as plain React text (`whitespace-pre-wrap break-words`) — never `dangerouslySetInnerHTML` — so user input cannot inject markup. All length/clamp limits are re-enforced server-side, not just client-side.
+- v1 is **open posting** (no moderation). Spam protection is the per-visitor rate limit only; add pre-moderation/blocklist if needed later.
+- The `comments` section is wrapped by `maybeWrapFrame` in `Tabs.tsx`, so `widgetFrame`/`widgetFrameWidth` apply like other widgets. The section title (`icon`/`text`) renders above the frame, consistent with `discord-user`/`steam`/etc.
+
 ### Gradient widget frame stacking
 - `.gradient-frame::before` needs `z-index: 1` and `.gradient-frame` needs `isolation: isolate` because Next.js `Image fill` uses `position: absolute`, putting it in the same stacking level as the `::before`. Without these, the image renders on top of the gradient border at the left/right edges of full-width content like the Discord banner.
 - When `widgetFrame` is enabled on a `discord-user` section, DiscordUser receives a `framed` prop. When `framed`, it removes its own inner `border` (redundant with the gradient frame) and adds `paddingTop: var(--gf-width, 2px)` so the widget's background creates a clean gap between the gradient border and the full-width banner at the top.
@@ -313,6 +330,13 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - `ParticleBackground` is rendered conditionally by `EffectsController` (based on `effects.particleBackground` in `homepage.json`).
 - It must **not** also be rendered unconditionally in `src/app/layout.tsx` — doing so produces two canvas elements animating on top of each other, doubling GPU/CPU cost.
 - `EffectsController` is the single source of truth for when the particle background is active.
+
+### MouseTrail performance + layering
+- `MouseTrail` is rendered conditionally by `EffectsController` (based on `effects.mouseTrail` in `homepage.json`), default `false`.
+- It is a `fixed` transparent overlay with `pointer-events-none z-50` — above content but non-interactive, so it reads as a cursor effect.
+- Drawn as a **single gradient path** (one `createLinearGradient` + two stroke passes: soft glow + bright core) — never per-segment `shadowBlur` strokes, which were too expensive. When the cursor is stationary the trail draws nothing (existing points simply decay and the line fades out).
+- A `moved` flag ensures points are only pushed on frames where the cursor actually moved, so idle frames do zero trail work.
+- `EffectsController` is the single source of truth for when the trail is active; do not also render it elsewhere.
 
 ### Default favicon animation
 - When `favicon` is empty/omitted in `homepage.json`, the page uses a canvas-based animated favicon that draws a conic-gradient ring using `titleGradient` colors.

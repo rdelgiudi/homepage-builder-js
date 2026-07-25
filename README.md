@@ -11,6 +11,7 @@ A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integ
 - Overwatch 2 stats integration (ranks, hero stats, performance metrics)
 - GitHub project cards (via public API, no key needed)
 - Fully customizable sections (text, links with primary/secondary styles, headers)
+- Guestbook / comments widget — visitors post name + comment, stored in SQLite (open posting, rate-limited)
 - Icon support using emoji or image URLs
 - Responsive design with Tailwind CSS
 - Light/dark mode support
@@ -56,7 +57,9 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
     "progressGradient": true,
     "progressGradientColors": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
     "widgetFrame": false,
-    "widgetFrameWidth": 3
+    "widgetFrameWidth": 3,
+    "mouseTrail": false,
+    "mouseTrailColors": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"]
   },
   "tabs": [
     {
@@ -100,12 +103,14 @@ Toggle visual effects on or off:
 | `progressGradientColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the progress bar (falls back to `titleGradient`, then default blue→purple→pink) |
 | `widgetFrame` | boolean | `false` | Animated gradient frame around widget sections using title gradient colors |
 | `widgetFrameWidth` | number | `2` | Border width in pixels for the widget gradient frame |
+| `mouseTrail` | boolean | `false` | Comet-style mouse trail — a continuous tapering gradient line that follows the cursor; draws nothing while the cursor is stationary |
+| `mouseTrailColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the mouse trail (falls back to `titleGradient`, then default blue→purple→pink) |
 
-All effects default to `true` if omitted (except `widgetFrame`/`widgetFrameWidth`). Set any to `false` to disable.
+All effects default to `true` if omitted (except `widgetFrame`/`widgetFrameWidth`/`mouseTrail`). Set any to `false` to disable.
 
 `progressGradientColors` accepts an array of CSS color strings. When unset it inherits `titleGradient` colors, falling back to a default blue→purple→pink gradient. On track change, the progress bar smoothly shrinks to the new position with burst sparkle particles.
 
-`widgetFrame` can be set globally in effects or overridden per-section by adding `"widgetFrame": true` to individual section objects (discord-server, discord-user, steam, overwatch, markdown, meme, github).
+`widgetFrame` can be set globally in effects or overridden per-section by adding `"widgetFrame": true` to individual section objects (discord-server, discord-user, steam, overwatch, markdown, meme, github, comments).
 
 ### Section Types
 
@@ -121,6 +126,7 @@ All effects default to `true` if omitted (except `widgetFrame`/`widgetFrameWidth
 | `markdown` | Renders a markdown file from `content/` directory | yes |
 | `meme` | Shows a random meme | yes (frame wraps only the image, not the button) |
 | `github` | GitHub project cards from public repos | yes |
+| `comments` | Guestbook widget: visitors post a name + comment, listed newest-first (open posting) | yes |
 
 ## Components Reference
 
@@ -303,6 +309,60 @@ Displays a random meme from an external API.
 
 ---
 
+### CommentsWidget (`comments`)
+
+Lets visitors leave a name + comment on a guestbook tab. Posts are open (no account) but rate-limited per visitor and validated server-side.
+
+**Config:** no environment variables needed
+
+**Features:**
+- Name input (max 40 chars) + comment textarea (max 500 chars)
+- Posts via `POST /api/comments`, lists newest-first via `GET /api/comments?limit=N`
+- Per-visitor rate limit (1 post / 5s) keyed by the `visitor_id` cookie, shared with the visitor counter
+- Control characters stripped; XSS-safe rendering (plain React text, never `dangerouslySetInnerHTML`)
+- Loading skeleton, empty state, and error fallback
+- Respects `widgetFrame` / `widgetFrameWidth` and `gradientBorders` effects
+
+**Storage:** comments live in the same `visitors.db` SQLite file as the visitor counter (a `comments` table), so the existing Docker volume keeps them persisted.
+
+**Config example in homepage.json:**
+```json
+{
+  "type": "comments",
+  "icon": "💬",
+  "text": "Leave a comment",
+  "limit": 50,
+  "widgetFrame": true
+}
+```
+
+---
+
+### MouseTrail (`effects.mouseTrail`)
+
+A canvas overlay that renders a comet-style trail following the cursor, matching the comet background aesthetic.
+
+**Config:** `mouseTrail` (boolean, default `false`) and `mouseTrailColors` (string[], falls back to `titleGradient`) in `effects`.
+
+**Features:**
+- Continuous tapering gradient line that follows the cursor; color flows along the trail by interpolating across `mouseTrailColors`.
+- Two-pass stroke (soft glow + bright core) drawn as a single `createLinearGradient` path — cheap, no per-segment `shadowBlur`.
+- Draws **nothing while the cursor is stationary**; existing points decay so the trail fades out cleanly on stop.
+- `fixed`, `pointer-events-none`, `z-50` overlay — above content but non-interactive.
+- Pauses on `visibilitychange` (tab hidden) and caps the point history to keep per-frame cost low.
+
+**Config example in homepage.json:**
+```json
+{
+  "effects": {
+    "mouseTrail": true,
+    "mouseTrailColors": ["#60a5fa", "#a78bfa", "#f472b6"]
+  }
+}
+```
+
+---
+
 ## Data Flow
 
 | API | Mechanism | Notes |
@@ -312,6 +372,7 @@ Displays a random meme from an external API.
 | Overwatch | **WebSocket** (push, 30s refresh) | Stats and ranks pushed via WebSocket |
 | GitHub | **REST** (server API, 6h cache) | `/api/github` proxies GitHub API, caches success 6h, errors 10m |
 | Visitor Counter | **REST** (server API) | SQLite-backed `/api/visitors` with hashed visitor IDs |
+| Comments | **REST** (server API) | SQLite-backed `/api/comments`; same `visitors.db`, shared `visitor_id` cookie for rate-limiting |
 
 ---
 
@@ -331,7 +392,8 @@ Displays a random meme from an external API.
 │   │   │   ├── github/route.ts      # GitHub repo data (6h cache)
 │   │   │   ├── markdown/route.ts    # Markdown API (server-rendered HTML, mtime-cached)
 │   │   │   ├── meme/route.ts        # Random meme
-│   │   │   └── visitors/route.ts    # Visitor counter (SQLite, write-behind)
+│   │   │   ├── visitors/route.ts    # Visitor counter (SQLite, write-behind)
+│   │   │   └── comments/route.ts    # Guestbook comments (SQLite, GET list + POST create)
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   ├── loading.tsx              # Cold-load skeleton
@@ -344,16 +406,20 @@ Displays a random meme from an external API.
 │   │   ├── MemeWidget.tsx           # Random meme
 │   │   ├── MarkdownWidget.tsx       # Renders pre-rendered HTML
 │   │   ├── VisitorCounter.tsx       # Visitor count
+│   │   ├── CommentsWidget.tsx       # Guestbook: post + list visitor comments (SQLite)
 │   │   ├── GitHubProjects.tsx       # GitHub repo cards
 │   │   ├── Tabs.tsx                 # Tab navigation
 │   │   ├── ParticleBackground.tsx   # Canvas particle effect (stars/comet modes)
+│   │   ├── MouseTrail.tsx           # Canvas comet-style mouse trail (gradient line, idle = no draw)
 │   │   ├── EffectsController.tsx    # Conditional effects renderer
 │   │   └── FaviconAnimation.tsx     # Canvas animated favicon
 │   ├── hooks/
 │   │   └── useWebSocket.ts          # WebSocket hook (rAF-coalesced per type)
 │   └── lib/
 │       ├── config.ts                # mtime-cached homepage.json loader
-│       └── markdown.ts              # Server-side markdown → HTML (marked)
+│       ├── markdown.ts              # Server-side markdown → HTML (marked)
+│       ├── db.ts                    # Shared better-sqlite3 connection (visitors.db, WAL)
+│       └── visitor.ts               # visitor_id cookie + hashing helpers (shared by visitors/comments)
 ├── discord-presence.js              # Discord.js bot (in-process module)
 ├── websocket-server.js              # Custom server + WebSocket
 ├── docker-entrypoint.sh
