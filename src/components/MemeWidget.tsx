@@ -23,6 +23,7 @@ export default function MemeWidget({ enableGradientBorders, widgetFrameEnabled, 
   const [meme, setMeme] = useState<Meme | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   async function fetchMeme() {
     if (refreshing) return;
@@ -52,6 +53,10 @@ export default function MemeWidget({ enableGradientBorders, widgetFrameEnabled, 
   useEffect(() => {
     fetchMeme();
   }, []);
+
+  useEffect(() => {
+    setImgLoaded(false);
+  }, [meme?.url]);
 
   if (loading) {
     return (
@@ -84,8 +89,9 @@ export default function MemeWidget({ enableGradientBorders, widgetFrameEnabled, 
           alt={meme.title}
           className="w-full h-auto"
           loading="lazy"
+          onLoad={() => setImgLoaded(true)}
         />
-        {refreshing && (
+        {!imgLoaded && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm">
             <div className="w-full h-full absolute bg-gray-200 dark:bg-gray-700 animate-pulse" />
             <svg
@@ -101,7 +107,7 @@ export default function MemeWidget({ enableGradientBorders, widgetFrameEnabled, 
               <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
               <path d="M21 3v5h-5" />
             </svg>
-            <span className="relative text-sm text-gray-500 dark:text-gray-400">Loading new meme...</span>
+            <span className="relative text-sm text-gray-500 dark:text-gray-400">{refreshing ? "Loading new meme..." : "Loading meme..."}</span>
           </div>
         )}
       </div>
