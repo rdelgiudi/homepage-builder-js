@@ -17,7 +17,9 @@
     "progressGradient": true,
     "progressGradientColors": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
     "widgetFrame": false,
-    "widgetFrameWidth": 3
+    "widgetFrameWidth": 3,
+    "mouseTrail": false,
+    "mouseTrailColors": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"]
   },
   "tabs": [
     {
@@ -147,6 +149,19 @@
             { "owner": "vercel", "repo": "next.js" },
             { "owner": "facebook", "repo": "react" }
           ]
+        }
+      ]
+    },
+    {
+      "label": "Guestbook",
+      "icon": "📝",
+      "sections": [
+        {
+          "type": "comments",
+          "icon": "💬",
+          "text": "Leave a comment",
+          "limit": 50,
+          "widgetFrame": false
         }
       ]
     }
