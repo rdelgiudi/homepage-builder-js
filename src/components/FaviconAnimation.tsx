@@ -45,22 +45,22 @@ export default function FaviconAnimation({ gradient }: Props) {
       return el;
     }
 
-    function pruneStaleLinks() {
-      document
-        .querySelectorAll<HTMLLinkElement>(
-          `link[rel="icon"]:not([${MARKER}])`
-        )
-        .forEach((el) => el.remove());
-    }
-
     function render(now: number) {
       if (!running) return;
-      raf = requestAnimationFrame(render);
+      requestAnimationFrame(render);
       if (now - lastPaint < FRAME_INTERVAL_MS) return;
       lastPaint = now;
       try {
         if (!link || !link.isConnected) link = ensureLink();
-        pruneStaleLinks();
+        // Keep our animated link as the last <link rel="icon"> so it takes
+        // precedence. We must NOT remove other icon links: those are managed
+        // by React/Next's head reconciler, and deleting them out of band makes
+        // React throw "removeChild ... parentNode is null" on the next
+        // navigation (e.g. switching tabs). Moving our own node is safe because
+        // React does not track it.
+        if (link.parentNode !== document.head || document.head.lastElementChild !== link) {
+          document.head.appendChild(link);
+        }
         const c = ctx!;
         c.clearRect(0, 0, SIZE, SIZE);
         const angle = ((now - start) / ROTATION_MS) * Math.PI * 2;
