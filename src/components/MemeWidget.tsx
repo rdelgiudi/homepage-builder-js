@@ -28,9 +28,17 @@ export default function MemeWidget({ enableGradientBorders, widgetFrameEnabled, 
     if (refreshing) return;
     setRefreshing(true);
     try {
-      const res = await fetch("/api/meme", { cache: "no-store" });
-      const data = await res.json();
-      if (data.url) {
+      const currentUrl = meme?.url ?? null;
+      let data: Meme | null = null;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const res = await fetch("/api/meme", { cache: "no-store" });
+        const candidate = await res.json();
+        if (!candidate.url) continue;
+        if (candidate.url === currentUrl) continue;
+        data = candidate;
+        break;
+      }
+      if (data) {
         setMeme(data);
       }
     } catch (err) {
