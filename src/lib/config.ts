@@ -15,6 +15,7 @@ interface EffectsConfig {
   widgetFrameWidth?: number;
   mouseTrail?: boolean;
   mouseTrailColors?: string[];
+  faviconAnimation?: boolean;
 }
 
 interface HomepageConfig {

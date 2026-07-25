@@ -412,7 +412,7 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 │   │   ├── ParticleBackground.tsx   # Canvas particle effect (stars/comet modes)
 │   │   ├── MouseTrail.tsx           # Canvas comet-style mouse trail (gradient line, idle = no draw)
 │   │   ├── EffectsController.tsx    # Conditional effects renderer
-│   │   └── FaviconAnimation.tsx     # Canvas animated favicon
+│   │   └── FaviconAnimation.tsx     # Canvas animated favicon (self-healing)
 │   ├── hooks/
 │   │   └── useWebSocket.ts          # WebSocket hook (rAF-coalesced per type)
 │   └── lib/

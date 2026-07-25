@@ -39,7 +39,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── ParticleBackground.tsx   # Canvas floating particles
 │   │   ├── MouseTrail.tsx           # Canvas comet-style mouse trail (gradient line, no draw while stationary)
 │   │   ├── EffectsController.tsx    # Conditionally renders effects based on config
-│   │   └── FaviconAnimation.tsx     # Canvas-based animated favicon (hidden canvas → PNG data URL)
+│   │   └── FaviconAnimation.tsx     # Canvas-based animated favicon (hidden canvas → PNG data URL, self-healing)
 │   ├── config/
 │   │   ├── homepage.json            # ALL site config: name, tagline, favicon, tabs
 │   │   └── homepage.example.json
@@ -108,6 +108,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 | `widgetFrameWidth` | number | `2` | Border width in pixels for the widget gradient frame |
 | `mouseTrail` | boolean | `false` | Comet-style mouse trail — continuous tapering gradient line following the cursor (no trail drawn while stationary) |
 | `mouseTrailColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the mouse trail; falls back to `titleGradient` colors, then to a default blue→purple→pink gradient |
+| `faviconAnimation` | boolean | `true` | Animated gradient-ring favicon (canvas → PNG data URL per frame). Set to `false` to use the static SVG favicon from `/api/favicon` — useful to silence the per-frame `<link href>` churn in DevTools while debugging. |
 
 ### Tab sections types:
 
@@ -339,11 +340,12 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - `EffectsController` is the single source of truth for when the trail is active; do not also render it elsewhere.
 
 ### Default favicon animation
-- When `favicon` is empty/omitted in `homepage.json`, the page uses a canvas-based animated favicon that draws a conic-gradient ring using `titleGradient` colors.
-- A hidden `<canvas>` (32×32) renders each frame via `requestAnimationFrame`, converts to a PNG data URL via `canvas.toDataURL("image/png")`, and sets it as `link[rel*="icon"].href` — the same technique as the GeeksForGeeks favicon animation article.
-- A server-side SVG fallback (`/api/favicon`) is set as the initial favicon via metadata, so a favicon exists during SSR before the canvas JS hydrates.
-- The gradient sweeps continuously as the `startAngle` parameter of `createConicGradient` advances per frame. The first color is duplicated at position `1.0` to prevent a hard seam at the gradient wrap point.
-- The `FaviconAnimation` client component receives `titleGradient` as a prop from the server layout. Falls back to `["#60a5fa", "#a78bfa", "#f472b6"]` if no gradient is configured.
+- When `favicon` is empty/omitted in `homepage.json`, the favicon is animated by the `FaviconAnimation` client component (a `<canvas>` → PNG data URL per frame). The server-side SVG at `/api/favicon` (set via `generateMetadata`) is the SSR/non-JS fallback favicon only.
+- **Why not pure animated SVG?** Chromium-based browsers (Chrome/Edge) do not animate SMIL SVG favicons at all — "Support animated webpage icon" is a still-open Chromium feature request, and animated GIF/APNG favicons are also ignored. So a frame-free animated favicon is impossible in Chromium; the canvas data-URL approach is the only reliable method.
+- **Dev vs prod / debugging:** `FaviconAnimation` runs whenever `effects.faviconAnimation` (default `true`) is enabled. Because it mutates `<link href>` every frame, it floods DevTools and makes the rest of the DOM hard to inspect — set `effects.faviconAnimation: false` in `homepage.json` while debugging to fall back to the static SVG favicon from `/api/favicon`. The animation still runs in production by default.
+- **Self-healing (fixes the old "stops animating" bug):** `FaviconAnimation` targets the exact `<link rel="icon">` node (creating its own if none exists) — the previous version used `rel*="icon"`, which could match `apple-touch-icon` or a stale/detached node, so updates went to the wrong element and the visible favicon froze. The rAF loop is wrapped in try/catch (an exception can't kill it), restarts on `visibilitychange` when the tab becomes visible, and uses a time-based angle so speed is consistent regardless of frame rate. It is throttled to ~20fps to limit work.
+- The canvas draws a conic-gradient ring (sweeping via `createConicGradient` start angle) using `titleGradient` colors. The first color is duplicated at position `1.0` to avoid a seam. Falls back to `["#60a5fa", "#a78bfa", "#f472b6"]` if no gradient is configured.
+- Note: this approach updates `link.href` with a data URL each frame (client-local work; the server pushes nothing). If a frame-free favicon is required later, it depends on browser support for animated SVG/GIF favicons.
 
 ### ParticleBackground mobile performance
 - Canvas uses `transform: translate3d(0,0,0)` in its inline style to promote it to its own GPU compositor layer, so the browser doesn't repaint the page underneath on every frame.

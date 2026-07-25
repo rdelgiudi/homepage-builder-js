@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import FaviconAnimation from "@/components/FaviconAnimation";
-import { getMetadata } from "@/lib/config";
+import { getMetadata, getConfig } from "@/lib/config";
 
 export function generateMetadata(): Metadata {
   const { name, tagline, favicon } = getMetadata();
@@ -19,11 +19,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const { titleGradient } = getMetadata();
+  const faviconAnimation = getConfig().effects?.faviconAnimation ?? true;
   return (
     <html lang="en" className="dark">
       <body className="antialiased">
         {children}
-        <FaviconAnimation gradient={titleGradient} />
+        {faviconAnimation && <FaviconAnimation gradient={titleGradient} />}
         <ThemeSwitcher />
       </body>
     </html>
