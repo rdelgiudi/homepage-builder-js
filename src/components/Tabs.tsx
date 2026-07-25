@@ -118,6 +118,7 @@ interface MemeSection {
   align?: Align;
   invertDark?: boolean;
   widgetFrame?: boolean;
+  popular?: boolean;
 }
 
 interface RepoItem {
@@ -285,7 +286,7 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
               {section.text && <span>{section.text}</span>}
             </p>
           )}
-          <MemeWidget enableGradientBorders={enableGradientBorders} widgetFrameEnabled={section.widgetFrame ?? widgetFrame} widgetFrameWidth={widgetFrameWidth} widgetFrameGradient={titleGradient} />
+          <MemeWidget enableGradientBorders={enableGradientBorders} widgetFrameEnabled={section.widgetFrame ?? widgetFrame} widgetFrameWidth={widgetFrameWidth} widgetFrameGradient={titleGradient} popular={section.popular} />
         </div>
       );
 

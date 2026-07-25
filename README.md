@@ -124,7 +124,7 @@ All effects default to `true` if omitted (except `widgetFrame`/`widgetFrameWidth
 | `steam` | Steam profile, recently played, and top games | yes |
 | `overwatch` | Overwatch 2 stats with competitive ranks, hero stats, and performance metrics | yes |
 | `markdown` | Renders a markdown file from `content/` directory | yes |
-| `meme` | Shows a random meme | yes (frame wraps only the image, not the button) |
+| `meme` | Shows a random meme (supports `popular` flag; NSFW/spoiler always filtered) | yes (frame wraps only the image, not the button) |
 | `github` | GitHub project cards from public repos | yes |
 | `comments` | Guestbook widget: visitors post a name + comment, listed newest-first (open posting) | yes |
 
@@ -300,11 +300,13 @@ Displays GitHub project cards with stars, forks, language, license, and update t
 
 Displays a random meme from an external API.
 
-**Config:** no environment variables needed
+**Config:** no environment variables needed. Set `"popular": true` on the `meme` section in `homepage.json` to fetch the highest-upvoted memes instead of a random one.
 
 **Features:**
-- Random meme from r/memes subreddit
-- Image display with title and subreddit source
+- Random (or, in `popular` mode, highest-upvoted) meme; NSFW and spoiler memes are always filtered out server-side
+- De-duplication via a 30-entry client history so rerolls never show the same meme twice (popular mode advances to the next most-upvoted unseen meme; default mode picks a random unseen one)
+- Image display with title and subreddit source; the title links to the original Reddit post
+- Loading placeholder stays until the image finishes downloading in the browser
 - Refresh button for a new meme
 
 ---

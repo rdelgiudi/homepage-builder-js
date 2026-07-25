@@ -18,7 +18,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │   ├── favicon/route.ts     # Serves animated SVG favicon (fallback when no favicon set)
 │   │   │   ├── github/route.ts      # GitHub repo data with 6h cache, 10m error cache
 │   │   │   ├── markdown/route.ts    # Reads markdown from src/content/ at runtime, renders to HTML
-│   │   │   ├── meme/route.ts        # Random meme from external API
+│   │   │   ├── meme/route.ts        # Random meme from external API (NSFW/spoiler always filtered; popular mode supported)
 │   │   │   ├── visitors/route.ts    # Visitor counter (SQLite, write-behind queue)
 │   │   │   └── comments/route.ts    # Guestbook comments (SQLite, GET list + POST create)
 │   │   ├── globals.css
@@ -120,7 +120,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - **steam** — Steam profile & games (includes achievement progress for recent and top games)
 - **overwatch** — Overwatch 2 competitive stats
 - **markdown** — Renders `content/<file>.md` via `/api/markdown?file=<file>`
-- **meme** — Random meme from external API
+- **meme** — Random meme from external API (supports `popular` flag; NSFW/spoiler always filtered server-side)
 - **github** — GitHub project cards (repos: [{ owner, repo, label?, note? }])
 - **comments** — Guestbook widget (repos: none; optional `limit` for max comments fetched, default 50). Posts via `/api/comments`, lists newest-first.
 
@@ -326,6 +326,13 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 ### Meme widget frame wraps only the image, not the whole widget
 - `MemeWidget` accepts `widgetFrameEnabled`, `widgetFrameWidth`, `widgetFrameGradient` props directly (not wrapped by `maybeWrapFrame`).
 - When enabled, the `gradient-frame` class and CSS variables are applied only to the image container `<div>`, leaving the title, metadata, and "New Meme" button outside the framed area.
+
+### Meme API always filters NSFW, and de-duplicates via client history
+- `/api/meme` fetches a batch of 50 from `meme-api.com`, then **always** filters out `nsfw` and `spoiler` memes before returning anything — this runs in both default and `popular` modes, so NSFW can never be served.
+- **Default mode** (`popular` not set): the safe batch is shuffled and returned as a `memes` array; the client picks a random entry that is not in the 30-entry `historyRef` (falling back to a full reset when the pool is exhausted). The `meme` section's `popular` flag (default `false`) controls this.
+- **Popular mode** (`popular: true`): the safe batch is sorted by `ups` descending and the top 30 returned as `memes`; the client walks the list, showing the highest-`ups` entry not already in `historyRef`, so rerolling advances to the next most-popular unseen meme instead of looping the same few.
+- `MemeWidget` keeps the loading placeholder (`imgLoaded` state) until the `<img>` `onLoad` fires, so the new meme is only revealed once the browser has actually downloaded it.
+- The title is rendered as a link to the meme's Reddit `postLink` (new tab).
 
 ### ParticleBackground must only render once
 - `ParticleBackground` is rendered conditionally by `EffectsController` (based on `effects.particleBackground` in `homepage.json`).

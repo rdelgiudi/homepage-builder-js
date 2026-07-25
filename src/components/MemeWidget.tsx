@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface Meme {
   title: string;
@@ -17,30 +17,40 @@ interface MemeWidgetProps {
   widgetFrameEnabled?: boolean;
   widgetFrameWidth?: number;
   widgetFrameGradient?: string[];
+  popular?: boolean;
 }
 
-export default function MemeWidget({ enableGradientBorders, widgetFrameEnabled, widgetFrameWidth, widgetFrameGradient }: MemeWidgetProps) {
+export default function MemeWidget({ enableGradientBorders, widgetFrameEnabled, widgetFrameWidth, widgetFrameGradient, popular }: MemeWidgetProps) {
   const [meme, setMeme] = useState<Meme | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const historyRef = useRef<string[]>([]);
 
   async function fetchMeme() {
     if (refreshing) return;
     setRefreshing(true);
     try {
-      const currentUrl = meme?.url ?? null;
-      let data: Meme | null = null;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const res = await fetch("/api/meme", { cache: "no-store" });
-        const candidate = await res.json();
-        if (!candidate.url) continue;
-        if (candidate.url === currentUrl) continue;
-        data = candidate;
-        break;
+      const query = popular ? "?popular=true" : "";
+      const res = await fetch(`/api/meme${query}`, { cache: "no-store" });
+      const data = await res.json();
+      const candidates: Meme[] = data.memes || [];
+      let pool = candidates.filter((c) => !historyRef.current.includes(c.url));
+      if (!pool.length && candidates.length) {
+        historyRef.current = [];
+        pool = candidates;
       }
-      if (data) {
-        setMeme(data);
+      let chosen: Meme | null = null;
+      if (pool.length) {
+        if (popular) {
+          chosen = pool[0];
+        } else {
+          chosen = pool[Math.floor(Math.random() * pool.length)];
+        }
+      }
+      if (chosen && chosen.url !== meme?.url) {
+        historyRef.current = [...historyRef.current, chosen.url].slice(-30);
+        setMeme(chosen);
       }
     } catch (err) {
       console.error("Failed to fetch meme:", err);
@@ -112,9 +122,14 @@ export default function MemeWidget({ enableGradientBorders, widgetFrameEnabled, 
         )}
       </div>
       <div className="flex flex-col items-center gap-1 text-center">
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <a
+          href={meme.postLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors"
+        >
           {meme.title}
-        </p>
+        </a>
         <p className="text-xs text-gray-500 dark:text-gray-400">
           r/{meme.subreddit} • u/{meme.author} • ⬆ {meme.ups}
         </p>

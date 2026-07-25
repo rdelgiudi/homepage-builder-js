@@ -54,7 +54,8 @@
         {
           "type": "meme",
           "icon": "",
-          "text": "A random meme, refreshed each visit"
+          "text": "A random meme, refreshed each visit",
+          "popular": false
         }
       ]
     },
