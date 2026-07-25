@@ -13,6 +13,8 @@ interface EffectsConfig {
   progressGradientColors?: string[];
   widgetFrame?: boolean;
   widgetFrameWidth?: number;
+  mouseTrail?: boolean;
+  mouseTrailColors?: string[];
 }
 
 interface HomepageConfig {

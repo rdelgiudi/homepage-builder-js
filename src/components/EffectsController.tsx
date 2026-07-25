@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import ParticleBackground from "@/components/ParticleBackground";
+import MouseTrail from "@/components/MouseTrail";
 
 interface EffectsConfig {
   particleBackground?: boolean;
@@ -9,6 +10,8 @@ interface EffectsConfig {
   gradientBorders?: boolean;
   tabTransitions?: boolean;
   customScrollbar?: boolean;
+  mouseTrail?: boolean;
+  mouseTrailColors?: string[];
 }
 
 interface EffectsControllerProps {
@@ -27,6 +30,7 @@ export default function EffectsController({ effects }: EffectsControllerProps) {
   return (
     <>
       {effects?.particleBackground && <ParticleBackground mode={(effects?.particleEffect as "stars" | "comet") || "stars"} />}
+      {effects?.mouseTrail && <MouseTrail colors={effects?.mouseTrailColors} />}
     </>
   );
 }
