@@ -77,6 +77,25 @@ export default function MemeWidget({ enableGradientBorders, widgetFrameEnabled, 
           className="w-full h-auto"
           loading="lazy"
         />
+        {refreshing && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm">
+            <div className="w-full h-full absolute bg-gray-200 dark:bg-gray-700 animate-pulse" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="relative w-8 h-8 animate-spin text-gray-500 dark:text-gray-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+            </svg>
+            <span className="relative text-sm text-gray-500 dark:text-gray-400">Loading new meme...</span>
+          </div>
+        )}
       </div>
       <div className="flex flex-col items-center gap-1 text-center">
         <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
