@@ -2,13 +2,15 @@
 
 A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integration. Powers my site: https://giudi.me.
 
+⚠️ WARNING ⚠️: Entire project is AI generated, there may be some major bugs or overall weirdly structured code.
+
 ## Features
 
 - Tab-based navigation
 - Discord server widget showing member count
 - Discord user presence via WebSocket (instant updates, no polling, mobile indicator)
 - Steam integration showing recently played games and game library
-- Overwatch 2 stats integration (ranks, hero stats, performance metrics)
+- Overwatch stats integration (ranks, hero stats, performance metrics)
 - GitHub project cards (via public API, no key needed)
 - Fully customizable sections (text, links with primary/secondary styles, headers)
 - Guestbook / comments widget — visitors post name + comment, stored in SQLite (open posting, rate-limited)
@@ -122,7 +124,7 @@ All effects default to `true` if omitted (except `widgetFrame`/`widgetFrameWidth
 | `discord-server` | Discord server widget | yes |
 | `discord-user` | Discord user presence with activity, status, custom status, elapsed time, and mobile indicator | yes (adds top padding to separate gradient border from banner) |
 | `steam` | Steam profile, recently played, and top games | yes |
-| `overwatch` | Overwatch 2 stats with competitive ranks, hero stats, and performance metrics | yes |
+| `overwatch` | Overwatch stats with competitive ranks, hero stats, and performance metrics | yes |
 | `markdown` | Renders a markdown file from `content/` directory | yes |
 | `meme` | Shows a random meme (supports `popular` flag; NSFW/spoiler always filtered) | yes (frame wraps only the image, not the button) |
 | `github` | GitHub project cards from public repos | yes |
@@ -450,7 +452,7 @@ Single container with:
 - **Tailwind CSS** - Styling
 - **Discord API** - User presence & server widget
 - **Steam API** - Game library
-- **OverFast API** - Overwatch 2 stats
+- **OverFast API** - Overwatch stats
 - **GitHub API** - Repo data
 
 ## License
