@@ -5,6 +5,7 @@ import { useEffect } from "react";
 const FALLBACK_GRADIENT = ["#60a5fa", "#a78bfa", "#f472b6"];
 const ROTATION_MS = 3000;
 const FRAME_INTERVAL_MS = 50;
+const MARKER = "data-anim-favicon";
 
 interface Props {
   gradient?: string[];
@@ -25,19 +26,32 @@ export default function FaviconAnimation({ gradient }: Props) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    const ownedLink = !link;
-    const target = link ?? (() => {
-      const el = document.createElement("link");
-      el.rel = "icon";
-      document.head.appendChild(el);
-      return el;
-    })();
-
     let raf = 0;
     let running = true;
     let lastPaint = 0;
     const start = performance.now();
+    let link: HTMLLinkElement | null = null;
+
+    function ensureLink(): HTMLLinkElement {
+      let el = document.querySelector<HTMLLinkElement>(
+        `link[rel="icon"][${MARKER}]`
+      );
+      if (!el) {
+        el = document.createElement("link");
+        el.rel = "icon";
+        el.setAttribute(MARKER, "1");
+        document.head.appendChild(el);
+      }
+      return el;
+    }
+
+    function pruneStaleLinks() {
+      document
+        .querySelectorAll<HTMLLinkElement>(
+          `link[rel="icon"]:not([${MARKER}])`
+        )
+        .forEach((el) => el.remove());
+    }
 
     function render(now: number) {
       if (!running) return;
@@ -45,6 +59,8 @@ export default function FaviconAnimation({ gradient }: Props) {
       if (now - lastPaint < FRAME_INTERVAL_MS) return;
       lastPaint = now;
       try {
+        if (!link || !link.isConnected) link = ensureLink();
+        pruneStaleLinks();
         const c = ctx!;
         c.clearRect(0, 0, SIZE, SIZE);
         const angle = ((now - start) / ROTATION_MS) * Math.PI * 2;
@@ -60,7 +76,7 @@ export default function FaviconAnimation({ gradient }: Props) {
         c.beginPath();
         c.arc(CX, CY, R, 0, Math.PI * 2);
         c.stroke();
-        target!.href = canvas.toDataURL("image/png");
+        link!.href = canvas.toDataURL("image/png");
       } catch {
         // Never let a thrown error kill the animation loop.
       }
@@ -81,7 +97,7 @@ export default function FaviconAnimation({ gradient }: Props) {
       running = false;
       cancelAnimationFrame(raf);
       document.removeEventListener("visibilitychange", onVisibility);
-      if (ownedLink && target) target.remove();
+      if (link && link.isConnected) link.remove();
     };
   }, [gradient]);
 
