@@ -5,11 +5,20 @@ import { useEffect, useRef } from "react";
 interface UseWebSocketOptions {
   onMessage: (data: unknown) => void;
   enabled?: boolean;
+  // When false, every message is delivered to this listener immediately
+  // instead of being coalesced per type within a rAF tick. Needed for event
+  // streams (e.g. reaction flyers) where every message matters.
+  coalesce?: boolean;
+}
+
+interface ListenerEntry {
+  fn: (data: unknown) => void;
+  coalesce: boolean;
 }
 
 let sharedWs: WebSocket | null = null;
 let subscriberCount = 0;
-const listeners = new Set<(data: unknown) => void>();
+const listeners = new Set<ListenerEntry>();
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 let pendingByType = new Map<string, unknown>();
@@ -23,10 +32,11 @@ function scheduleFlush() {
     if (pendingByType.size === 0) return;
     const batch = pendingByType;
     pendingByType = new Map();
-    for (const listener of listeners) {
+    for (const entry of listeners) {
+      if (!entry.coalesce) continue;
       for (const msg of batch.values()) {
         try {
-          listener(msg);
+          entry.fn(msg);
         } catch (e) {
           console.error("WebSocket listener error:", e);
         }
@@ -52,8 +62,22 @@ function createConnection() {
     try {
       const msg = JSON.parse(event.data);
       const type = (msg && typeof msg === "object" && "type" in msg) ? String(msg.type) : "_";
-      pendingByType.set(type, msg);
-      scheduleFlush();
+      // Non-coalescing listeners get every message right away.
+      for (const entry of listeners) {
+        if (!entry.coalesce) {
+          try {
+            entry.fn(msg);
+          } catch (e) {
+            console.error("WebSocket listener error:", e);
+          }
+        }
+      }
+      // Coalescing listeners receive one message per type per frame.
+      const hasCoalescing = [...listeners].some((e) => e.coalesce);
+      if (hasCoalescing) {
+        pendingByType.set(type, msg);
+        scheduleFlush();
+      }
     } catch {}
   };
 
@@ -82,14 +106,16 @@ function teardownConnection() {
   sharedWs = null;
 }
 
-export function useWebSocket({ onMessage, enabled = true }: UseWebSocketOptions) {
+export function useWebSocket({ onMessage, enabled = true, coalesce = true }: UseWebSocketOptions) {
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
+  const coalesceRef = useRef(coalesce);
+  coalesceRef.current = coalesce;
 
   useEffect(() => {
     if (!enabled) return;
 
-    const listener = (data: unknown) => onMessageRef.current(data);
+    const listener: ListenerEntry = { fn: (data: unknown) => onMessageRef.current(data), coalesce: coalesceRef.current };
     listeners.add(listener);
 
     if (subscriberCount === 0) {

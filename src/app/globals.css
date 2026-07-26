@@ -462,3 +462,27 @@ html.dark.custom-scrollbar * {
 .animate-curtain-slide {
   animation: curtain-slide 0.25s ease-out;
 }
+
+/* Emoji reactions that fly up in the background when someone reacts. */
+@keyframes reaction-fly {
+  0% {
+    transform: translateY(0) translateX(0) scale(0.6) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.9;
+  }
+  85% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-105vh) translateX(var(--drift, 0px)) scale(1.15) rotate(var(--rotate, 0deg));
+    opacity: 0;
+  }
+}
+.reaction-fly {
+  animation-name: reaction-fly;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+  line-height: 1;
+}

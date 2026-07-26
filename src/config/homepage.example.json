@@ -20,7 +20,8 @@
     "widgetFrameWidth": 3,
     "mouseTrail": false,
     "mouseTrailColors": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
-    "faviconAnimation": true
+    "faviconAnimation": true,
+    "reactionFlyer": true
   },
   "tabs": [
     {
@@ -163,6 +164,13 @@
           "icon": "💬",
           "text": "Leave a comment",
           "limit": 50,
+          "widgetFrame": false
+        },
+        {
+          "type": "reactions",
+          "icon": "✨",
+          "text": "Or just drop a reaction",
+          "emojis": ["👍", "❤️", "😂", "🔥", "🎉", "👀"],
           "widgetFrame": false
         }
       ]

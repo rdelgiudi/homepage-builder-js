@@ -20,7 +20,11 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │   ├── markdown/route.ts    # Reads markdown from src/content/ at runtime, renders to HTML
 │   │   │   ├── meme/route.ts        # Random meme from external API (NSFW/spoiler always filtered; popular mode supported)
 │   │   │   ├── visitors/route.ts    # Visitor counter (SQLite, write-behind queue)
-│   │   │   └── comments/route.ts    # Guestbook comments (SQLite, GET list + POST create)
+│   │   │   ├── comments/route.ts    # Guestbook comments (SQLite, GET list + POST create)
+│   │   │   ├── reactions/route.ts   # Anonymous emoji reactions (SQLite, GET counts + POST/DELETE, broadcasts to all clients)
+│   │   │   ├── presence/route.ts    # Snapshot of current Discord presence (force-dynamic; reads in-memory server state)
+│   │   │   ├── steam/route.ts       # Snapshot of current Steam data (force-dynamic; reads in-memory server state)
+│   │   │   └── overwatch/route.ts   # Snapshot of current Overwatch data (force-dynamic; reads in-memory server state)
 │   │   ├── globals.css
 │   │   ├── layout.tsx               # Root layout, generateMetadata reads homepage.json
 │   │   ├── loading.tsx              # Cold-load skeleton
@@ -34,6 +38,8 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── MarkdownWidget.tsx       # Renders pre-rendered HTML from /api/markdown
 │   │   ├── VisitorCounter.tsx       # Visitor count display
 │   │   ├── CommentsWidget.tsx       # Guestbook: post + list visitor comments (SQLite)
+│   │   │   ├── ReactionsWidget.tsx      # Anonymous emoji reactions (toggle, visitor-hash keyed, rate-limited, GUI lock)
+│   │   │   ├── ReactionFlyer.tsx        # Background layer that flies an emoji up the screen when anyone reacts (WebSocket subscriber, coalesce:false)
 │   │   ├── GitHubProjects.tsx       # GitHub repo cards (public API, no key needed)
 │   │   ├── Tabs.tsx                 # Tab navigation w/ header + icon + sections
 │   │   ├── ParticleBackground.tsx   # Canvas floating particles
@@ -47,11 +53,13 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── about.md                 # Runtime markdown (not bundled)
 │   │   └── about-example.md
 │   ├── hooks/
-│   │   └── useWebSocket.ts          # Singleton WebSocket hook (rAF-coalesced)
+│   │   └── useWebSocket.ts          # Singleton WebSocket hook (rAF-coalesced per type; supports `coalesce: false` for event streams like reaction flyers)
 │   ├── lib/
 │   │   ├── config.ts                # mtime-cached homepage.json loader
 │   │   ├── db.ts                    # Shared better-sqlite3 connection (visitors.db, WAL)
 │   │   └── visitor.ts               # visitor_id cookie + hashing helpers (shared by visitors/comments)
+│   │   │   ├── reactions.ts             # DEFAULT_EMOJIS constant shared by API + widget
+│   │   │   └── reaction-bus.ts          # broadcastReaction() — pushes a reaction to all WS clients via globalThis.__wssBroadcast
 │   └── types/
 │       ├── gray-matter.d.ts
 │       └── quantize.d.ts
@@ -109,6 +117,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 | `mouseTrail` | boolean | `false` | Comet-style mouse trail — continuous tapering gradient line following the cursor (no trail drawn while stationary) |
 | `mouseTrailColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the mouse trail; falls back to `titleGradient` colors, then to a default blue→purple→pink gradient |
 | `faviconAnimation` | boolean | `true` | Animated gradient-ring favicon (canvas → PNG data URL per frame). Set to `false` to use the static SVG favicon from `/api/favicon` — useful to silence the per-frame `<link href>` churn in DevTools while debugging. |
+| `reactionFlyer` | boolean | `true` | Background emoji flyer — when someone reacts, an emoji flies up the screen (bottom→top) for all connected visitors. Toggle off to disable. |
 
 ### Tab sections types:
 
@@ -123,6 +132,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - **meme** — Random meme from external API (supports `popular` flag; NSFW/spoiler always filtered server-side)
 - **github** — GitHub project cards (repos: [{ owner, repo, label?, note? }])
 - **comments** — Guestbook widget (repos: none; optional `limit` for max comments fetched, default 50). Posts via `/api/comments`, lists newest-first.
+- **reactions** — Anonymous emoji reactions (repos: none; optional `emojis` array overriding `DEFAULT_EMOJIS`). Toggle per emoji keyed by `visitor_hash`; a new reaction broadcasts `{type:"reaction", emoji}` to all clients for the background flyer (`effects.reactionFlyer`).
 
 ## Critical Gotchas
 
@@ -258,7 +268,8 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 2. Calls registered callbacks in-process (no localhost WS hop).
 3. `websocket-server.js` enriches + relays to all connected browser clients.
 4. React components (`DiscordUser`, `SteamStatus`, `OverwatchStatus`) subscribe via `useWebSocket` hook.
-5. `useWebSocket` coalesces messages per `type` within a `requestAnimationFrame` tick, so a burst of updates results in a single React render per subscriber.
+5. `useWebSocket` coalesces messages per `type` within a `requestAnimationFrame` tick, so a burst of updates results in a single React render per subscriber. Pass `coalesce: false` when every message matters (e.g. `ReactionFlyer` for reaction events).
+6. **Reactions**: `POST /api/reactions` (on a new, non-duplicate insert) calls `broadcastReaction()` → `globalThis.__wssBroadcast` in `websocket-server.js` → pushes `{ type: "reaction", emoji }` to every connected client. `ReactionFlyer` is a non-coalescing subscriber that spawns a flying emoji. The three snapshot routes (`/api/presence`, `/api/steam`, `/api/overwatch`) read the in-memory server state via `globalThis.__serverSnapshots` so the widgets repopulate instantly on mount (e.g. after a tab switch remounts them) instead of waiting for the next periodic re-broadcast.
 
 ### Steam achievements
 - `websocket-server.js` fetches achievement data for all games in both `recentGames` and `ownedGames` via `ISteamUserStats/GetPlayerAchievements/v0001/`.
@@ -313,6 +324,18 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - **XSS safety**: `CommentsWidget` renders `name` and `body` as plain React text (`whitespace-pre-wrap break-words`) — never `dangerouslySetInnerHTML` — so user input cannot inject markup. All length/clamp limits are re-enforced server-side, not just client-side.
 - v1 is **open posting** (no moderation). Spam protection is the per-visitor rate limit only; add pre-moderation/blocklist if needed later.
 - The `comments` section is wrapped by `maybeWrapFrame` in `Tabs.tsx`, so `widgetFrame`/`widgetFrameWidth` apply like other widgets. The section title (`icon`/`text`) renders above the frame, consistent with `discord-user`/`steam`/etc.
+
+### Reactions (`reactions` section + `/api/reactions`)
+- Anonymous emoji reactions — an alternative to leaving a comment. A visitor taps an emoji to react; no name/body required.
+- Stored in the **same** `visitors.db` SQLite file, in a `reactions` table (`id`, `emoji`, `visitor_hash`, `created_at`) with a `UNIQUE(emoji, visitor_hash)` constraint so each visitor reacts once per emoji. The shared connection lives in `src/lib/db.ts`.
+- `src/lib/reactions.ts` holds the `DEFAULT_EMOJIS` list (shared by the API validation and the widget). The section config may override with an `emojis` array.
+- **GET `/api/reactions`**: returns per-emoji `counts` plus the `reacted` list (the emojis the current `visitor_id` has already reacted to, derived from the cookie) so the widget is authoritative and survives across reloads/devices sharing the cookie.
+- **POST `/api/reactions`**: body `{ emoji }`. Server validates the emoji is in the allowed set, then `INSERT OR IGNORE`. Only a genuinely new row (`changes > 0`) triggers `broadcastReaction(emoji)` → a real-time flyer for all connected visitors. Returns updated `counts` + `reacted`.
+- **DELETE `/api/reactions`**: body `{ emoji }`. Removes the visitor's reaction row; returns updated `counts` + `reacted`.
+- **Rate limit**: a global `RATE_LIMIT_MS` (250ms) per hashed `visitor_id`. A `429` is not a hard failure — `ReactionsWidget` retries the request after the window elapses so the visitor's intent is honored rather than dropped, and the whole widget stays locked (grayed out) until the request resolves, matching the rate-limit window.
+- **Keyed by visitor hash, not localStorage**: the `reacted` state comes from the server (`GET`/`POST`/`DELETE` responses), not client storage, so toggling is consistent with the `UNIQUE` constraint.
+- **Real-time flyer**: on a new reaction the server broadcasts `{ type: "reaction", emoji }` to every client. `ReactionFlyer` (rendered by `EffectsController` when `effects.reactionFlyer` is not `false`) subscribes with `coalesce: false` and spawns an emoji that animates bottom→top in the background; capped at 40 concurrent, removed on animation end.
+- The `reactions` section is wrapped by `maybeWrapFrame` in `Tabs.tsx`, so `widgetFrame`/`widgetFrameWidth` apply like other widgets.
 
 ### Gradient widget frame stacking
 - `.gradient-frame::before` needs `z-index: 1` and `.gradient-frame` needs `isolation: isolate` because Next.js `Image fill` uses `position: absolute`, putting it in the same stacking level as the `::before`. Without these, the image renders on top of the gradient border at the left/right edges of full-width content like the Discord banner.

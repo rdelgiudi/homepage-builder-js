@@ -498,8 +498,7 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
     }
   }, [data?.avatar, data?.banner, data?.bannerColor, data?.id]);
 
-  useWebSocket({
-    onMessage: useCallback((msg: unknown) => {
+  const handlePresence = useCallback((msg: unknown) => {
       const m = msg as { type?: string; data?: DiscordUserData };
       if (m?.type === 'presence' && m.data?.id && m.data?.username) {
         const result = m.data;
@@ -605,8 +604,26 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
         setLoading(false);
         setActivityImageErrors({});
       }
-    }, []),
-  });
+    }, []);
+
+  useWebSocket({ onMessage: handlePresence });
+
+  // Repopulate instantly on mount (e.g. after a tab switch remounts this
+  // widget) instead of waiting up to 30s for the next presence re-broadcast.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/presence")
+      .then((r) => r.json())
+      .then((j: { data?: DiscordUserData }) => {
+        if (!cancelled && j.data?.id && j.data?.username) {
+          handlePresence({ type: "presence", data: j.data });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [handlePresence]);
 
   if (loading && !lastDisplayNameRef.current) {
     return (

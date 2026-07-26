@@ -14,6 +14,7 @@ A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integ
 - GitHub project cards (via public API, no key needed)
 - Fully customizable sections (text, links with primary/secondary styles, headers)
 - Guestbook / comments widget — visitors post name + comment, stored in SQLite (open posting, rate-limited)
+- Anonymous emoji reactions — visitors tap an emoji to react (no account); real-time background flyer shows the reaction to everyone currently viewing
 - Icon support using emoji or image URLs
 - Responsive design with Tailwind CSS
 - Light/dark mode support
@@ -61,7 +62,8 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
     "widgetFrame": false,
     "widgetFrameWidth": 3,
     "mouseTrail": false,
-    "mouseTrailColors": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"]
+    "mouseTrailColors": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
+    "reactionFlyer": true
   },
   "tabs": [
     {
@@ -107,6 +109,7 @@ Toggle visual effects on or off:
 | `widgetFrameWidth` | number | `2` | Border width in pixels for the widget gradient frame |
 | `mouseTrail` | boolean | `false` | Comet-style mouse trail — a continuous tapering gradient line that follows the cursor; draws nothing while the cursor is stationary |
 | `mouseTrailColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the mouse trail (falls back to `titleGradient`, then default blue→purple→pink) |
+| `reactionFlyer` | boolean | `true` | Background emoji flyer — when someone reacts, an emoji flies up the screen (bottom→top) for all connected visitors. Toggle off to disable |
 
 All effects default to `true` if omitted (except `widgetFrame`/`widgetFrameWidth`/`mouseTrail`). Set any to `false` to disable.
 
@@ -129,6 +132,7 @@ All effects default to `true` if omitted (except `widgetFrame`/`widgetFrameWidth
 | `meme` | Shows a random meme (supports `popular` flag; NSFW/spoiler always filtered) | yes (frame wraps only the image, not the button) |
 | `github` | GitHub project cards from public repos | yes |
 | `comments` | Guestbook widget: visitors post a name + comment, listed newest-first (open posting) | yes |
+| `reactions` | Anonymous emoji reactions (toggle per emoji, rate-limited, background flyer on react) | yes |
 
 ## Components Reference
 
@@ -342,6 +346,35 @@ Lets visitors leave a name + comment on a guestbook tab. Posts are open (no acco
 
 ---
 
+### ReactionsWidget (`reactions`)
+
+Lets visitors leave an anonymous emoji reaction instead of a comment — no name or account needed.
+
+**Config:** no environment variables needed. Optional `emojis` array on the section overrides the default set.
+
+**Features:**
+- Emoji buttons with live per-emoji counts
+- Toggle on/off per emoji; one reaction per emoji per visitor (enforced by a `UNIQUE(emoji, visitor_hash)` constraint in SQLite)
+- State is authoritative from the server (`GET`/`POST`/`DELETE /api/reactions` return the `reacted` list derived from the `visitor_id` cookie) — not `localStorage`, so it survives reloads/devices
+- Per-visitor rate limit (`RATE_LIMIT_MS` = 250ms); on a `429` the widget retries after the window so intent isn't dropped, and stays grayed/locked until the request resolves
+- Real-time background flyer: a new reaction broadcasts to all connected clients, spawning an emoji that flies bottom→top behind the content (`ReactionFlyer`, gated by `effects.reactionFlyer`)
+- Respects `widgetFrame` / `widgetFrameWidth` and `gradientBorders` effects
+
+**Storage:** reactions live in the same `visitors.db` SQLite file as the comments/visitor counter (a `reactions` table).
+
+**Config example in homepage.json:**
+```json
+{
+  "type": "reactions",
+  "icon": "✨",
+  "text": "Or just drop a reaction",
+  "emojis": ["👍", "❤️", "😂", "🔥", "🎉", "👀"],
+  "widgetFrame": true
+}
+```
+
+---
+
 ### MouseTrail (`effects.mouseTrail`)
 
 A canvas overlay that renders a comet-style trail following the cursor, matching the comet background aesthetic.
@@ -377,6 +410,8 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 | GitHub | **REST** (server API, 6h cache) | `/api/github` proxies GitHub API, caches success 6h, errors 10m |
 | Visitor Counter | **REST** (server API) | SQLite-backed `/api/visitors` with hashed visitor IDs |
 | Comments | **REST** (server API) | SQLite-backed `/api/comments`; same `visitors.db`, shared `visitor_id` cookie for rate-limiting |
+| Reactions | **REST + WebSocket** (server API + broadcast) | SQLite-backed `/api/reactions`; toggle per emoji keyed by `visitor_hash` (UNIQUE). A new reaction broadcasts `{type:"reaction", emoji}` to all clients via the WebSocket server for the background flyer |
+| Discord/Steam/Overwatch (mount) | **REST** (server API snapshots) | `/api/presence`, `/api/steam`, `/api/overwatch` return the current in-memory server state so the widgets repopulate instantly on mount (e.g. after a tab switch remounts them) instead of waiting for the next re-broadcast |
 
 ---
 
@@ -397,7 +432,11 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 │   │   │   ├── markdown/route.ts    # Markdown API (server-rendered HTML, mtime-cached)
 │   │   │   ├── meme/route.ts        # Random meme
 │   │   │   ├── visitors/route.ts    # Visitor counter (SQLite, write-behind)
-│   │   │   └── comments/route.ts    # Guestbook comments (SQLite, GET list + POST create)
+│   │   │   ├── comments/route.ts    # Guestbook comments (SQLite, GET list + POST create)
+│   │   │   ├── reactions/route.ts   # Anonymous emoji reactions (SQLite, GET counts + POST/DELETE, broadcasts)
+│   │   │   ├── presence/route.ts    # Snapshot of current Discord presence (reads in-memory server state)
+│   │   │   ├── steam/route.ts       # Snapshot of current Steam data (reads in-memory server state)
+│   │   │   └── overwatch/route.ts   # Snapshot of current Overwatch data (reads in-memory server state)
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   ├── loading.tsx              # Cold-load skeleton
@@ -411,19 +450,23 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 │   │   ├── MarkdownWidget.tsx       # Renders pre-rendered HTML
 │   │   ├── VisitorCounter.tsx       # Visitor count
 │   │   ├── CommentsWidget.tsx       # Guestbook: post + list visitor comments (SQLite)
-│   │   ├── GitHubProjects.tsx       # GitHub repo cards
+│   │   ├── ReactionsWidget.tsx   # Anonymous emoji reactions (toggle, visitor-hash keyed, rate-limited, GUI lock)
+│   │   │   ├── ReactionFlyer.tsx     # Background layer that flies an emoji up the screen when anyone reacts
+│   │   │   ├── GitHubProjects.tsx    # GitHub repo cards
 │   │   ├── Tabs.tsx                 # Tab navigation
 │   │   ├── ParticleBackground.tsx   # Canvas particle effect (stars/comet modes)
 │   │   ├── MouseTrail.tsx           # Canvas comet-style mouse trail (gradient line, idle = no draw)
 │   │   ├── EffectsController.tsx    # Conditional effects renderer
 │   │   └── FaviconAnimation.tsx     # Canvas animated favicon (self-healing)
 │   ├── hooks/
-│   │   └── useWebSocket.ts          # WebSocket hook (rAF-coalesced per type)
+│   │   └── useWebSocket.ts          # WebSocket hook (rAF-coalesced per type; supports `coalesce: false` for event streams)
 │   └── lib/
 │       ├── config.ts                # mtime-cached homepage.json loader
 │       ├── markdown.ts              # Server-side markdown → HTML (marked)
 │       ├── db.ts                    # Shared better-sqlite3 connection (visitors.db, WAL)
 │       └── visitor.ts               # visitor_id cookie + hashing helpers (shared by visitors/comments)
+│   │   ├── reactions.ts             # DEFAULT_EMOJIS constant shared by API + widget
+│   │   └── reaction-bus.ts          # broadcastReaction() — pushes a reaction to all WS clients via globalThis.__wssBroadcast
 ├── discord-presence.js              # Discord.js bot (in-process module)
 ├── websocket-server.js              # Custom server + WebSocket
 ├── docker-entrypoint.sh

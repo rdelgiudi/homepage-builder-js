@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
@@ -246,6 +246,24 @@ export default function OverwatchStatus() {
       setLoading(false);
     }, []),
   });
+
+  // Repopulate instantly on mount (e.g. after a tab switch remounts this
+  // widget) instead of waiting for the next periodic WS re-broadcast.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/overwatch")
+      .then((r) => r.json())
+      .then((j: { data?: OverwatchData }) => {
+        if (!cancelled && j.data) {
+          setData(j.data);
+          setLoading(false);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (loading) {
     return (

@@ -336,6 +336,20 @@ async function fetchProfile() {
 let enrichedData = null;
 let wss;
 
+// Exposed for the Next.js API routes (same process) to broadcast real-time
+// events — e.g. emoji reactions — to every connected browser client.
+globalThis.__wssBroadcast = broadcastMessage;
+
+// Exposed so the API routes can serve the latest in-memory snapshots. These
+// let the Discord/Steam/Overwatch widgets repopulate instantly on mount
+// (e.g. after a tab switch remounts them) instead of waiting for the next
+// periodic re-broadcast.
+globalThis.__serverSnapshots = {
+  getSteam: () => steamData,
+  getOverwatch: () => overwatchData,
+  getPresence: () => enrichedData,
+};
+
 async function enrichPresence(rawPresence) {
   const userData = await fetchProfile();
   if (!userData) return;

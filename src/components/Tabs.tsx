@@ -11,6 +11,7 @@ import MarkdownWidget from "@/components/MarkdownWidget";
 import MemeWidget from "@/components/MemeWidget";
 import GitHubProjects from "@/components/GitHubProjects";
 import CommentsWidget from "@/components/CommentsWidget";
+import ReactionsWidget from "@/components/ReactionsWidget";
 
 interface LinkItem {
   label: string;
@@ -148,14 +149,24 @@ interface CommentsSection {
   widgetFrame?: boolean;
 }
 
+interface ReactionsSection {
+  type: "reactions";
+  icon?: string;
+  text?: string;
+  align?: Align;
+  invertDark?: boolean;
+  emojis?: string[];
+  widgetFrame?: boolean;
+}
+
 interface TabItem {
   label: string;
   icon?: string;
   invertDark?: boolean;
-  sections: (TextSection | LinksSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection | CommentsSection)[];
+  sections: (TextSection | LinksSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection | CommentsSection | ReactionsSection)[];
 }
 
-type Section = TextSection | LinksSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection | CommentsSection;
+type Section = TextSection | LinksSection | HeaderSection | DiscordSection | DiscordUserSection | SteamSection | OverwatchSection | MarkdownSection | MemeSection | GitHubSection | CommentsSection | ReactionsSection;
 
 function maybeWrapFrame(content: ReactNode, enabled: boolean | undefined, gradientColors: string[] | undefined, gradientWidth: number | undefined): ReactNode {
   if (!enabled) return content;
@@ -313,6 +324,19 @@ function renderSection(section: Section, index: number, enableGradientBorders?: 
             </p>
           )}
           {maybeWrapFrame(<CommentsWidget limit={section.limit} enableGradientBorders={enableGradientBorders} />, section.widgetFrame ?? widgetFrame, titleGradient, widgetFrameWidth)}
+        </div>
+      );
+
+    case "reactions":
+      return (
+        <div key={index}>
+          {(section.icon || section.text) && (
+            <p className={`text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2 ${sa}`}>
+              {section.icon && <Icon icon={section.icon} className="text-xl" width={24} height={24} invertDark={section.invertDark} />}
+              {section.text && <span>{section.text}</span>}
+            </p>
+          )}
+          {maybeWrapFrame(<ReactionsWidget emojis={section.emojis} enableGradientBorders={enableGradientBorders} />, section.widgetFrame ?? widgetFrame, titleGradient, widgetFrameWidth)}
         </div>
       );
 

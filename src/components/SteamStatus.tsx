@@ -302,6 +302,24 @@ export default function SteamStatus({ enableGradientBorders }: { enableGradientB
     }, []),
   });
 
+  // Repopulate instantly on mount (e.g. after a tab switch remounts this
+  // widget) instead of waiting for the next periodic WS re-broadcast.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/steam")
+      .then((r) => r.json())
+      .then((j: { data?: SteamData }) => {
+        if (!cancelled && j.data) {
+          setData(j.data);
+          setLoading(false);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 flex items-center gap-4 shadow-sm dark:shadow-none border border-gray-200 dark:border-0">
