@@ -486,3 +486,22 @@ html.dark.custom-scrollbar * {
   animation-fill-mode: forwards;
   line-height: 1;
 }
+
+/* Brief pop + color flash when a reaction counter increments. */
+@keyframes reaction-count-pop {
+  0% {
+    transform: scale(1);
+    color: inherit;
+  }
+  35% {
+    transform: scale(1.45);
+    color: #34d399;
+  }
+  100% {
+    transform: scale(1);
+    color: inherit;
+  }
+}
+.reaction-count-pop {
+  animation: reaction-count-pop 0.5s ease-out;
+}

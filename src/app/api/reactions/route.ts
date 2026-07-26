@@ -104,9 +104,10 @@ export async function POST(request: Request) {
       const info = database
         .prepare("INSERT OR IGNORE INTO reactions (emoji, visitor_hash) VALUES (?, ?)")
         .run(emoji, hashedId);
-      // A new row means a genuinely new reaction — broadcast it to everyone.
+      // A new row means a genuinely new reaction — broadcast it (with the
+      // updated counts) to everyone so all viewers' counters stay in sync.
       if (info.changes > 0) {
-        broadcastReaction(emoji);
+        broadcastReaction(emoji, getCounts(database), "add");
       }
     } catch {
       // Unique constraint: visitor already reacted with this emoji — ignore.
@@ -152,9 +153,14 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Invalid emoji" }, { status: 400 });
     }
 
-    database
+    const info = database
       .prepare("DELETE FROM reactions WHERE emoji = ? AND visitor_hash = ?")
       .run(emoji, hashedId);
+    // A removed row means the visitor un-reacted — broadcast the updated
+    // counts so other viewers' counters decrement too.
+    if (info.changes > 0) {
+      broadcastReaction(emoji, getCounts(database), "remove");
+    }
 
     rateLimit.set(hashedId, Date.now());
 

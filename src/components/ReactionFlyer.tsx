@@ -20,8 +20,10 @@ export default function ReactionFlyer() {
   const [flyers, setFlyers] = useState<Flyer[]>([]);
 
   const onMessage = useCallback((data: unknown) => {
-    const msg = data as { type?: string; emoji?: string };
+    const msg = data as { type?: string; emoji?: string; action?: string };
     if (msg?.type !== "reaction" || typeof msg.emoji !== "string") return;
+    // Only fly on a new reaction — un-reacting ("remove") just updates counts.
+    if (msg.action === "remove") return;
 
     const flyer: Flyer = {
       id: nextId++,

@@ -2,11 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { DEFAULT_EMOJIS } from "@/lib/reactions";
-
-interface ReactionCount {
-  emoji: string;
-  count: number;
-}
+import { useWebSocket } from "@/hooks/useWebSocket";
+import type { ReactionCount } from "@/lib/reaction-bus";
 
 interface ReactionsResponse {
   counts?: ReactionCount[];
@@ -18,6 +15,8 @@ interface ReactionsWidgetProps {
   enableGradientBorders?: boolean;
 }
 
+const ANIM_MS = 500;
+
 export default function ReactionsWidget({
   emojis = DEFAULT_EMOJIS,
   enableGradientBorders,
@@ -26,22 +25,48 @@ export default function ReactionsWidget({
   const [reacted, setReacted] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [locked, setLocked] = useState(false);
+  const [animating, setAnimating] = useState<Set<string>>(new Set());
 
   // Refs mirror the latest values so click handlers never read stale state.
   const reactedRef = useRef<Set<string>>(new Set());
+  const prevCountsRef = useRef<Record<string, number>>({});
+  const firstLoadRef = useRef(true);
 
   function updateReacted(next: Set<string>) {
     reactedRef.current = next;
     setReacted(next);
   }
 
+  function pulse(emoji: string) {
+    setAnimating((prev) => {
+      const next = new Set(prev);
+      next.add(emoji);
+      return next;
+    });
+    setTimeout(() => {
+      setAnimating((prev) => {
+        const next = new Set(prev);
+        next.delete(emoji);
+        return next;
+      });
+    }, ANIM_MS);
+  }
+
   function applyCounts(data: ReactionsResponse) {
     if (data.counts) {
       const map: Record<string, number> = {};
       for (const c of data.counts) map[c.emoji] = c.count;
+      // Animate emojis whose count went up (skip the initial load).
+      if (!firstLoadRef.current) {
+        for (const c of data.counts) {
+          if (c.count > (prevCountsRef.current[c.emoji] || 0)) pulse(c.emoji);
+        }
+      }
       setCounts(map);
+      prevCountsRef.current = map;
     }
     if (data.reacted) updateReacted(new Set(data.reacted));
+    firstLoadRef.current = false;
   }
 
   const load = useCallback(async () => {
@@ -59,6 +84,19 @@ export default function ReactionsWidget({
   useEffect(() => {
     load();
   }, [load]);
+
+  // Real-time sync: whenever anyone reacts/un-reacts, the server broadcasts
+  // the updated counts to every connected client. We only update the numbers
+  // (not the per-visitor `reacted` set, which is private to each visitor).
+  useWebSocket({
+    coalesce: false,
+    onMessage: useCallback((msg: unknown) => {
+      const m = msg as { type?: string; counts?: ReactionCount[] };
+      if (m?.type === "reaction" && m.counts) {
+        applyCounts({ counts: m.counts });
+      }
+    }, []),
+  });
 
   // Matches RATE_LIMIT_MS on the server. On a 429 we wait out the window and
   // retry so the visitor's intent is honored instead of being dropped.
@@ -95,7 +133,10 @@ export default function ReactionsWidget({
 
     // Optimistic update for snappy UI; server response reconciles to truth.
     updateReacted(nextReacted);
-    setCounts((c) => ({ ...c, [emoji]: (c[emoji] || 0) + (has ? -1 : 1) }));
+    const newCount = (counts[emoji] || 0) + (has ? -1 : 1);
+    setCounts((c) => ({ ...c, [emoji]: newCount }));
+    prevCountsRef.current = { ...prevCountsRef.current, [emoji]: newCount };
+    if (!has) pulse(emoji);
 
     try {
       const res = await sendReaction(emoji, has ? "DELETE" : "POST");
@@ -111,7 +152,9 @@ export default function ReactionsWidget({
       if (has) revert.add(emoji);
       else revert.delete(emoji);
       updateReacted(revert);
-      setCounts((c) => ({ ...c, [emoji]: (c[emoji] || 0) + (has ? 1 : -1) }));
+      const revertCount = (counts[emoji] || 0) + (has ? 1 : -1);
+      setCounts((c) => ({ ...c, [emoji]: revertCount }));
+      prevCountsRef.current = { ...prevCountsRef.current, [emoji]: revertCount };
     } finally {
       const remaining = RATE_LIMIT_MS - (Date.now() - lockStart);
       if (remaining > 0) {
@@ -144,7 +187,11 @@ export default function ReactionsWidget({
               } ${locked ? "opacity-50 grayscale pointer-events-none" : ""}`}
             >
               <span className="text-xl leading-none">{emoji}</span>
-              <span className="font-medium tabular-nums">{loading ? "·" : count}</span>
+              <span
+                className={`font-medium tabular-nums inline-block${animating.has(emoji) ? " reaction-count-pop" : ""}`}
+              >
+                {loading ? "·" : count}
+              </span>
             </button>
           );
         })}
