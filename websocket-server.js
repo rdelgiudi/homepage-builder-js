@@ -335,6 +335,8 @@ async function fetchProfile() {
 
 let enrichedData = null;
 let wss;
+// Maps each connected WebSocket to its visitor hash (deduped for viewer count).
+const viewerHashes = new Map();
 
 // Exposed for the Next.js API routes (same process) to broadcast real-time
 // events — e.g. emoji reactions — to every connected browser client.
@@ -348,7 +350,33 @@ globalThis.__serverSnapshots = {
   getSteam: () => steamData,
   getOverwatch: () => overwatchData,
   getPresence: () => enrichedData,
+  getViewers: () => (wss ? wss.clients.size : 0),
 };
+
+function broadcastViewerCount() {
+  if (!wss) return;
+  // Count distinct visitor hashes so multiple tabs from the same browser
+  // (sharing the visitor_id cookie) are not double-counted.
+  const distinct = new Set(viewerHashes.values()).size;
+  const message = JSON.stringify({ type: 'viewers', count: distinct });
+  wss.clients.forEach((client) => {
+    if (client.readyState === 1) client.send(message);
+  });
+}
+
+function hashVisitor(visitorId) {
+  const salt = process.env.VISITOR_SALT || 'default-salt';
+  return crypto.createHash('sha256').update(`${visitorId}:${salt}`).digest('hex').substring(0, 32);
+}
+
+function getCookieValue(cookieHeader, name) {
+  if (!cookieHeader) return null;
+  for (const c of cookieHeader.split(';')) {
+    const [n, ...rest] = c.trim().split('=');
+    if (n === name) return decodeURIComponent(rest.join('='));
+  }
+  return null;
+}
 
 async function enrichPresence(rawPresence) {
   const userData = await fetchProfile();
@@ -897,8 +925,21 @@ app.prepare().then(() => {
 
   wss = new WebSocketServer({ noServer: true });
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
     console.log(`[${new Date().toISOString()}] [WS] Browser client connected (${wss.clients.size} total)`);
+    // Try to attribute this connection to a visitor from the upgrade request's
+    // cookie (covers returning visitors / multiple tabs sharing the cookie).
+    const cookieVisitorId = getCookieValue(req?.headers?.cookie || null, 'visitor_id');
+    viewerHashes.set(ws, cookieVisitorId ? hashVisitor(cookieVisitorId) : undefined);
+    ws.on('message', (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString());
+        if (msg.type === 'identify' && typeof msg.visitorId === 'string') {
+          viewerHashes.set(ws, hashVisitor(msg.visitorId));
+          broadcastViewerCount();
+        }
+      } catch {}
+    });
     if (enrichedData) {
       ws.send(JSON.stringify({ type: 'presence', data: enrichedData }));
     }
@@ -912,8 +953,12 @@ app.prepare().then(() => {
     if (overwatchData) {
       ws.send(JSON.stringify({ type: 'overwatch', data: overwatchData, hash: overwatchHash }));
     }
+    // Announce the updated viewer count to every connected client.
+    broadcastViewerCount();
     ws.on('close', () => {
       console.log(`[${new Date().toISOString()}] [WS] Browser client disconnected (${wss.clients.size} total)`);
+      viewerHashes.delete(ws);
+      broadcastViewerCount();
     });
   });
 

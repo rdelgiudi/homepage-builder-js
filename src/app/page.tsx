@@ -18,8 +18,10 @@ function TabsFallback() {
 }
 
 export default async function Home() {
-  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, backgroundColor, effects, tabs = [] } = getConfig();
+  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, backgroundColor, effects, counters, tabs = [] } = getConfig();
   const taglineGradient = rawTaglineGradient?.length ? rawTaglineGradient : titleGradient;
+  const showViewers = counters?.viewers ?? true;
+  const showVisitors = counters?.visitors ?? true;
 
   const bgVars = backgroundColor?.light || backgroundColor?.dark
     ? { '--bg-light': backgroundColor?.light || '#f3f4f6', '--bg-dark': backgroundColor?.dark || '#111827' } as React.CSSProperties
@@ -48,7 +50,7 @@ export default async function Home() {
       </div>
 
       <div className="fixed bottom-4 left-4 z-30">
-        <VisitorCounter />
+        <VisitorCounter showViewers={showViewers} showVisitors={showVisitors} />
       </div>
     </main>
   );

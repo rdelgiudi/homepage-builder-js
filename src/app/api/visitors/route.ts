@@ -98,7 +98,7 @@ export async function POST(request: Request) {
 
     const count = database.prepare("SELECT COUNT(*) as count FROM visitors").get() as { count: number };
 
-    const response = NextResponse.json({ count: count.count + pendingWrites.size, isNew });
+    const response = NextResponse.json({ count: count.count + pendingWrites.size, isNew, visitorId });
 
     response.cookies.set(COOKIE_NAME, visitorId, {
       httpOnly: true,

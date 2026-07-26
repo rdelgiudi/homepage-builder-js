@@ -18,6 +18,11 @@ interface EffectsConfig {
   faviconAnimation?: boolean;
 }
 
+interface CountersConfig {
+  viewers?: boolean;
+  visitors?: boolean;
+}
+
 interface HomepageConfig {
   name: string;
   tagline: string;
@@ -26,6 +31,7 @@ interface HomepageConfig {
   taglineGradient?: string[];
   backgroundColor?: { light?: string; dark?: string };
   effects?: EffectsConfig;
+  counters?: CountersConfig;
   tabs: unknown[];
 }
 

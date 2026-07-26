@@ -133,3 +133,11 @@ export function useWebSocket({ onMessage, enabled = true, coalesce = true }: Use
     };
   }, [enabled]);
 }
+
+export function sendWebSocket(data: unknown): boolean {
+  if (sharedWs && sharedWs.readyState === WebSocket.OPEN) {
+    sharedWs.send(JSON.stringify(data));
+    return true;
+  }
+  return false;
+}

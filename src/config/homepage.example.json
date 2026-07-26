@@ -23,6 +23,10 @@
     "faviconAnimation": true,
     "reactionFlyer": true
   },
+  "counters": {
+    "viewers": true,
+    "visitors": true
+  },
   "tabs": [
     {
       "label": "Welcome",
