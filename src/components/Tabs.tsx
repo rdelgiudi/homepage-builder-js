@@ -445,7 +445,7 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions, e
 
   return (
     <div className="w-full">
-      <div ref={barRef} className="sticky top-0 z-50 w-screen ml-[calc(50%-50vw)] bg-tab-bar backdrop-blur-sm border-b border-gray-300 dark:border-gray-700 h-12 md:h-auto">
+      <div ref={barRef} className="sticky top-0 z-50 w-screen ml-[calc(50%-50vw)] bg-tab-bar border-b border-gray-300 dark:border-gray-700 h-12 md:h-auto">
         <div className="max-w-[870px] mx-auto px-4 md:px-8 flex items-center gap-3 pt-2 pb-2 h-full">
           {/* Desktop tab bar */}
           <div className="hidden md:flex gap-4 justify-center flex-1">
@@ -480,7 +480,7 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions, e
       {/* Mobile side drawer — starts at the tab bar's level (drawerTop) so the title above stays visible; the bar (z-50) sits on top so its morphing close button remains in view */}
       <div className={`fixed inset-x-0 bottom-0 z-40 md:hidden transition-opacity duration-300 ${menuOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} style={{ top: drawerTop }}>
         <div
-          className={`absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${menuOpen ? "opacity-100" : "opacity-0"}`}
+          className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${menuOpen ? "opacity-100" : "opacity-0"}`}
           onClick={() => setMenuOpen(false)}
         />
         <div className={`absolute right-0 top-0 h-full w-72 max-w-[80vw] bg-page shadow-2xl border-l border-gray-300 dark:border-gray-700 flex flex-col transition-transform duration-300 ease-out ${menuOpen ? "translate-x-0" : "translate-x-full"}`}>

@@ -102,7 +102,7 @@ export default function MemeWidget({ enableGradientBorders, widgetFrameEnabled, 
           onLoad={() => setImgLoaded(true)}
         />
         {!imgLoaded && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gray-100/80 dark:bg-gray-800/80">
             <div className="w-full h-full absolute bg-gray-200 dark:bg-gray-700 animate-pulse" />
             <svg
               xmlns="http://www.w3.org/2000/svg"
