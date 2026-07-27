@@ -28,22 +28,22 @@ export default async function Home() {
     : undefined;
 
   return (
-    <main className="min-h-screen bg-page relative z-10" style={bgVars}>
+    <main className="min-h-screen bg-page relative z-10 overflow-x-clip" style={bgVars}>
       <EffectsController effects={{ particleBackground: true, customScrollbar: true, ...effects }} />
-      <div className="bg-page pt-8 pb-4">
-        <div className="w-full max-w-[870px] mx-auto text-center space-y-4">
+      <div className="bg-page pt-6 md:pt-8 pb-3 md:pb-4">
+        <div className="w-full max-w-[870px] mx-auto text-center space-y-3 md:space-y-4">
           <h1
-            className={`text-5xl font-bold pb-2${titleGradient?.length ? ' animate-gradient-text' : ' text-gray-900 dark:text-white'}`}
+            className={`text-3xl md:text-5xl font-bold pb-2${titleGradient?.length ? ' animate-gradient-text' : ' text-gray-900 dark:text-white'}`}
             style={titleGradient?.length ? { backgroundImage: `linear-gradient(135deg, ${titleGradient.join(', ')})` } : undefined}
           >{name}</h1>
           <p
-            className={`text-xl ${taglineGradient?.length ? 'animate-gradient-text' : 'text-gray-600 dark:text-gray-300'}`}
+            className={`text-base md:text-xl ${taglineGradient?.length ? 'animate-gradient-text' : 'text-gray-600 dark:text-gray-300'}`}
             style={taglineGradient?.length ? { backgroundImage: `linear-gradient(135deg, ${taglineGradient.join(', ')})` } : undefined}
           >{tagline}</p>
         </div>
       </div>
 
-      <div className="w-full max-w-[870px] mx-auto px-8 pb-8">
+      <div className="w-full max-w-[870px] mx-auto px-4 md:px-8 pb-8">
         <Suspense fallback={<TabsFallback />}>
           <Tabs tabs={tabs as Parameters<typeof Tabs>[0]["tabs"]} enableGradientBorders={effects?.gradientBorders ?? true} enableTransitions={effects?.tabTransitions ?? true} enableProgressGradient={effects?.progressGradient ?? true} progressGradientColors={effects?.progressGradientColors} titleGradient={titleGradient} discordServerId={process.env.DISCORD_SERVER_ID} widgetFrame={effects?.widgetFrame} widgetFrameWidth={effects?.widgetFrameWidth} />
         </Suspense>
