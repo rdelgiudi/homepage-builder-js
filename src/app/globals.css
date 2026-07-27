@@ -505,3 +505,31 @@ html.dark.custom-scrollbar * {
 .reaction-count-pop {
   animation: reaction-count-pop 0.5s ease-out;
 }
+
+/* ===== Firefox perf: kill the infinite gradient repaint loop =====
+   Firefox runs background-position animations on the main thread (unlike
+   Chrome, which can composite them), so the always-on gradient slides
+   (clip:text title, masked widget frames/borders, progress bar) force a
+   full repaint every frame and starve the canvas effects on mobile.
+   We keep the gradient *styling* (static) but drop the per-frame slide,
+   which removes the repaint entirely. Chrome is untouched. */
+@-moz-document url-prefix() {
+  .animate-gradient-text,
+  .gradient-frame::before,
+  .gradient-border-card::before,
+  .gradient-tab::before,
+  .animate-gradient-bar {
+    animation: none !important;
+  }
+}
+
+/* Respect users who ask for reduced motion: no infinite gradient slides. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-gradient-text,
+  .gradient-frame::before,
+  .gradient-border-card::before,
+  .gradient-tab::before,
+  .animate-gradient-bar {
+    animation: none !important;
+  }
+}

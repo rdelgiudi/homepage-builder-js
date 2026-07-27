@@ -4,7 +4,7 @@ import { useEffect } from "react";
 
 const FALLBACK_GRADIENT = ["#60a5fa", "#a78bfa", "#f472b6"];
 const ROTATION_MS = 3000;
-const FRAME_INTERVAL_MS = 50;
+const FRAME_INTERVAL_MS = 100;
 const MARKER = "data-anim-favicon";
 
 interface Props {
@@ -25,6 +25,11 @@ export default function FaviconAnimation({ gradient }: Props) {
     canvas.height = SIZE;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     let raf = 0;
     let running = true;
@@ -47,7 +52,7 @@ export default function FaviconAnimation({ gradient }: Props) {
 
     function render(now: number) {
       if (!running) return;
-      requestAnimationFrame(render);
+      if (!reduceMotion) requestAnimationFrame(render);
       if (now - lastPaint < FRAME_INTERVAL_MS) return;
       lastPaint = now;
       try {
@@ -88,7 +93,11 @@ export default function FaviconAnimation({ gradient }: Props) {
       if (document.visibilityState === "visible" && running) {
         cancelAnimationFrame(raf);
         lastPaint = 0;
-        raf = requestAnimationFrame(render);
+    if (reduceMotion) {
+      render(performance.now());
+    } else {
+      raf = requestAnimationFrame(render);
+    }
       }
     }
     document.addEventListener("visibilitychange", onVisibility);
