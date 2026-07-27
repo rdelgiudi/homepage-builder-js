@@ -16,10 +16,14 @@ A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integ
 - Guestbook / comments widget — visitors post name + comment, stored in SQLite (open posting, rate-limited)
 - Anonymous emoji reactions — visitors tap an emoji to react (no account); real-time background flyer shows the reaction to everyone currently viewing
 - Icon support using emoji or image URLs
-- Responsive design with Tailwind CSS
+- Responsive design with Tailwind CSS — on screens under 768px (`md`), the tab bar collapses into a compact bar with the current tab label and a hamburger toggle that opens a slide-in side menu (hamburger morphs to an X, menu starts level with the tab bar leaving the site title visible)
 - Light/dark mode support
 - Auto-generated animated gradient favicon (when not specified, uses title colors)
 - Easy to customize via JSON config files
+
+## Mobile
+
+On screens narrower than 768px (`md` breakpoint), the horizontal tab bar is replaced by a compact bar showing the active tab's name and a hamburger button. Tapping the hamburger opens a side menu that slides in from the right; the hamburger morphs into an X to close it. The menu is anchored to the tab bar, so when the site title is visible at the top of the page the menu drops down below it rather than covering it. No horizontal scrolling occurs on mobile.
 
 ## Getting Started
 

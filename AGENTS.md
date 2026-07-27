@@ -140,6 +140,17 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - `HOSTNAME` is a standard Unix env var set to the machine's hostname (e.g. `bazzite`). **Do not use it** as a config key.
 - The bind address env var is called `HOST`.
 
+### Mobile navigation (Tabs)
+- **Breakpoint:** Tailwind `md` (768px). Below `md`, the horizontal tab bar (`hidden md:flex`) is replaced by a compact sticky bar showing the active tab's label + icon (left) and a hamburger toggle (right).
+- **HamburgerButton:** a 3-bar button that morphs into an X via CSS transforms (`rotate-45` / `opacity-0` / `-rotate-45` on the three spans) when `menuOpen`. Tapping toggles the slide-in side drawer. Defined as a small component in `Tabs.tsx` and reused in the bar.
+- **Drawer slide:** slides in from the **right** (`absolute right-0`, `transition-transform duration-300 ease-out`, `translate-x-full → translate-x-0`). It is always rendered but toggled via `opacity-100` + `pointer-events-auto` vs `opacity-0 pointer-events-none` so the transform transition actually plays (conditional mount would skip the animation).
+- **drawerTop:** captured from `barRef.current.getBoundingClientRect().top` when the menu opens, and applied as the overlay's `top` (`fixed inset-x-0 bottom-0`, `top: drawerTop`). This makes the menu **start level with the tab bar** — when the page is scrolled to the top (title header visible) the menu drops down below the title instead of covering it; when scrolled (title hidden) the sticky bar is at `0` so the menu starts at the viewport top.
+- **Close button stays visible:** the tab bar is `sticky top-0 z-50`, above the `z-40` drawer, so its morphing X (right side, same side as the menu) is always in view. The drawer list is padded `pt-12` so the first item clears the 48px (`h-12`) bar.
+- **Closing:** tap the X, tap the backdrop, or press `Escape`. Opening sets `document.body.style.overflow = "hidden"` (restored on close) to lock scroll. The open state is `menuOpen`; `handleTabClick` also closes it.
+- **No horizontal scroll:** `<main>` has `overflow-x-clip` (NOT `overflow-x-hidden`, which would break `position: sticky`). This safely clips the `w-screen` full-bleed tab bar that would otherwise overflow by the scrollbar width without breaking the sticky bar or fixed overlays.
+- Widgets already avoid horizontal overflow: GitHub cards stack vertically (`space-y-3`), Overwatch grids use `grid-cols-2` → `sm:` scaling, and Discord/Steam rows use `flex-shrink-0` + `min-w-0` + `truncate`.
+- The page header is also compact on mobile: `text-3xl md:text-5xl` title, `text-base md:text-xl` tagline, and `px-4 md:px-8` gutters.
+
 ### homepage.json is runtime, not bundled
 - Read via `fs.readFileSync` in `src/lib/config.ts` (mtime-cached; re-parsed only when the file's mtime changes).
 - Imported by `src/app/page.tsx` and `src/app/layout.tsx`.
