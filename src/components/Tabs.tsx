@@ -466,13 +466,13 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions, e
             ))}
           </div>
 
-          {/* Mobile: current tab label + hamburger (pinned to the tab bar) */}
-          <div className="flex md:hidden items-center justify-between flex-1">
+          {/* Mobile: hamburger + current tab label (pinned to the tab bar) */}
+          <div className="flex md:hidden items-center gap-4 flex-1">
+            <HamburgerButton open={menuOpen} onClick={() => setMenuOpen((o) => !o)} label={menuOpen ? "Close menu" : "Open menu"} />
             <span className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
               {tabs[activeTab].icon && <Icon icon={tabs[activeTab].icon} invertDark={tabs[activeTab].invertDark} width={18} height={18} />}
               <span className="truncate">{tabs[activeTab].label}</span>
             </span>
-            <HamburgerButton open={menuOpen} onClick={() => setMenuOpen((o) => !o)} label={menuOpen ? "Close menu" : "Open menu"} />
           </div>
         </div>
       </div>
@@ -483,7 +483,7 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions, e
           className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${menuOpen ? "opacity-100" : "opacity-0"}`}
           onClick={() => setMenuOpen(false)}
         />
-        <div className={`absolute right-0 top-0 h-full w-72 max-w-[80vw] bg-page shadow-2xl border-l border-gray-300 dark:border-gray-700 flex flex-col transition-transform duration-300 ease-out ${menuOpen ? "translate-x-0" : "translate-x-full"}`}>
+        <div className={`absolute left-0 top-0 h-full w-72 max-w-[80vw] bg-page shadow-2xl border-r border-gray-300 dark:border-gray-700 flex flex-col transition-transform duration-300 ease-out ${menuOpen ? "translate-x-0" : "-translate-x-full"}`}>
           <nav className="flex-1 overflow-y-auto pt-12 pb-2">
             {tabs.map((tab, index) => (
               <button
@@ -492,8 +492,8 @@ export default function Tabs({ tabs, enableGradientBorders, enableTransitions, e
                 onClick={() => handleTabClick(index)}
                 className={`flex items-center gap-3 w-full px-4 py-3 text-left transition-colors ${
                   activeTab === index
-                    ? "text-blue-600 dark:text-white bg-gray-200/60 dark:bg-gray-800/60 border-l-2 border-blue-600 dark:border-blue-400"
-                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-200/40 dark:hover:bg-gray-800/40 border-l-2 border-transparent"
+                    ? "text-blue-600 dark:text-white bg-gray-200/60 dark:bg-gray-800/60 border-r-2 border-blue-600 dark:border-blue-400"
+                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-200/40 dark:hover:bg-gray-800/40 border-r-2 border-transparent"
                 }`}
               >
                 {tab.icon && <Icon icon={tab.icon} invertDark={tab.invertDark} width={20} height={20} />}
