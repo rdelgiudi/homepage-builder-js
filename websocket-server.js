@@ -600,7 +600,10 @@ async function getGameName(appid) {
   try {
     const res = await fetch(`https://store.steampowered.com/api/appdetails?appids=${appid}&filters=basic`);
     const data = await res.json();
-    return data[appid]?.data?.name || `App ${appid}`;
+    // Steam no longer keys the response by the requested appid (it now uses
+    // some internal package/app-group id), so just take the single entry.
+    const entry = data[appid] || Object.values(data)[0];
+    return entry?.data?.name || `App ${appid}`;
   } catch (e) {
     console.error(`[${new Date().toISOString()}] [Steam] Failed to fetch name for appid ${appid}: ${e.message}`);
     return `App ${appid}`;
