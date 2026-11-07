@@ -39,3 +39,5 @@ src/config/homepage.json
 
 # Visitor database
 visitors.db
+visitors.db-shm
+visitors.db-wal
