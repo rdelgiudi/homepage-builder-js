@@ -1,4 +1,4 @@
-FROM node:26.3.1-alpine AS deps
+FROM node:26.13.0-alpine AS deps
 WORKDIR /app
 
 RUN apk add --no-cache python3 build-base
@@ -6,7 +6,7 @@ RUN apk add --no-cache python3 build-base
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM node:26.3.1-alpine AS builder
+FROM node:26.13.0-alpine AS builder
 WORKDIR /app
 
 RUN apk add --no-cache python3 build-base
@@ -17,7 +17,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:26.3.1-alpine AS runner
+FROM node:26.13.0-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

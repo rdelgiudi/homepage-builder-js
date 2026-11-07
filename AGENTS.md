@@ -260,7 +260,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
   | 5 (Stream) | 📺 | 0 |
 
 ### npm overrides
-- `package.json` overrides `undici@^6.27.0` to fix high-severity vulns without breaking `discord.js`.
+- `package.json` overrides pin patched transitive deps: `undici@^6.29.1` (discord.js), `glob@^14.0.4` / `rimraf@^6.1.4` (eslint tooling), and `postcss: "$postcss"` (forces Next's nested `postcss@8.4.31` up to the patched direct dependency `^8.5.32`).
 
 ### Docker build requires native modules
 - `better-sqlite3` and `sharp` need `build-base` + `python3` (already in Dockerfile).
