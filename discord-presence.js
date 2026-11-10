@@ -9,6 +9,10 @@ let client = null;
 let userPresence = null;
 let fetchInterval = null;
 let healthCheckInterval = null;
+// When paused (no viewers on the site), the periodic member fetch is skipped.
+// Gateway presence events still update `userPresence` in memory, since those
+// are pushed by Discord and cost no outbound requests.
+let paused = false;
 
 function emptyPresence() {
   return {
@@ -78,6 +82,7 @@ function emitPresence() {
 
 async function fetchUserPresence() {
   if (!client) return;
+  if (paused) return;
   for (const guild of client.guilds.cache.values()) {
     try {
       const member = await guild.members.fetch(userId);
@@ -101,6 +106,16 @@ function onPresenceUpdate(callback) {
     presenceCallbacks.delete(callback);
     console.log(`[${new Date().toISOString()}] [Discord Presence] Callback unregistered (${presenceCallbacks.size} total)`);
   };
+}
+
+function setPaused(value) {
+  const next = !!value;
+  if (next === paused) return;
+  paused = next;
+  console.log(`[${new Date().toISOString()}] [Discord Presence] Periodic fetch ${paused ? 'paused' : 'resumed'}`);
+  if (!paused && client?.isReady()) {
+    fetchUserPresence().catch(() => {});
+  }
 }
 
 function getCurrentPresence() {
@@ -231,7 +246,7 @@ async function stop() {
   userPresence = null;
 }
 
-module.exports = { start, stop, onPresenceUpdate, getCurrentPresence };
+module.exports = { start, stop, onPresenceUpdate, getCurrentPresence, setPaused };
 
 if (require.main === module) {
   start().catch((e) => {

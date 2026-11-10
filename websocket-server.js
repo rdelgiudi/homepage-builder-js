@@ -353,6 +353,42 @@ globalThis.__serverSnapshots = {
   getViewers: () => (wss ? wss.clients.size : 0),
 };
 
+// --- Idle pause ---
+// When no browser client is connected, the periodic refreshes (Steam,
+// achievements, Overwatch) and Discord presence enrichment skip their
+// outbound queries. The first skipped refresh marks the server as paused;
+// the next client connection resumes everything with an immediate refresh.
+// A page reload that reconnects before the next tick never pauses at all.
+let idlePaused = false;
+let presencePendingWhileIdle = false;
+const resumeHandlers = [];
+
+function hasViewers() {
+  return !!wss && wss.clients.size > 0;
+}
+
+// Returns true (and marks paused) when the caller should skip its work.
+function skipWhileIdle(tag) {
+  if (hasViewers()) return false;
+  if (!idlePaused) {
+    idlePaused = true;
+    console.log(`[${new Date().toISOString()}] [Idle] No viewers connected; pausing refreshes (triggered by ${tag})`);
+    try { require('./discord-presence').setPaused?.(true); } catch {}
+  }
+  return true;
+}
+
+function resumeFromIdle() {
+  if (!idlePaused) return;
+  idlePaused = false;
+  console.log(`[${new Date().toISOString()}] [Idle] Viewer connected; resuming refreshes`);
+  for (const fn of resumeHandlers) {
+    try { fn(); } catch (e) {
+      console.error(`[${new Date().toISOString()}] [Idle] Resume handler error:`, e);
+    }
+  }
+}
+
 function broadcastViewerCount() {
   if (!wss) return;
   // Count distinct visitor hashes so multiple tabs from the same browser
@@ -623,6 +659,8 @@ function computeSteamHashes(data) {
 }
 
 async function refreshSteam() {
+  // Always allow the initial warm-up fetch so the first visitor gets a snapshot.
+  if (steamData && skipWhileIdle('Steam')) return;
   if (steamRefreshPromise) return steamRefreshPromise;
   steamRefreshPromise = (async () => {
     try {
@@ -735,9 +773,12 @@ async function fetchWithConcurrency(items, fn, limit = 3) {
 }
 
 let steamAchievementRefreshPromise = null;
+let achievementsWarmed = false;
 
 async function refreshSteamAchievements() {
   if (!steamData) return;
+  if (achievementsWarmed && skipWhileIdle('Steam Achievements')) return;
+  achievementsWarmed = true;
   if (steamAchievementRefreshPromise) return steamAchievementRefreshPromise;
 
   steamAchievementRefreshPromise = (async () => {
@@ -896,6 +937,7 @@ function computeOverwatchHash(data) {
 }
 
 async function refreshOverwatch() {
+  if (overwatchData && skipWhileIdle('Overwatch')) return;
   if (overwatchRefreshPromise) return overwatchRefreshPromise;
   overwatchRefreshPromise = (async () => {
     try {
@@ -930,6 +972,7 @@ app.prepare().then(() => {
 
   wss.on('connection', (ws, req) => {
     console.log(`[${new Date().toISOString()}] [WS] Browser client connected (${wss.clients.size} total)`);
+    resumeFromIdle();
     // Try to attribute this connection to a visitor from the upgrade request's
     // cookie (covers returning visitors / multiple tabs sharing the cookie).
     const cookieVisitorId = getCookieValue(req?.headers?.cookie || null, 'visitor_id');
@@ -990,6 +1033,12 @@ app.prepare().then(() => {
   let enrichmentQueued = false;
 
   async function processRawPresence(raw) {
+    // Gateway events keep arriving while idle (they're pushed, not polled),
+    // but enrichment hits external APIs — defer it until someone is watching.
+    if (enrichedData && skipWhileIdle('Discord enrichment')) {
+      presencePendingWhileIdle = true;
+      return;
+    }
     if (enrichmentInFlight) {
       enrichmentQueued = true;
       console.warn(`[${new Date().toISOString()}] [Discord User] Enrichment queued (backpressure)`);
@@ -1025,6 +1074,18 @@ app.prepare().then(() => {
       console.error(`[${new Date().toISOString()}] [Discord Presence] Start error:`, e);
     });
   }
+
+  resumeHandlers.push(() => {
+    presenceModule.setPaused?.(false);
+    if (presencePendingWhileIdle) {
+      presencePendingWhileIdle = false;
+      const latest = presenceModule.getCurrentPresence();
+      if (latest) processRawPresence(latest);
+    }
+    refreshSteam();
+    refreshSteamAchievements();
+    refreshOverwatch();
+  });
 
   refreshSteam();
   setInterval(refreshSteam, 10000);

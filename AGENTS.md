@@ -282,6 +282,13 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 5. `useWebSocket` coalesces messages per `type` within a `requestAnimationFrame` tick, so a burst of updates results in a single React render per subscriber. Pass `coalesce: false` when every message matters (e.g. `ReactionFlyer` for reaction events).
 6. **Reactions**: `POST /api/reactions` (on a new, non-duplicate insert) calls `broadcastReaction()` → `globalThis.__wssBroadcast` in `websocket-server.js` → pushes `{ type: "reaction", emoji }` to every connected client. `ReactionFlyer` is a non-coalescing subscriber that spawns a flying emoji. The three snapshot routes (`/api/presence`, `/api/steam`, `/api/overwatch`) read the in-memory server state via `globalThis.__serverSnapshots` so the widgets repopulate instantly on mount (e.g. after a tab switch remounts them) instead of waiting for the next periodic re-broadcast.
 
+### Idle pause (no viewers → no outbound queries)
+- `websocket-server.js` treats "someone is on the site" as `wss.clients.size > 0` (any open WebSocket).
+- With no clients, `refreshSteam`, `refreshSteamAchievements`, `refreshOverwatch` and Discord presence enrichment (`processRawPresence`) return early via `skipWhileIdle(tag)`. The first skip sets `idlePaused` and calls `discord-presence.setPaused(true)`, which makes the 30s `fetchUserPresence` poll a no-op. Discord gateway events keep updating `userPresence` in memory (they're pushed, so they cost no requests). Enrichment is deferred with `presencePendingWhileIdle`.
+- On the next `connection`, `resumeFromIdle()` runs the `resumeHandlers`: `setPaused(false)` (triggers an immediate member fetch), enriches the latest deferred presence, and refreshes Steam, achievements and Overwatch right away. The intervals themselves are never cleared, so they just start doing work again.
+- **Warm-up exception**: each refresh runs once at startup even with no viewers (guarded by `steamData` / `overwatchData` / `enrichedData` being null, and `achievementsWarmed`), so the first visitor gets a snapshot from `/api/*` instead of an empty widget.
+- A reload that reconnects before the next interval tick never pauses, so short gaps don't cause churn.
+
 ### Steam achievements
 - `websocket-server.js` fetches achievement data for all games in both `recentGames` and `ownedGames` via `ISteamUserStats/GetPlayerAchievements/v0001/`.
 - Games are deduplicated by `appid` before fetching — recent and top games often overlap.
