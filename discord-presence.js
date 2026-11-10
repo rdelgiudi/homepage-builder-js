@@ -9,7 +9,8 @@ let client = null;
 let userPresence = null;
 let fetchInterval = null;
 let healthCheckInterval = null;
-// When paused (no viewers on the site), the periodic member fetch is skipped.
+// When paused (no viewers on the site), the 30s periodic member fetch is skipped
+// (the on-ready / shard-reconnect fetches still run).
 // Gateway presence events still update `userPresence` in memory, since those
 // are pushed by Discord and cost no outbound requests.
 let paused = false;
@@ -82,7 +83,6 @@ function emitPresence() {
 
 async function fetchUserPresence() {
   if (!client) return;
-  if (paused) return;
   for (const guild of client.guilds.cache.values()) {
     try {
       const member = await guild.members.fetch(userId);
@@ -178,7 +178,10 @@ async function start() {
     console.log(`[${new Date().toISOString()}] Discord bot logged in as ${client.user.tag}`);
     await fetchUserPresence();
     if (fetchInterval) clearInterval(fetchInterval);
-    fetchInterval = setInterval(fetchUserPresence, 30000);
+    // Only the periodic poll is paused while idle; the fetches on ready /
+    // shard reconnect always run so a status change missed during a gateway
+    // disconnect is still caught promptly (keeps lastSeen accurate).
+    fetchInterval = setInterval(() => { if (!paused) fetchUserPresence(); }, 30000);
     startHealthCheck();
   });
 
