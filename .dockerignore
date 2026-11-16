@@ -6,7 +6,8 @@ node_modules/
 README.md
 .env
 .env*.local
-visitors.db
+visitors.db*
+data/
 tsconfig.tsbuildinfo
 next-env.d.ts
 .idea/

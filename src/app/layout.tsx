@@ -19,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const { titleGradient } = getMetadata();
-  const faviconAnimation = getConfig().effects?.faviconAnimation ?? true;
+  const faviconAnimation = getConfig().effects.faviconAnimation;
   return (
     <html lang="en" className="dark">
       <body className="antialiased">

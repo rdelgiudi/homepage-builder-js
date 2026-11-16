@@ -5,35 +5,25 @@ import ParticleBackground from "@/components/ParticleBackground";
 import MouseTrail from "@/components/MouseTrail";
 import ReactionFlyer from "@/components/ReactionFlyer";
 
-interface EffectsConfig {
-  particleBackground?: boolean;
-  particleEffect?: string;
-  gradientBorders?: boolean;
-  tabTransitions?: boolean;
-  customScrollbar?: boolean;
-  mouseTrail?: boolean;
-  mouseTrailColors?: string[];
-  reactionFlyer?: boolean;
-}
-
 interface EffectsControllerProps {
-  effects?: EffectsConfig;
+  /** `background.effect.type` from homepage.json. */
+  particleEffect: "none" | "stars" | "comet";
+  customScrollbar: boolean;
+  mouseTrail: boolean;
+  mouseTrailColors?: string[];
+  reactionFlyer: boolean;
 }
 
-export default function EffectsController({ effects }: EffectsControllerProps) {
+export default function EffectsController({ particleEffect, customScrollbar, mouseTrail, mouseTrailColors, reactionFlyer }: EffectsControllerProps) {
   useEffect(() => {
-    if (effects?.customScrollbar) {
-      document.documentElement.classList.add("custom-scrollbar");
-    } else {
-      document.documentElement.classList.remove("custom-scrollbar");
-    }
-  }, [effects?.customScrollbar]);
+    document.documentElement.classList.toggle("custom-scrollbar", customScrollbar);
+  }, [customScrollbar]);
 
   return (
     <>
-      {effects?.particleBackground && <ParticleBackground mode={(effects?.particleEffect as "stars" | "comet") || "stars"} />}
-      {effects?.mouseTrail && <MouseTrail colors={effects?.mouseTrailColors} />}
-      {effects?.reactionFlyer !== false && <ReactionFlyer />}
+      {particleEffect !== "none" && <ParticleBackground mode={particleEffect} />}
+      {mouseTrail && <MouseTrail colors={mouseTrailColors} />}
+      {reactionFlyer && <ReactionFlyer />}
     </>
   );
 }

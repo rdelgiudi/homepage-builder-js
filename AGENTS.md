@@ -41,7 +41,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │   ├── ReactionsWidget.tsx      # Anonymous emoji reactions (toggle, visitor-hash keyed, rate-limited, GUI lock)
 │   │   │   ├── ReactionFlyer.tsx        # Background layer that flies an emoji up the screen when anyone reacts (WebSocket subscriber, coalesce:false)
 │   │   ├── GitHubProjects.tsx       # GitHub repo cards (public API, no key needed)
-│   │   ├── Tabs.tsx                 # Tab navigation w/ header + icon + sections
+│   │   ├── Tabs.tsx                 # Tab navigation (bar, mobile drawer, transitions); renders sections via widgets/registry
 │   │   ├── ParticleBackground.tsx   # Canvas floating particles
 │   │   ├── MouseTrail.tsx           # Canvas comet-style mouse trail (gradient line, no draw while stationary)
 │   │   ├── EffectsController.tsx    # Conditionally renders effects based on config
@@ -55,11 +55,23 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   ├── hooks/
 │   │   └── useWebSocket.ts          # Singleton WebSocket hook (rAF-coalesced per type; supports `coalesce: false` for event streams like reaction flyers)
 │   ├── lib/
-│   │   ├── config.ts                # mtime-cached homepage.json loader
-│   │   ├── db.ts                    # Shared better-sqlite3 connection (visitors.db, WAL)
+│   │   ├── schema/
+│   │   │   ├── config.ts            # Zod schema for homepage.json v2 — single source of truth for types + defaults
+│   │   │   ├── migrate.ts           # v1 → v2 structural migration + id generation
+│   │   │   └── parse.ts             # parseConfig(): migrate + lenient validation (drops bad tabs/sections with warnings)
+│   │   ├── config.ts                # mtime-cached homepage.json loader (uses parseConfig)
+│   │   ├── db.ts                    # Shared better-sqlite3 connection (DATA_DIR/visitors.db, WAL); exports DATA_DIR
 │   │   └── visitor.ts               # visitor_id cookie + hashing helpers (shared by visitors/comments)
 │   │   │   ├── reactions.ts             # DEFAULT_EMOJIS constant shared by API + widget
 │   │   │   └── reaction-bus.ts          # broadcastReaction() — pushes a reaction to all WS clients via globalThis.__wssBroadcast
+│   ├── widgets/                     # Widget registry — one folder per section type
+│   │   ├── <type>/meta.ts           # Server-safe: zod options schema, label, icon, category, defaults, requiresEnv
+│   │   ├── <type>/render.tsx        # Client: WidgetView { titled, frame, render(section, ctx) }
+│   │   ├── meta.ts                  # Server-safe index: SectionSchema (discriminated union), widgetMetas
+│   │   ├── registry.tsx             # Client index: renderSection(section, ctx)
+│   │   ├── fields.ts                # Shared zod fields (base id/type, titleFields, frameField)
+│   │   ├── shared.tsx               # Icon, SectionTitle, WidgetFrame, alignClass
+│   │   └── types.ts                 # WidgetMeta, WidgetView, WidgetContext
 │   └── types/
 │       ├── gray-matter.d.ts
 │       └── quantize.d.ts
@@ -87,26 +99,28 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 | `STEAM_ID` | Steam 64-bit ID |
 | `OVERWATCH_BATTLE_TAG` | Overwatch battle tag (e.g. `User-12345`) |
 | `VISITOR_SALT` | Salt for visitor ID hashing |
+| `DATA_DIR` | Directory for runtime-written state (default: `<cwd>/data`) |
 
-### homepage.json — content config (no secrets):
+### homepage.json — content config (no secrets), **config v2**:
 
 | Field | Description |
 |---|---|
+| `version` | `2`. A file without `version` is treated as v1 and migrated in memory (see "Config schema, validation and migration"). |
 | `name` | Site title (HTML `<title>`, page h1) |
 | `tagline` | Page subtitle, also used as `<meta name="description">` |
 | `favicon` | URL for favicon (optional, empty/omit = auto-generated animated gradient ring using `titleGradient` colors) |
 | `titleGradient` | Array of CSS color stops for title gradient text; omit or empty = solid color |
 | `taglineGradient` | Array of CSS color stops for tagline gradient; empty array or omit = inherits `titleGradient` |
-| `backgroundColor` | Object with `light` and `dark` hex colors for page background (defaults: `#f3f4f6` / `#111827`) |
+| `layout` | `{ site }` — site shell. Only `"tabs"` exists so far. |
+| `background` | `{ base: { type: "solid", light, dark }, effect: { type: "none" \| "stars" \| "comet" } }` — page background color (defaults `#f3f4f6` / `#111827`) and the canvas particle layer (default `"stars"`) |
+| `counters` | `{ viewers, visitors }` — toggles for the bottom-left counters (both default `true`) |
 | `effects` | Object toggling visual effects — see Effects section below |
-| `tabs` | Array of tab objects |
+| `tabs` | Array of tab objects: `{ id, label, icon?, invertDark?, layout: "stack", sections: [...] }`. Every tab and section has an `id` (unique across the file; auto-derived on load when missing). |
 
 ### Effects Config:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `particleBackground` | boolean | `true` | Canvas particle effect — master toggle |
-| `particleEffect` | string | `"stars"` | Particle visual mode: `"stars"` (flickering drifting circles) or `"comet"` (3D comet starfield with motion trails) |
 | `gradientBorders` | boolean | `true` | Animated gradient border + subtle scale on hover for link cards, buttons, GitHub project cards, Steam "View Profile", and Meme "New Meme" |
 | `tabTransitions` | boolean | `true` | Smooth crossfade when switching tabs |
 | `customScrollbar` | boolean | `true` | Thin rounded scrollbar styling |
@@ -136,6 +150,24 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 
 ## Critical Gotchas
 
+### Config schema, validation and migration
+- `src/lib/schema/config.ts` (zod) is the **only** place config types and defaults are defined. Never re-declare config interfaces in components and never write `?? default` for a config value in a consumer — `getConfig()` returns a fully-defaulted `HomepageConfig`. Fields carry `.meta({ title, description, ui })` — these are the labels/hints the admin panel's form generator will read, so add them to every new field.
+- `parseConfig(raw)` = `migrateConfig` → per-section and per-tab validation → top-level validation. It is deliberately **lenient**: an invalid/unknown section or tab is dropped and reported in `warnings` (logged as `[Config]`), so one typo doesn't blank the site. If the top level fails (`config: null`), `config.ts` keeps serving the last good config. A save path that must not lose data has to treat warnings as errors.
+- `config.ts` records the mtime even when a load fails, so a broken file is logged once, not on every request.
+- **v1 → v2** (`migrate.ts`): `backgroundColor` → `background.base`; `effects.particleBackground` / `effects.particleEffect` → `background.effect.type` (`false` → `"none"`); ids generated. The user's on-disk `homepage.json` is never rewritten by the loader. New schema changes should be **additive** (new optional fields / enum members); anything else needs a version bump and a new step in `migrateConfig`.
+- **Generated ids** are `slug(label)` for tabs and `<tabId>-<type>` for sections, de-duplicated with `-2`, `-3`… Explicit ids are reserved first. They are stable across loads for an unchanged file, but for an id-less (v1) file reordering two sections of the same type swaps their ids. The `?tab=` URL param still uses `slugify(label)`, not `tab.id`.
+
+### Widget registry (`src/widgets/`)
+- Adding a widget = `src/widgets/<type>/meta.ts` + `render.tsx`, then one line each in `widgets/meta.ts` (`SectionSchema` + `widgetMetas`) and `widgets/registry.tsx` (`views`). The `views` map is typed against `SectionType`, so a missing renderer is a compile error.
+- **`meta.ts` must stay server-safe and `render.tsx` must only `import type` from it.** `registry.tsx` is pulled into the client bundle through `Tabs.tsx`; a runtime import of a meta file would ship zod to the browser. Conversely the config loader imports `widgets/meta.ts` on the server, so meta files must never import React components.
+- `renderSection` owns the shared chrome: the icon + text title row (`view.titled`, uses `titleFields`) and the gradient frame (`view.frame`: `wrap` = shell wraps the body, `self` = widget draws its own frame from `ctx.framed`, `none`). `ctx.framed` is `section.widgetFrame ?? effects.widgetFrame`.
+- Site-wide values reach widgets through one `WidgetContext` object built in `page.tsx` — add a field there instead of threading new props through `Tabs`.
+- The widget components themselves still live in `src/components/`.
+
+### Runtime data lives in `DATA_DIR`
+- Everything the app writes (currently `visitors.db` + its `-wal`/`-shm`) goes under `DATA_DIR` (default `<cwd>/data`, `/app/data` in Docker), exported from `src/lib/db.ts`. New writable state (uploads, config revisions) belongs there too, so one read-write volume persists it.
+- On first `getDb()`, if `DATA_DIR/visitors.db` doesn't exist but the old `<cwd>/visitors.db` file does, it is copied with `VACUUM INTO` (consistent snapshot including un-checkpointed WAL; original left untouched).
+
 ### `HOST` vs `HOSTNAME`
 - `HOSTNAME` is a standard Unix env var set to the machine's hostname (e.g. `bazzite`). **Do not use it** as a config key.
 - The bind address env var is called `HOST`.
@@ -152,7 +184,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - The page header is also compact on mobile: `text-3xl md:text-5xl` title, `text-base md:text-xl` tagline, and `px-4 md:px-8` gutters.
 
 ### homepage.json is runtime, not bundled
-- Read via `fs.readFileSync` in `src/lib/config.ts` (mtime-cached; re-parsed only when the file's mtime changes).
+- Read via `fs.readFileSync` in `src/lib/config.ts` (mtime-cached; re-parsed, migrated and validated only when the file's mtime changes).
 - Imported by `src/app/page.tsx` and `src/app/layout.tsx`.
 - `export const dynamic = "force-dynamic"` prevents static prerendering.
 - Allows editing without rebuild; can be volume-mounted in Docker.
@@ -331,11 +363,11 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - Status text appends " · On Mobile" when mobile-only.
 
 ### Docker persistence
-- `visitors.db` is ephemeral in the container — `docker-compose-example.yml` mounts a named volume to persist it.
+- `/app/data` (`DATA_DIR`) holds `visitors.db` — `docker-compose-example.yml` mounts the named volume `homepage_data` there to persist it. (Older setups mounted a volume at `/app/visitors.db`; that data needs to be copied into the new volume by hand.)
 - `src/config/` and `src/content/` can be bind-mounted at runtime for live config edits without rebuild.
 
 ### Comments guestbook (`comments` section + `/api/comments`)
-- Comments are stored in the **same** `visitors.db` SQLite file as the visitor counter, in a `comments` table (columns: `id`, `name`, `body`, `created_at`). The shared connection lives in `src/lib/db.ts` (WAL mode); both `/api/visitors` and `/api/comments` call `getDb()` so there is exactly one connection per process.
+- Comments are stored in the **same** `data/visitors.db` SQLite file as the visitor counter, in a `comments` table (columns: `id`, `name`, `body`, `created_at`). The shared connection lives in `src/lib/db.ts` (WAL mode); both `/api/visitors` and `/api/comments` call `getDb()` so there is exactly one connection per process.
 - `src/lib/visitor.ts` holds the shared `visitor_id` cookie logic (name, salt, hashing, parsing) used by both routes for identification and rate-limiting.
 - **POST `/api/comments`**: body `{ name, body }` (both trimmed, required). Server validates name ≤ 40 chars, body ≤ 500 chars, strips control characters (`\u0000-\u001f`, `\u007f`), and rate-limits per hashed `visitor_id` to one post / 5s. A new `visitor_id` cookie is set if absent. Returns `201` with the created row.
 - **GET `/api/comments?limit=N`**: returns the most recent `N` comments newest-first (`ORDER BY id DESC`), `limit` clamped to 1–200 (default 50).
@@ -376,7 +408,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - The title is rendered as a link to the meme's Reddit `postLink` (new tab).
 
 ### ParticleBackground must only render once
-- `ParticleBackground` is rendered conditionally by `EffectsController` (based on `effects.particleBackground` in `homepage.json`).
+- `ParticleBackground` is rendered conditionally by `EffectsController` (when `background.effect.type` in `homepage.json` is not `"none"`).
 - It must **not** also be rendered unconditionally in `src/app/layout.tsx` — doing so produces two canvas elements animating on top of each other, doubling GPU/CPU cost.
 - `EffectsController` is the single source of truth for when the particle background is active.
 
@@ -400,7 +432,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - `getCount()` reduces the particle multiplier from 0.04 to 0.025 and the cap from 60 to 30 on screens < 640px.
 - A `visibilitychange` listener cancels the `requestAnimationFrame` loop when `document.hidden` is true and resumes it when the tab becomes visible again — saves battery/CPU when the user switches away.
 
-### Particle system modes (`particleEffect`)
+### Particle system modes (`background.effect.type`)
 - `"stars"` — Original 2D mode: circles with velocity drift that wrap at screen edges, opacity-based twinkle (`0.8 + 0.2 * sin(t)`).
 - `"comet"` — 3D starfield mode: particles have (x, y, z) coordinates projected to 2D via `FOCAL / z`. Moving toward viewer (z decreases), they grow and move outward from center. Semi-transparent overlay (`TRAIL_ALPHA = 0.3`) replaces `clearRect` for motion blur trails. Each comet is drawn as a 4-pointed asymmetrical star stretched along a `dirAngle` (radial from screen center), with elongation controlled by `stretch = min(1, radialDist / 0.4)` — particles near the viewing axis stay symmetrical, off-axis ones elongate to a comet. Each particle has a fixed `brightness` (no flicker) for natural variation. `baseSize` scales with `FOCAL / z` so close particles appear larger.
 

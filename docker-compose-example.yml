@@ -6,7 +6,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - visitor_data:/app/visitors.db
+      - homepage_data:/app/data
       - ./src/config:/app/src/config:ro
       - ./src/content:/app/src/content:ro
     environment:
@@ -19,4 +19,4 @@ services:
       - VISITOR_SALT=${VISITOR_SALT:-}
 
 volumes:
-  visitor_data:
+  homepage_data:

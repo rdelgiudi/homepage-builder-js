@@ -3,6 +3,7 @@ import VisitorCounter from "@/components/VisitorCounter";
 import EffectsController from "@/components/EffectsController";
 import { Suspense } from "react";
 import { getConfig } from "@/lib/config";
+import type { WidgetContext } from "@/widgets/types";
 
 export const dynamic = "force-dynamic";
 
@@ -18,39 +19,45 @@ function TabsFallback() {
 }
 
 export default async function Home() {
-  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, backgroundColor, effects, counters, tabs = [] } = getConfig();
-  const taglineGradient = rawTaglineGradient?.length ? rawTaglineGradient : titleGradient;
-  const showViewers = counters?.viewers ?? true;
-  const showVisitors = counters?.visitors ?? true;
+  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, background, effects, counters, tabs } = getConfig();
+  const taglineGradient = rawTaglineGradient.length ? rawTaglineGradient : titleGradient;
 
-  const bgVars = backgroundColor?.light || backgroundColor?.dark
-    ? { '--bg-light': backgroundColor?.light || '#f3f4f6', '--bg-dark': backgroundColor?.dark || '#111827' } as React.CSSProperties
-    : undefined;
+  const bgVars = { '--bg-light': background.base.light, '--bg-dark': background.base.dark } as React.CSSProperties;
+
+  const widgetContext: WidgetContext = {
+    gradientBorders: effects.gradientBorders,
+    progressGradient: effects.progressGradient,
+    progressGradientColors: effects.progressGradientColors,
+    titleGradient,
+    discordServerId: process.env.DISCORD_SERVER_ID,
+    widgetFrame: effects.widgetFrame,
+    widgetFrameWidth: effects.widgetFrameWidth,
+  };
 
   return (
     <main className="min-h-screen bg-page relative z-10 overflow-x-clip" style={bgVars}>
-      <EffectsController effects={{ particleBackground: true, customScrollbar: true, ...effects }} />
+      <EffectsController particleEffect={background.effect.type} customScrollbar={effects.customScrollbar} mouseTrail={effects.mouseTrail} mouseTrailColors={effects.mouseTrailColors} reactionFlyer={effects.reactionFlyer} />
       <div className="bg-page pt-6 md:pt-8 pb-3 md:pb-4">
         <div className="w-full max-w-[870px] mx-auto text-center space-y-3 md:space-y-4">
           <h1
-            className={`text-3xl md:text-5xl font-bold pb-2${titleGradient?.length ? ' animate-gradient-text' : ' text-gray-900 dark:text-white'}`}
-            style={titleGradient?.length ? { backgroundImage: `linear-gradient(135deg, ${titleGradient.join(', ')})` } : undefined}
+            className={`text-3xl md:text-5xl font-bold pb-2${titleGradient.length ? ' animate-gradient-text' : ' text-gray-900 dark:text-white'}`}
+            style={titleGradient.length ? { backgroundImage: `linear-gradient(135deg, ${titleGradient.join(', ')})` } : undefined}
           >{name}</h1>
           <p
-            className={`text-base md:text-xl ${taglineGradient?.length ? 'animate-gradient-text' : 'text-gray-600 dark:text-gray-300'}`}
-            style={taglineGradient?.length ? { backgroundImage: `linear-gradient(135deg, ${taglineGradient.join(', ')})` } : undefined}
+            className={`text-base md:text-xl ${taglineGradient.length ? 'animate-gradient-text' : 'text-gray-600 dark:text-gray-300'}`}
+            style={taglineGradient.length ? { backgroundImage: `linear-gradient(135deg, ${taglineGradient.join(', ')})` } : undefined}
           >{tagline}</p>
         </div>
       </div>
 
       <div className="w-full max-w-[870px] mx-auto px-4 md:px-8 pb-8">
         <Suspense fallback={<TabsFallback />}>
-          <Tabs tabs={tabs as Parameters<typeof Tabs>[0]["tabs"]} enableGradientBorders={effects?.gradientBorders ?? true} enableTransitions={effects?.tabTransitions ?? true} enableProgressGradient={effects?.progressGradient ?? true} progressGradientColors={effects?.progressGradientColors} titleGradient={titleGradient} discordServerId={process.env.DISCORD_SERVER_ID} widgetFrame={effects?.widgetFrame} widgetFrameWidth={effects?.widgetFrameWidth} />
+          <Tabs tabs={tabs} enableTransitions={effects.tabTransitions} widgetContext={widgetContext} />
         </Suspense>
       </div>
 
       <div className="fixed bottom-4 left-4 z-30">
-        <VisitorCounter showViewers={showViewers} showVisitors={showVisitors} />
+        <VisitorCounter showViewers={counters.viewers} showVisitors={counters.visitors} />
       </div>
     </main>
   );

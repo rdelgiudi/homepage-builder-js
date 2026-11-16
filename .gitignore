@@ -37,7 +37,10 @@ src/config/homepage.json
 !/src/content/about-example.md
 /src/content/*
 
-# Visitor database
+# Runtime data (database, uploads)
+/data/
+
+# Visitor database (pre-data/ location)
 visitors.db
 visitors.db-shm
 visitors.db-wal

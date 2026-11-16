@@ -1,16 +1,24 @@
 {
+  "version": 2,
   "name": "Display Name",
   "tagline": "Your tagline or bio goes here",
   "favicon": "",
   "titleGradient": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
   "taglineGradient": [],
-  "backgroundColor": {
-    "light": "#f3f4f6",
-    "dark": "#111827"
+  "layout": {
+    "site": "tabs"
+  },
+  "background": {
+    "base": {
+      "type": "solid",
+      "light": "#f3f4f6",
+      "dark": "#111827"
+    },
+    "effect": {
+      "type": "comet"
+    }
   },
   "effects": {
-    "particleBackground": true,
-    "particleEffect": "comet",
     "gradientBorders": true,
     "tabTransitions": true,
     "customScrollbar": true,
@@ -29,34 +37,41 @@
   },
   "tabs": [
     {
+      "id": "welcome",
       "label": "Welcome",
       "icon": "👋",
       "sections": [
         {
+          "id": "welcome-header",
           "type": "header",
           "title": "Hello! Welcome to my site!",
           "icon": "👋"
         },
         {
+          "id": "welcome-text",
           "type": "text",
           "content": "A simple paragraph of text with an optional icon.",
           "icon": "💬"
         },
         {
+          "id": "welcome-text-2",
           "type": "text",
           "content": "This one is left-aligned.",
           "align": "left"
         },
         {
+          "id": "welcome-text-3",
           "type": "text",
           "content": "This one is right-aligned.",
           "align": "right"
         },
         {
+          "id": "welcome-markdown",
           "type": "markdown",
           "file": "about.md"
         },
         {
+          "id": "welcome-meme",
           "type": "meme",
           "icon": "",
           "text": "A random meme, refreshed each visit",
@@ -65,56 +80,64 @@
       ]
     },
     {
+      "id": "social",
       "label": "Social",
       "icon": "🔗",
       "sections": [
         {
+          "id": "social-links",
           "type": "links",
           "text": "Follow me on social media",
           "align": "right",
           "items": [
-            { "label": "GitHub",  "url": "https://github.com/yourusername",  "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/github.svg", "invertDark": true },
+            { "label": "GitHub", "url": "https://github.com/yourusername", "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/github.svg", "invertDark": true },
             { "label": "Twitter", "url": "https://twitter.com/yourusername", "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/twitter.svg", "invertDark": true },
             { "label": "YouTube", "url": "https://youtube.com/@yourchannel", "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/youtube.svg", "invertDark": true },
-            { "label": "Email",   "url": "mailto:you@example.com",          "icon": "📧" }
+            { "label": "Email", "url": "mailto:you@example.com", "icon": "📧" }
           ]
         },
         {
+          "id": "social-links-2",
           "type": "links",
           "align": "left",
           "items": [
-            { "label": "GitHub",  "url": "https://github.com/yourusername",  "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/github.svg", "invertDark": true },
+            { "label": "GitHub", "url": "https://github.com/yourusername", "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/github.svg", "invertDark": true },
             { "label": "Twitter", "url": "https://twitter.com/yourusername", "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/twitter.svg", "invertDark": true },
             { "label": "YouTube", "url": "https://youtube.com/@yourchannel", "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/youtube.svg", "invertDark": true },
-            { "label": "Email",   "url": "mailto:you@example.com",          "icon": "📧" }
+            { "label": "Email", "url": "mailto:you@example.com", "icon": "📧" }
           ]
         },
         {
+          "id": "social-links-3",
           "type": "links",
           "items": [
             { "label": "Download Resume", "url": "https://yoursite.com/resume.pdf", "icon": "📄", "style": "primary" },
-            { "label": "View Portfolio",  "url": "https://yoursite.com",            "icon": "🎨", "style": "secondary" }
+            { "label": "View Portfolio", "url": "https://yoursite.com", "icon": "🎨", "style": "secondary" }
           ]
         }
       ]
     },
     {
+      "id": "gaming",
       "label": "Gaming",
       "icon": "🎮",
       "sections": [
         {
+          "id": "gaming-discord-user",
           "type": "discord-user",
           "icon": "",
           "text": "My Discord Status",
           "widgetFrame": true
         },
         {
+          "id": "gaming-steam",
           "type": "steam",
           "icon": "",
           "text": "My Steam Profile",
           "widgetFrame": true
         },
         {
+          "id": "gaming-overwatch",
           "type": "overwatch",
           "icon": "",
           "text": "My Overwatch Stats",
@@ -123,10 +146,12 @@
       ]
     },
     {
+      "id": "projects",
       "label": "Projects",
       "icon": "📂",
       "sections": [
         {
+          "id": "projects-github",
           "type": "github",
           "repos": [
             { "owner": "vercel", "repo": "next.js", "label": "Next.js", "note": "The React Framework" },
@@ -138,16 +163,19 @@
       ]
     },
     {
+      "id": "widgets",
       "label": "Widgets",
       "icon": "🧩",
       "sections": [
         {
+          "id": "widgets-discord-server",
           "type": "discord-server",
           "icon": "💬",
           "text": "Discord Server Widget",
           "widgetFrame": true
         },
         {
+          "id": "widgets-github",
           "type": "github",
           "icon": "",
           "text": "GitHub Projects",
@@ -160,10 +188,12 @@
       ]
     },
     {
+      "id": "guestbook",
       "label": "Guestbook",
       "icon": "📝",
       "sections": [
         {
+          "id": "guestbook-comments",
           "type": "comments",
           "icon": "💬",
           "text": "Leave a comment",
@@ -171,6 +201,7 @@
           "widgetFrame": false
         },
         {
+          "id": "guestbook-reactions",
           "type": "reactions",
           "icon": "✨",
           "text": "Or just drop a reaction",

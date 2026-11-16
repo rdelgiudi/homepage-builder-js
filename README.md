@@ -46,18 +46,18 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 
 ```json
 {
+  "version": 2,
   "name": "Your Name",
   "tagline": "Your tagline or bio goes here",
   "favicon": "",  // empty/omit = auto-generated animated gradient ring
   "titleGradient": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
   "taglineGradient": [],
-  "backgroundColor": {
-    "light": "#f3f4f6",
-    "dark": "#111827"
+  "layout": { "site": "tabs" },
+  "background": {
+    "base": { "type": "solid", "light": "#f3f4f6", "dark": "#111827" },
+    "effect": { "type": "comet" }  // "none" | "stars" | "comet"
   },
   "effects": {
-    "particleBackground": true,
-    "particleEffect": "comet",
     "gradientBorders": true,
     "tabTransitions": true,
     "customScrollbar": true,
@@ -71,18 +71,20 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
   },
   "tabs": [
     {
+      "id": "home",
       "label": "Home",
       "icon": "🏠",
       "sections": [
-        { "type": "header", "title": "Welcome", "icon": "👋" },
-        { "type": "text", "content": "Your bio here.", "icon": "📝" }
+        { "id": "home-header", "type": "header", "title": "Welcome", "icon": "👋" },
+        { "id": "home-text", "type": "text", "content": "Your bio here.", "icon": "📝" }
       ]
     },
     {
+      "id": "projects",
       "label": "Projects",
       "icon": "📦",
       "sections": [
-        { "type": "github", "icon": "⭐", "text": "Open Source", "repos": [
+        { "id": "projects-github", "type": "github", "icon": "⭐", "text": "Open Source", "repos": [
           { "owner": "user", "repo": "repo-name", "label": "My Project", "note": "A personal note" }
         ]}
       ]
@@ -91,10 +93,15 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 }
 ```
 
+**Config versions:** this is config **v2**. A v1 file (no `version` field, with `backgroundColor` and `effects.particleBackground` / `effects.particleEffect`) still works unchanged — it is upgraded in memory on load. `id`s are optional when writing by hand (they are derived from the tab label / section type); they must be unique across the whole file if you set them.
+
+**Validation:** the file is validated on load. An invalid section or tab is skipped and reported in the server log (`[Config] ...`) while the rest of the site keeps working; if the file as a whole is unusable, the last good config stays active.
+
 **Gradient & background customization:**
 - `titleGradient` — Array of color stops for the animated title text gradient. Omit or empty = solid color.
 - `taglineGradient` — Color stops for the tagline gradient. Leave empty or omit to inherit `titleGradient` colors.
-- `backgroundColor` — Object `{ light: "#f3f4f6", dark: "#111827" }` for page background. Omit or set individual values to keep defaults.
+- `background.base` — `{ "type": "solid", "light": "#f3f4f6", "dark": "#111827" }` for the page background. Omit individual values to keep defaults.
+- `background.effect.type` — Canvas particle layer: `"stars"` (default; flickering drifting circles), `"comet"` (3D comet starfield with motion trails) or `"none"`.
 
 ### Effects (`effects`)
 
@@ -102,8 +109,6 @@ Toggle visual effects on or off:
 
 | Effect | Type | Default | Description |
 |--------|------|---------|-------------|
-| `particleBackground` | boolean | `true` | Canvas particle effect — master toggle |
-| `particleEffect` | string | `"stars"` | Particle visual mode: `"stars"` (flickering drifting circles) or `"comet"` (3D comet starfield with motion trails) |
 | `gradientBorders` | boolean | `true` | Animated gradient border + subtle scale on hover for link cards, buttons, GitHub project cards, Steam "View Profile", and Meme "New Meme" |
 | `tabTransitions` | boolean | `true` | Smooth crossfade animation when switching between tabs |
 | `customScrollbar` | boolean | `true` | Thin, rounded scrollbar matching the theme |
@@ -335,7 +340,7 @@ Lets visitors leave a name + comment on a guestbook tab. Posts are open (no acco
 - Loading skeleton, empty state, and error fallback
 - Respects `widgetFrame` / `widgetFrameWidth` and `gradientBorders` effects
 
-**Storage:** comments live in the same `visitors.db` SQLite file as the visitor counter (a `comments` table), so the existing Docker volume keeps them persisted.
+**Storage:** comments live in the same `data/visitors.db` SQLite file as the visitor counter (a `comments` table), so the existing Docker volume keeps them persisted.
 
 **Config example in homepage.json:**
 ```json
@@ -364,7 +369,7 @@ Lets visitors leave an anonymous emoji reaction instead of a comment — no name
 - Real-time background flyer: a new reaction broadcasts to all connected clients, spawning an emoji that flies bottom→top behind the content (`ReactionFlyer`, gated by `effects.reactionFlyer`)
 - Respects `widgetFrame` / `widgetFrameWidth` and `gradientBorders` effects
 
-**Storage:** reactions live in the same `visitors.db` SQLite file as the comments/visitor counter (a `reactions` table).
+**Storage:** reactions live in the same `data/visitors.db` SQLite file as the comments/visitor counter (a `reactions` table).
 
 **Config example in homepage.json:**
 ```json
@@ -464,10 +469,17 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 │   │   └── FaviconAnimation.tsx     # Canvas animated favicon (self-healing)
 │   ├── hooks/
 │   │   └── useWebSocket.ts          # WebSocket hook (rAF-coalesced per type; supports `coalesce: false` for event streams)
+│   ├── widgets/                     # Widget registry — one folder per section type
+│   │   ├── <type>/meta.ts           # Options schema (zod), label, defaults, required env vars (server-safe)
+│   │   ├── <type>/render.tsx        # How the section renders
+│   │   ├── meta.ts                  # All widget metas + SectionSchema
+│   │   ├── registry.tsx             # renderSection(): title row + gradient frame + widget body
+│   │   └── shared.tsx / fields.ts / types.ts
 │   └── lib/
-│       ├── config.ts                # mtime-cached homepage.json loader
+│       ├── schema/                  # Config v2 schema (zod), v1→v2 migration, lenient parser
+│       ├── config.ts                # mtime-cached homepage.json loader (migrates + validates)
 │       ├── markdown.ts              # Server-side markdown → HTML (marked)
-│       ├── db.ts                    # Shared better-sqlite3 connection (visitors.db, WAL)
+│       ├── db.ts                    # Shared better-sqlite3 connection (data/visitors.db, WAL)
 │       └── visitor.ts               # visitor_id cookie + hashing helpers (shared by visitors/comments)
 │   │   ├── reactions.ts             # DEFAULT_EMOJIS constant shared by API + widget
 │   │   └── reaction-bus.ts          # broadcastReaction() — pushes a reaction to all WS clients via globalThis.__wssBroadcast
@@ -489,7 +501,7 @@ docker compose up --build
 
 Single container with:
 - WebSocket server + Next.js + Discord presence bot (all in one Node process)
-- Named volume for `visitors.db` persistence
+- Named volume mounted at `/app/data` for everything written at runtime (`visitors.db`: visitor counter, comments, reactions). Override the location with `DATA_DIR`.
 - Optional bind mounts for `src/config/` and `src/content/`
 
 ## Tech Stack
