@@ -8,7 +8,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - **Backend**: Custom Node.js WebSocket server (`websocket-server.js`) — wraps Next.js, adds WebSocket on same port, in-process requires `discord-presence.js`
 - **Presence Module**: `discord-presence.js` — Discord.js bot, exports `start()` / `onPresenceUpdate()` / `getCurrentPresence()`. Websocket-server calls `start()` to begin tracking, subscribes via `onPresenceUpdate()` to receive raw presence in-process (no localhost WS hop).
 - **Single process per container**: `docker-entrypoint.sh` runs only `websocket-server.js` in the foreground; the presence bot runs in-process.
-- **Admin panel**: `/admin` + `/api/admin/*`, same app. Exists only when `ADMIN_PASSWORD_HASH` (or plain `ADMIN_PASSWORD`) is set and `APP_ROLE` is not `public`. Recommended deployment is two containers from one image (public with `APP_ROLE=public`, admin not exposed) sharing `DATA_DIR`, `src/config` and `src/content`.
+- **Admin panel**: `/admin` + `/api/admin/*`, same app. Exists only when `ADMIN_PASSWORD_HASH` (or plain `ADMIN_PASSWORD`) is set and `APP_ROLE` is not `public`. Recommended deployment is two containers from one image on **one hostname**: the reverse proxy sends the path prefixes `/admin` and `/api/admin` to the admin container and everything else to the public one (`APP_ROLE=public`); both share `DATA_DIR`, `src/config` and `src/content`.
 
 ## File Layout
 
@@ -35,14 +35,17 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │       ├── comments/        # GET list by status, POST bulk; [id] PATCH/DELETE; settings PUT
 │   │   │       └── integrations/    # Which env vars are set, what is writable
 │   │   ├── admin/
-│   │   │   ├── layout.tsx           # notFound() when admin is disabled; wraps in .adm; imports admin.css
-│   │   │   ├── page.tsx             # Redirects to /admin/login without a session; renders AdminApp
-│   │   │   ├── login/page.tsx
-│   │   │   └── admin.css            # All admin styles, scoped under .adm
+│   │   │   ├── layout.tsx           # Guard only: notFound() when admin is disabled
+│   │   │   ├── (panel)/             # The panel's own chrome
+│   │   │   │   ├── layout.tsx       # Wraps in .adm; imports admin.css
+│   │   │   │   ├── page.tsx         # /admin — redirects to /admin/login without a session; renders AdminApp
+│   │   │   │   ├── login/page.tsx   # /admin/login
+│   │   │   │   └── admin.css        # All admin styles, scoped under .adm
+│   │   │   └── preview/page.tsx     # /admin/preview — SitePage rendered from the draft (session required)
 │   │   ├── globals.css
 │   │   ├── layout.tsx               # Root layout (html/body + metadata only — shared by site and admin)
 │   │   ├── loading.tsx              # Cold-load skeleton
-│   │   └── page.tsx                 # Homepage — reads homepage.json at runtime via fs; `?preview=draft` renders the admin draft; mounts ThemeSwitcher, FaviconAnimation, ConfigSync
+│   │   └── page.tsx                 # Homepage — <SitePage> with the published config (homepage.json read at runtime via fs)
 │   ├── components/
 │   │   ├── DiscordServer.tsx        # Discord server widget (client-side cache)
 │   │   ├── DiscordUser.tsx          # Discord user presence (WebSocket subscriber, mobile indicator)
@@ -58,6 +61,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── Tabs.tsx                 # Tab navigation (bar, mobile drawer, transitions); renders sections via widgets/registry
 │   │   ├── ParticleBackground.tsx   # Canvas floating particles
 │   │   ├── MouseTrail.tsx           # Canvas comet-style mouse trail (gradient line, no draw while stationary)
+│   │   ├── SitePage.tsx             # The whole site rendered from a config; used by / and /admin/preview. Mounts ThemeSwitcher, FaviconAnimation, ConfigSync
 │   │   ├── ConfigSync.tsx           # router.refresh() on WS {type:"config"} (live) or on postMessage from the admin panel (preview)
 │   │   ├── admin/                   # Admin panel client code (zod is allowed here — it is a separate route chunk)
 │   │   │   ├── AdminApp.tsx         # Shell: top bar (status, undo/redo, discard, publish), nav, screens
@@ -65,7 +69,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │   ├── schemas.ts           # z.toJSONSchema() views of the config schema for the form generator
 │   │   │   ├── SchemaForm.tsx       # Generic form generator (JSON Schema + `ui` hints → controls)
 │   │   │   ├── Builder.tsx          # useBuilder(): dnd-kit outline (tabs, widgets, palette) + inspector
-│   │   │   ├── PreviewPane.tsx      # iframe of /?preview=draft, refreshed by postMessage
+│   │   │   ├── PreviewPane.tsx      # iframe of /admin/preview, refreshed by postMessage
 │   │   │   ├── ConfigScreens.tsx    # Site / Background / Effects
 │   │   │   ├── ContentScreen.tsx  CommentsScreen.tsx  OtherScreens.tsx (Integrations, History)  LoginForm.tsx
 │   │   │   └── api.ts               # fetch helper for /api/admin/*
@@ -202,11 +206,17 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - Sessions live in SQLite (`admin_sessions`, token stored hashed), so they survive restarts and are shared by containers on the same `DATA_DIR`. The login throttle is in-memory per process.
 - `/api/admin/integrations` reports only *whether* env vars are set. Never return their values from any route.
 
+### Everything admin lives under `/admin` and `/api/admin` — keep it that way
+- The supported deployment routes **only those two path prefixes** to the admin container; every other request on the hostname (`/`, `/_next/*`, `/ws`, `/api/*`) goes to the public container, where admin is off. So anything that needs an admin session or the draft must be served from under one of the two prefixes. This is why the draft preview is the route `/admin/preview` and not a query param on `/`.
+- The session cookie is set twice, with `Path=/admin` and `Path=/api/admin` (`setSessionCookie` in `auth.ts`, raw `Set-Cookie` headers because `NextResponse.cookies` keeps one cookie per name). The browser therefore never sends the token to the public container. Don't widen it to `Path=/`.
+- Consequences of the split: admin pages load their JS/CSS (`/_next/...`) from the **public** container, so both containers must run the same build; the preview's widgets get their data (`/api/presence`, `/api/steam`, `/ws`, …) from the public container, so the admin container needs no integration keys in this setup (it does if it is opened directly on its own port).
+- `src/app/admin/layout.tsx` is only the "admin enabled" guard. The panel's wrapper and CSS are in the `(panel)` route group so that `/admin/preview` renders as the plain site.
+
 ### Draft, preview and publish
 - Three states: **published** = `src/config/homepage.json` on disk; **draft** = one row in `admin_state` (`config.draft`); **working copy** = React state in `components/admin/store.tsx`. The store autosaves the working copy to the draft 500ms after the last change (`PUT /api/admin/config`), and deletes the draft when the working copy equals the published config again — "has a draft" always means "differs from live".
 - Draft saves and publish use `strictParseConfig` (nothing dropped, duplicate ids rejected). An invalid working copy is simply not saved: the issues are shown in a banner and Publish is disabled. The lenient `parseConfig` is only for reading files and old drafts.
 - `store.tsx` keeps `{ config, past, future }` in **one** state value so updates are pure (Strict Mode double-invokes updaters — don't call another setState inside one). `serverDraft` (ref) mirrors what the server holds so no-op saves are skipped; saves are chained on one promise so they never overlap or reorder.
-- **Preview** = the real page: `page.tsx` renders the draft when the URL has `?preview=draft` *and* the request carries a valid admin session (otherwise the param is ignored). The admin panel embeds it in an iframe and, after each successful draft save, posts `PREVIEW_REFRESH`; `ConfigSync` inside the iframe calls `router.refresh()`. `{ type: PREVIEW_TAB, tab }` makes the preview show the tab selected in the builder. `Tabs.tsx` preserves other query params when switching tabs so the preview doesn't fall out of preview mode.
+- **Preview** = the real page: `/admin/preview` renders `SitePage` (the same component `/` uses) from the draft, and redirects to the sign-in page without a valid admin session. The admin panel embeds it in an iframe and, after each successful draft save, posts `PREVIEW_REFRESH`; `ConfigSync` inside the iframe calls `router.refresh()`. `{ type: PREVIEW_TAB, tab }` makes the preview show the tab selected in the builder. `Tabs.tsx` and `ConfigSync` build tab URLs from `window.location.pathname`, never a hard-coded `/`, so tab switches inside the preview stay on `/admin/preview`.
 - The preview iframe must stay mounted across the Builder/Site/Background/Effects screens — `AdminApp` keeps `<PreviewPane>` at the same position in the tree for all four. Moving it inside a per-screen component would reload the iframe on every screen switch.
 - **Publish** (`publishConfig`): stores the previous file content in `config_revisions` (last 50), writes a temp file and renames it over `homepage.json` (falls back to an in-place write if the file itself is a mount point), then clears the draft. The loader notices via mtime; `websocket-server.js` polls the file with `fs.watchFile` (2s) and broadcasts `{ type: "config" }`, on which `ConfigSync` refreshes every open page. This works across containers because it is driven by the file, not by an in-process call — hand edits trigger it too.
 - Because the tab list can now change under a mounted page, `Tabs.tsx` clamps `activeTab`/`mountedTab` to the current length (`activeIndex`/`mountedIndex`) — index with those, not the raw state.
@@ -525,6 +535,6 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 
 - One image, multi-stage build; started once or twice (public + admin).
 - `docker-entrypoint.sh` execs `websocket-server.js` in the foreground; `discord-presence.js` runs in-process.
-- `docker-compose-example.yml` runs two containers from the image: `homepage` (public, `APP_ROLE=public`, config/content mounted `:ro`) and `homepage-admin` (admin panel on `127.0.0.1:3001`, config/content writable), sharing the `homepage_data` volume and the same integration env vars (a YAML anchor, `x-shared-env`) so the admin preview shows live widget data. The admin container's outbound polling is covered by the idle pause — it only runs while the panel (whose preview iframe opens a WebSocket) is open. Publishing needs `src/config` writable in the container that serves the panel.
+- `docker-compose-example.yml` runs two containers from the image for one hostname: `homepage` (public, `APP_ROLE=public`, config/content mounted `:ro`, holds the integration keys) and `homepage-admin` (config/content writable, only `ADMIN_PASSWORD_HASH` + `VISITOR_SALT`), sharing the `homepage_data` volume. The proxy routes `/admin` and `/api/admin` to `homepage-admin`. Publishing needs `src/config` writable in the admin container.
 - Traefik recommended as reverse proxy.
 - `.dockerignore` includes node_modules, .next, .env, visitors.db.

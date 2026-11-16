@@ -30,7 +30,7 @@ export default function ConfigSync({ preview }: { preview: boolean }) {
       if (e.origin !== window.location.origin) return;
       if (e.data === PREVIEW_REFRESH) router.refresh();
       else if (e.data?.type === PREVIEW_TAB && typeof e.data.tab === "string") {
-        router.replace(`/?preview=draft&tab=${encodeURIComponent(e.data.tab)}`, { scroll: false });
+        router.replace(`${window.location.pathname}?tab=${encodeURIComponent(e.data.tab)}`, { scroll: false });
       }
     };
     window.addEventListener("message", onMessage);

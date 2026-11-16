@@ -78,7 +78,7 @@ export default function Tabs({ tabs, enableTransitions, widgetContext }: TabsPro
     if (index === mountedTab || transitioning.current) return;
     setMenuOpen(false);
     setActiveTab(index);
-    // Keep other params (e.g. the admin panel's `preview=draft`) when switching tabs.
+    // Keep the current path (the admin preview lives at /admin/preview) and any other params.
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", slugify(tabs[index].label));
     router.push(`${window.location.pathname}?${params}`, { scroll: false });

@@ -511,7 +511,15 @@ The hash (salted scrypt) means the password itself is not stored anywhere — so
 
 **Every option gets a form automatically.** The forms are generated from the config schema (`src/lib/schema/config.ts` and each widget's `meta.ts`), so a new option or widget needs no admin code.
 
-**Security.** One password, stored as a scrypt hash and compared in constant time; server-side sessions (7 days) in an `HttpOnly`, `SameSite=Strict` cookie; cross-site write requests are refused; 8 failed sign-ins per 10 minutes per client. For anything public-facing, the recommended setup is the two-container one in `docker-compose-example.yml`: the public container runs with `APP_ROLE=public` (no admin panel at all, config and content mounted read-only) and a second container, not routed through the public reverse proxy, serves the panel.
+**Security.** One password, stored as a scrypt hash and compared in constant time; server-side sessions (7 days) in an `HttpOnly`, `SameSite=Strict` cookie; cross-site write requests are refused; 8 failed sign-ins per 10 minutes per client. For anything public-facing, the recommended setup is the two-container one in `docker-compose-example.yml`, on a single hostname: the public container runs with `APP_ROLE=public` (no admin panel at all, config and content mounted read-only) and a second container serves the panel. Your reverse proxy sends two path prefixes to the admin container and everything else to the public one:
+
+| Path prefix | Goes to |
+|---|---|
+| `/admin` | admin container (panel, sign-in page, draft preview) |
+| `/api/admin` | admin container (everything the panel calls) |
+| everything else | public container |
+
+The session cookie is scoped to those two prefixes, so it is never sent to the public container. Rebuild and recreate both containers together — the admin pages load their scripts from the public one, so they must run the same build. To keep the sign-in page off the internet as well, put an IP allow-list or VPN-only rule on the admin route.
 
 **Hand-editing still works.** `homepage.json` stays a plain file; the panel just reads and writes it. Publishing rewrites it in the current format (v2) and keeps the previous content under History.
 
@@ -527,7 +535,7 @@ Each container runs:
 - Named volume mounted at `/app/data` for everything written at runtime (`visitors.db`: visitor counter, comments, reactions). Override the location with `DATA_DIR`.
 - Bind mounts for `src/config/` and `src/content/` (read-only for the public container, writable for the one serving the admin panel)
 
-The example compose file starts two containers from the same image — the public site, and the admin panel on `127.0.0.1:3001` — sharing the data volume and the config/content folders. See the comments in the file for the single-container alternative.
+The example compose file starts two containers from the same image — the public site and the admin panel — sharing the data volume and the config/content folders, meant to sit behind one hostname with the proxy rule described under *Admin panel*. The comments in the file cover the own-port and single-container alternatives.
 
 ## Tech Stack
 

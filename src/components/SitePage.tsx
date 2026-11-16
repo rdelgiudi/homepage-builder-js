@@ -1,0 +1,72 @@
+import Tabs from "@/components/Tabs";
+import VisitorCounter from "@/components/VisitorCounter";
+import EffectsController from "@/components/EffectsController";
+import { Suspense } from "react";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
+import FaviconAnimation from "@/components/FaviconAnimation";
+import ConfigSync from "@/components/ConfigSync";
+import type { HomepageConfig } from "@/lib/schema/config";
+import type { WidgetContext } from "@/widgets/types";
+
+function TabsFallback() {
+  return (
+    <div className="w-full">
+      <div className="flex gap-4 justify-center mb-6 border-b border-gray-300 dark:border-gray-700 pb-2">
+        <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded relative overflow-hidden animate-shimmer" />
+        <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded relative overflow-hidden animate-shimmer" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The whole site, rendered from `config`. Used by `/` (the published config) and by
+ * `/admin/preview` (the admin panel's draft, `preview` = true).
+ */
+export default function SitePage({ config, preview }: { config: HomepageConfig; preview: boolean }) {
+  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, background, effects, counters, tabs } = config;
+  const taglineGradient = rawTaglineGradient.length ? rawTaglineGradient : titleGradient;
+
+  const bgVars = { '--bg-light': background.base.light, '--bg-dark': background.base.dark } as React.CSSProperties;
+
+  const widgetContext: WidgetContext = {
+    gradientBorders: effects.gradientBorders,
+    progressGradient: effects.progressGradient,
+    progressGradientColors: effects.progressGradientColors,
+    titleGradient,
+    discordServerId: process.env.DISCORD_SERVER_ID,
+    widgetFrame: effects.widgetFrame,
+    widgetFrameWidth: effects.widgetFrameWidth,
+  };
+
+  return (
+    <main className="min-h-screen bg-page relative z-10 overflow-x-clip" style={bgVars}>
+      <EffectsController particleEffect={background.effect.type} customScrollbar={effects.customScrollbar} mouseTrail={effects.mouseTrail} mouseTrailColors={effects.mouseTrailColors} reactionFlyer={effects.reactionFlyer} />
+      <div className="bg-page pt-6 md:pt-8 pb-3 md:pb-4">
+        <div className="w-full max-w-[870px] mx-auto text-center space-y-3 md:space-y-4">
+          <h1
+            className={`text-3xl md:text-5xl font-bold pb-2${titleGradient.length ? ' animate-gradient-text' : ' text-gray-900 dark:text-white'}`}
+            style={titleGradient.length ? { backgroundImage: `linear-gradient(135deg, ${titleGradient.join(', ')})` } : undefined}
+          >{name}</h1>
+          <p
+            className={`text-base md:text-xl ${taglineGradient.length ? 'animate-gradient-text' : 'text-gray-600 dark:text-gray-300'}`}
+            style={taglineGradient.length ? { backgroundImage: `linear-gradient(135deg, ${taglineGradient.join(', ')})` } : undefined}
+          >{tagline}</p>
+        </div>
+      </div>
+
+      <div className="w-full max-w-[870px] mx-auto px-4 md:px-8 pb-8">
+        <Suspense fallback={<TabsFallback />}>
+          <Tabs tabs={tabs} enableTransitions={effects.tabTransitions} widgetContext={widgetContext} />
+        </Suspense>
+      </div>
+
+      <div className="fixed bottom-4 left-4 z-30">
+        <VisitorCounter showViewers={counters.viewers} showVisitors={counters.visitors} />
+      </div>
+      <ConfigSync preview={preview} />
+      {effects.faviconAnimation && !preview && <FaviconAnimation gradient={titleGradient} />}
+      <ThemeSwitcher />
+    </main>
+  );
+}

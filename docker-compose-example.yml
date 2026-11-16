@@ -1,33 +1,34 @@
-# Two containers from the same image:
+# Two containers from the same image, behind ONE hostname:
 #
-#   homepage        the public site. Route your reverse proxy to this one.
-#                   APP_ROLE=public means the admin panel does not exist here at all
-#                   (/admin and /api/admin answer 404), and config/content are read-only.
+#   homepage        the public site. APP_ROLE=public means the admin panel does not
+#                   exist in this container at all (/admin and /api/admin answer 404),
+#                   and config/content are mounted read-only.
 #
-#   homepage-admin  the admin panel (http://localhost:3001/admin). Do NOT route it
-#                   through the public proxy — keep it on localhost / your LAN / a VPN.
-#                   It writes homepage.json, the markdown files and the database; the
-#                   public container picks the changes up by itself.
+#   homepage-admin  the admin panel. It writes homepage.json, the markdown files and
+#                   the database; the public container picks the changes up by itself.
 #
-# Both get the same integration keys, so the admin panel's preview shows live Discord /
-# Steam / Overwatch data just like the real site. The admin container only queries those
-# services while the panel is open in a browser (it pauses with no viewers, like the
-# public one), and the Discord bot being logged in from two containers is fine.
+# Reverse proxy rule: send exactly two path prefixes to homepage-admin and everything
+# else to homepage:
 #
-# Simpler alternative: delete the homepage-admin service, remove APP_ROLE and the two
-# ":ro" flags from homepage, and set ADMIN_PASSWORD_HASH there. The panel is then served
-# at /admin on the public site, protected by the password only.
-
-x-shared-env: &shared-env
-  HOST: 0.0.0.0
-  DISCORD_SERVER_ID: ${DISCORD_SERVER_ID:-}
-  DISCORD_USER_ID: ${DISCORD_USER_ID:-}
-  DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
-  STEAM_API_KEY: ${STEAM_API_KEY:-}
-  STEAM_ID: ${STEAM_ID:-}
-  OVERWATCH_BATTLE_TAG: ${OVERWATCH_BATTLE_TAG:-}
-  # Must be the same in both containers so visitor ids hash the same way.
-  VISITOR_SALT: ${VISITOR_SALT:-}
+#       /admin        (the panel, the sign-in page and the draft preview)
+#       /api/admin    (everything the panel calls)
+#
+# The admin session cookie is scoped to those two prefixes, so the browser never sends
+# it to the public container. The preview's widgets, the WebSocket and all assets are
+# served by the public container, which is why only it needs the integration keys.
+#
+# Always rebuild / recreate BOTH containers together: the admin pages load their
+# scripts (/_next/...) from the public container, so the two must run the same build.
+#
+# Traefik labels for this are sketched below (commented out). To keep the sign-in page
+# off the internet, add an IP allow-list or VPN-only entrypoint to the admin router.
+#
+# Variations:
+#   * No proxy path rule: publish the admin container on its own port instead
+#     (ports: ["127.0.0.1:3001:3000"]) and open http://localhost:3001/admin. Give it
+#     the integration keys too if you want live widget data in the preview.
+#   * One container: delete homepage-admin, remove APP_ROLE and the two ":ro" flags
+#     from homepage, and set ADMIN_PASSWORD_HASH there.
 
 services:
   homepage:
@@ -41,23 +42,38 @@ services:
       - ./src/config:/app/src/config:ro
       - ./src/content:/app/src/content:ro
     environment:
-      <<: *shared-env
-      APP_ROLE: public
+      - HOST=0.0.0.0
+      - APP_ROLE=public
+      - DISCORD_SERVER_ID=${DISCORD_SERVER_ID:-}
+      - DISCORD_USER_ID=${DISCORD_USER_ID:-}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
+      - STEAM_API_KEY=${STEAM_API_KEY:-}
+      - STEAM_ID=${STEAM_ID:-}
+      - OVERWATCH_BATTLE_TAG=${OVERWATCH_BATTLE_TAG:-}
+      - VISITOR_SALT=${VISITOR_SALT:-}
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.homepage.rule=Host(`example.com`)
+    #   - traefik.http.services.homepage.loadbalancer.server.port=3000
 
   homepage-admin:
     build: .
     container_name: next-js-homepage-admin
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:3001:3000"
     volumes:
       - homepage_data:/app/data
       - ./src/config:/app/src/config
       - ./src/content:/app/src/content
     environment:
-      <<: *shared-env
+      - HOST=0.0.0.0
       # Generate with: docker compose run --rm homepage-admin node scripts/admin-hash.js
-      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:?set ADMIN_PASSWORD_HASH in .env}
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:?set ADMIN_PASSWORD_HASH in .env}
+      # Must be the same in both containers so visitor ids hash the same way.
+      - VISITOR_SALT=${VISITOR_SALT:-}
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.homepage-admin.rule=Host(`example.com`) && (PathPrefix(`/admin`) || PathPrefix(`/api/admin`))
+    #   - traefik.http.services.homepage-admin.loadbalancer.server.port=3000
 
 volumes:
   homepage_data:

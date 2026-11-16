@@ -10,7 +10,7 @@ export default function PreviewPane({ tabSlug }: { tabSlug: string }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [device, setDevice] = useState<"desktop" | "phone">("desktop");
   // The src is fixed at mount; later tab changes are sent as messages so the page never reloads.
-  const [src] = useState(() => `/?preview=draft${tabSlug ? `&tab=${encodeURIComponent(tabSlug)}` : ""}`);
+  const [src] = useState(() => `/admin/preview${tabSlug ? `?tab=${encodeURIComponent(tabSlug)}` : ""}`);
 
   const post = useCallback((message: unknown) => {
     frame.current?.contentWindow?.postMessage(message, window.location.origin);

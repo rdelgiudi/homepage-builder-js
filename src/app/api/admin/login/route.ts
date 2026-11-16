@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminEnabled, checkPassword, clearLoginFailures, clientKey, createSession, isHttps, isSameOrigin, loginThrottle, readJson, recordLoginFailure, SESSION_COOKIE, SESSION_TTL_MS } from "@/lib/admin/auth";
+import { adminEnabled, checkPassword, clearLoginFailures, clientKey, createSession, isSameOrigin, loginThrottle, readJson, recordLoginFailure, setSessionCookie } from "@/lib/admin/auth";
 import { audit } from "@/lib/admin/store";
 
 export const dynamic = "force-dynamic";
@@ -26,12 +26,6 @@ export async function POST(request: Request) {
   const token = createSession();
   audit("auth.login", key);
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: isHttps(request),
-    sameSite: "strict",
-    maxAge: SESSION_TTL_MS / 1000,
-    path: "/",
-  });
+  setSessionCookie(res, request, token);
   return res;
 }

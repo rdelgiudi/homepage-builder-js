@@ -88,6 +88,28 @@ export function isHttps(request: Request): boolean {
   return new URL(request.url).protocol === "https:";
 }
 
+/**
+ * The session cookie is scoped to the admin paths instead of "/", so on a shared
+ * hostname the browser never sends it to the public site (which may be a different,
+ * internet-facing container). One Set-Cookie per path, since a cookie has only one.
+ */
+const COOKIE_PATHS = ["/admin", "/api/admin"];
+
+function appendCookies(res: Response, value: string, maxAgeSeconds: number, secure: boolean, paths: string[]) {
+  for (const path of paths) {
+    res.headers.append("Set-Cookie", `${SESSION_COOKIE}=${value}; Path=${path}; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Strict${secure ? "; Secure" : ""}`);
+  }
+}
+
+export function setSessionCookie(res: Response, request: Request, token: string) {
+  appendCookies(res, token, SESSION_TTL_MS / 1000, isHttps(request), COOKIE_PATHS);
+}
+
+export function clearSessionCookie(res: Response, request: Request) {
+  // "/" as well: sessions created before the cookie was path-scoped used it.
+  appendCookies(res, "", 0, isHttps(request), [...COOKIE_PATHS, "/"]);
+}
+
 // --- CSRF ---
 
 /** State-changing requests must come from this site's own pages. */
