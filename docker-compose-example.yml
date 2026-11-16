@@ -9,9 +9,25 @@
 #                   It writes homepage.json, the markdown files and the database; the
 #                   public container picks the changes up by itself.
 #
+# Both get the same integration keys, so the admin panel's preview shows live Discord /
+# Steam / Overwatch data just like the real site. The admin container only queries those
+# services while the panel is open in a browser (it pauses with no viewers, like the
+# public one), and the Discord bot being logged in from two containers is fine.
+#
 # Simpler alternative: delete the homepage-admin service, remove APP_ROLE and the two
-# ":ro" flags from homepage, and set ADMIN_PASSWORD_HASH there. The panel is then served at
-# /admin on the public site, protected by the password only.
+# ":ro" flags from homepage, and set ADMIN_PASSWORD_HASH there. The panel is then served
+# at /admin on the public site, protected by the password only.
+
+x-shared-env: &shared-env
+  HOST: 0.0.0.0
+  DISCORD_SERVER_ID: ${DISCORD_SERVER_ID:-}
+  DISCORD_USER_ID: ${DISCORD_USER_ID:-}
+  DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+  STEAM_API_KEY: ${STEAM_API_KEY:-}
+  STEAM_ID: ${STEAM_ID:-}
+  OVERWATCH_BATTLE_TAG: ${OVERWATCH_BATTLE_TAG:-}
+  # Must be the same in both containers so visitor ids hash the same way.
+  VISITOR_SALT: ${VISITOR_SALT:-}
 
 services:
   homepage:
@@ -25,15 +41,8 @@ services:
       - ./src/config:/app/src/config:ro
       - ./src/content:/app/src/content:ro
     environment:
-      - HOST=0.0.0.0
-      - APP_ROLE=public
-      - DISCORD_SERVER_ID=${DISCORD_SERVER_ID:-}
-      - DISCORD_USER_ID=${DISCORD_USER_ID:-}
-      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
-      - STEAM_API_KEY=${STEAM_API_KEY:-}
-      - STEAM_ID=${STEAM_ID:-}
-      - OVERWATCH_BATTLE_TAG=${OVERWATCH_BATTLE_TAG:-}
-      - VISITOR_SALT=${VISITOR_SALT:-}
+      <<: *shared-env
+      APP_ROLE: public
 
   homepage-admin:
     build: .
@@ -46,15 +55,9 @@ services:
       - ./src/config:/app/src/config
       - ./src/content:/app/src/content
     environment:
-      - HOST=0.0.0.0
+      <<: *shared-env
       # Generate with: docker compose run --rm homepage-admin node scripts/admin-hash.js
-      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:?set ADMIN_PASSWORD_HASH in .env}
-      # Must match the public container so visitor ids hash the same way.
-      - VISITOR_SALT=${VISITOR_SALT:-}
-      # Without the keys below, Discord / Steam / Overwatch widgets show their
-      # "not configured" state in the admin preview. Add them here if you want live
-      # data in the preview too (the Discord bot then logs in from both containers).
-      - DISCORD_SERVER_ID=${DISCORD_SERVER_ID:-}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:?set ADMIN_PASSWORD_HASH in .env}
 
 volumes:
   homepage_data:

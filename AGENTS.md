@@ -525,6 +525,6 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 
 - One image, multi-stage build; started once or twice (public + admin).
 - `docker-entrypoint.sh` execs `websocket-server.js` in the foreground; `discord-presence.js` runs in-process.
-- `docker-compose-example.yml` runs two containers from the image: `homepage` (public, `APP_ROLE=public`, config/content mounted `:ro`) and `homepage-admin` (admin panel on `127.0.0.1:3001`, config/content writable), sharing the `homepage_data` volume. Publishing needs `src/config` writable in the container that serves the panel.
+- `docker-compose-example.yml` runs two containers from the image: `homepage` (public, `APP_ROLE=public`, config/content mounted `:ro`) and `homepage-admin` (admin panel on `127.0.0.1:3001`, config/content writable), sharing the `homepage_data` volume and the same integration env vars (a YAML anchor, `x-shared-env`) so the admin preview shows live widget data. The admin container's outbound polling is covered by the idle pause — it only runs while the panel (whose preview iframe opens a WebSocket) is open. Publishing needs `src/config` writable in the container that serves the panel.
 - Traefik recommended as reverse proxy.
 - `.dockerignore` includes node_modules, .next, .env, visitors.db.
