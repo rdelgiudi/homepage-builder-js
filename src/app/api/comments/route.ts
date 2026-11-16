@@ -1,34 +1,27 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
 import { COOKIE_NAME, COOKIE_MAX_AGE, generateVisitorId, hashVisitorId, getVisitorIdFromCookie } from "@/lib/visitor";
+import { isBlocked } from "@/lib/admin/store";
+import { BODY_MAX, NAME_MAX, commentsDb, initialStatus, sanitize } from "@/lib/comments";
 
 export const dynamic = "force-dynamic";
 
-const NAME_MAX = 40;
-const BODY_MAX = 500;
 const RATE_LIMIT_MS = 5000;
 const MAX_LIMIT = 200;
 const DEFAULT_LIMIT = 50;
 
-const CONTROL_CHARS = new RegExp("[\\u0000-\\u001f\\u007f]", "g");
-
 const rateLimit = new Map<string, number>();
 
-function getDbWithSchema() {
-  const database = getDb();
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS comments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      body TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  return database;
+interface PublicRow {
+  id: number;
+  name: string;
+  body: string;
+  created_at: string;
+  status: string;
 }
 
-function sanitize(input: string, max: number): string {
-  return input.replace(CONTROL_CHARS, "").slice(0, max);
+/** What a visitor may see of a comment: no author hash, and `pending` only as a flag. */
+function toPublic({ status, ...row }: PublicRow) {
+  return status === "pending" ? { ...row, pending: true } : row;
 }
 
 export async function GET(request: Request) {
@@ -39,12 +32,19 @@ export async function GET(request: Request) {
       ? Math.min(Math.max(rawLimit, 1), MAX_LIMIT)
       : DEFAULT_LIMIT;
 
-    const database = getDbWithSchema();
-    const rows = database
-      .prepare("SELECT id, name, body, created_at FROM comments ORDER BY id DESC LIMIT ?")
-      .all(limit);
+    // Approved comments for everyone, plus the visitor's own comments still awaiting approval.
+    const visitorId = getVisitorIdFromCookie(request.headers.get("cookie"));
+    const hashedId = visitorId ? hashVisitorId(visitorId) : "";
 
-    return NextResponse.json({ comments: rows });
+    const rows = commentsDb()
+      .prepare(
+        `SELECT id, name, body, created_at, status FROM comments
+         WHERE status = 'approved' OR (status = 'pending' AND visitor_hash = ?)
+         ORDER BY id DESC LIMIT ?`
+      )
+      .all(hashedId, limit) as PublicRow[];
+
+    return NextResponse.json({ comments: rows.map(toPublic) });
   } catch (err) {
     console.error(`[${new Date().toISOString()}] [Comments] List error:`, err);
     return NextResponse.json({ error: "Database error" }, { status: 500 });
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const database = getDbWithSchema();
+    const database = commentsDb();
 
     let visitorId = getVisitorIdFromCookie(request.headers.get("cookie"));
     if (!visitorId) visitorId = generateVisitorId();
@@ -66,6 +66,10 @@ export async function POST(request: Request) {
         { error: "Please wait a moment before posting again." },
         { status: 429 }
       );
+    }
+
+    if (isBlocked(hashedId)) {
+      return NextResponse.json({ error: "Commenting is not available." }, { status: 403 });
     }
 
     let payload: unknown;
@@ -91,18 +95,19 @@ export async function POST(request: Request) {
 
     const cleanName = sanitize(name, NAME_MAX);
     const cleanBody = sanitize(body, BODY_MAX);
+    const status = initialStatus(cleanName, cleanBody);
 
     const info = database
-      .prepare("INSERT INTO comments (name, body) VALUES (?, ?)")
-      .run(cleanName, cleanBody);
+      .prepare("INSERT INTO comments (name, body, status, visitor_hash) VALUES (?, ?, ?, ?)")
+      .run(cleanName, cleanBody, status, hashedId);
 
     const row = database
-      .prepare("SELECT id, name, body, created_at FROM comments WHERE id = ?")
-      .get(info.lastInsertRowid);
+      .prepare("SELECT id, name, body, created_at, status FROM comments WHERE id = ?")
+      .get(info.lastInsertRowid) as PublicRow;
 
     rateLimit.set(hashedId, Date.now());
 
-    const response = NextResponse.json({ comment: row }, { status: 201 });
+    const response = NextResponse.json({ comment: toPublic(row) }, { status: 201 });
     response.cookies.set(COOKIE_NAME, visitorId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

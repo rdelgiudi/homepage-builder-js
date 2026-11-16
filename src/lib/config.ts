@@ -3,7 +3,7 @@ import path from "path";
 import { ConfigSchema, CONFIG_VERSION, type HomepageConfig, type EffectsConfig } from "@/lib/schema/config";
 import { parseConfig } from "@/lib/schema/parse";
 
-const CONFIG_PATH = path.join(process.cwd(), "src/config/homepage.json");
+export const CONFIG_PATH = path.join(process.cwd(), "src/config/homepage.json");
 
 const defaultConfig: HomepageConfig = ConfigSchema.parse({ version: CONFIG_VERSION });
 
@@ -48,6 +48,10 @@ function loadConfigSync(): HomepageConfig {
 
 export function getConfig(): HomepageConfig {
   return loadConfigSync();
+}
+
+export function getDefaultConfig(): HomepageConfig {
+  return defaultConfig;
 }
 
 export function getMetadata() {

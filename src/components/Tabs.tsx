@@ -78,8 +78,10 @@ export default function Tabs({ tabs, enableTransitions, widgetContext }: TabsPro
     if (index === mountedTab || transitioning.current) return;
     setMenuOpen(false);
     setActiveTab(index);
-    const newUrl = `${window.location.pathname}?tab=${slugify(tabs[index].label)}`;
-    router.push(newUrl, { scroll: false });
+    // Keep other params (e.g. the admin panel's `preview=draft`) when switching tabs.
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", slugify(tabs[index].label));
+    router.push(`${window.location.pathname}?${params}`, { scroll: false });
 
     if (enableTransitions) {
       transitioning.current = true;
@@ -99,6 +101,9 @@ export default function Tabs({ tabs, enableTransitions, widgetContext }: TabsPro
   };
 
   if (tabs.length === 0) return null;
+  // The tab list can change under us (live config refresh, admin preview) — never index past it.
+  const activeIndex = Math.min(activeTab, tabs.length - 1);
+  const mountedIndex = Math.min(mountedTab, tabs.length - 1);
 
   return (
     <div className="w-full">
@@ -112,7 +117,7 @@ export default function Tabs({ tabs, enableTransitions, widgetContext }: TabsPro
                 type="button"
                 onClick={() => handleTabClick(index)}
                 className={`flex items-center gap-2 px-4 py-2 transition-all duration-200 ${
-                  activeTab === index
+                  activeIndex === index
                     ? "text-blue-600 dark:text-white border-b-2 border-blue-600 dark:border-blue-400"
                     : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white hover:scale-105 gradient-tab"
                 }`}
@@ -127,8 +132,8 @@ export default function Tabs({ tabs, enableTransitions, widgetContext }: TabsPro
           <div className="flex md:hidden items-center gap-4 flex-1">
             <HamburgerButton open={menuOpen} onClick={() => setMenuOpen((o) => !o)} label={menuOpen ? "Close menu" : "Open menu"} />
             <span className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
-              {tabs[activeTab].icon && <Icon icon={tabs[activeTab].icon} invertDark={tabs[activeTab].invertDark} width={18} height={18} />}
-              <span className="truncate">{tabs[activeTab].label}</span>
+              {tabs[activeIndex].icon && <Icon icon={tabs[activeIndex].icon} invertDark={tabs[activeIndex].invertDark} width={18} height={18} />}
+              <span className="truncate">{tabs[activeIndex].label}</span>
             </span>
           </div>
         </div>
@@ -148,7 +153,7 @@ export default function Tabs({ tabs, enableTransitions, widgetContext }: TabsPro
                 type="button"
                 onClick={() => handleTabClick(index)}
                 className={`flex items-center gap-3 w-full px-4 py-3 text-left transition-colors ${
-                  activeTab === index
+                  activeIndex === index
                     ? "text-blue-600 dark:text-white bg-gray-200/60 dark:bg-gray-800/60 border-r-2 border-blue-600 dark:border-blue-400"
                     : "text-gray-600 dark:text-gray-300 hover:bg-gray-200/40 dark:hover:bg-gray-800/40 border-r-2 border-transparent"
                 }`}
@@ -166,7 +171,7 @@ export default function Tabs({ tabs, enableTransitions, widgetContext }: TabsPro
           visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
         }`}
       >
-        {tabs[mountedTab].sections.map((section, index) => (
+        {tabs[mountedIndex].sections.map((section, index) => (
           <div
             key={section.id}
             className={enableTransitions && visible ? "animate-fade-in-up" : ""}

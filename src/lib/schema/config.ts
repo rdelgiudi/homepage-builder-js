@@ -14,11 +14,11 @@ export const EffectsSchema = z.object({
   tabTransitions: z.boolean().default(true).meta({ title: "Tab transitions" }),
   customScrollbar: z.boolean().default(true).meta({ title: "Custom scrollbar" }),
   progressGradient: z.boolean().default(true).meta({ title: "Music progress gradient + sparkles" }),
-  progressGradientColors: GradientSchema.optional().meta({ title: "Progress bar colors", description: "Falls back to the title gradient" }),
+  progressGradientColors: GradientSchema.optional().meta({ title: "Progress bar colors", ui: "gradient", description: "Falls back to the title gradient" }),
   widgetFrame: z.boolean().default(false).meta({ title: "Gradient frame around widgets" }),
   widgetFrameWidth: z.number().min(0).max(20).default(2).meta({ title: "Frame width (px)" }),
   mouseTrail: z.boolean().default(false).meta({ title: "Mouse trail" }),
-  mouseTrailColors: GradientSchema.optional().meta({ title: "Mouse trail colors", description: "Falls back to the title gradient" }),
+  mouseTrailColors: GradientSchema.optional().meta({ title: "Mouse trail colors", ui: "gradient", description: "Falls back to the title gradient" }),
   faviconAnimation: z.boolean().default(true).meta({ title: "Animated favicon" }),
   reactionFlyer: z.boolean().default(true).meta({ title: "Flying emoji on reactions" }),
 });
@@ -53,7 +53,7 @@ export const CountersSchema = z.object({
 export const TabSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1).meta({ title: "Label" }),
-  icon: z.string().optional().meta({ title: "Icon", description: "Emoji or image URL" }),
+  icon: z.string().optional().meta({ title: "Icon", ui: "icon", description: "Emoji or image URL" }),
   invertDark: z.boolean().optional().meta({ title: "Invert icon in dark mode" }),
   /** How sections are arranged. Only `stack` exists so far. */
   layout: z.enum(["stack"]).default("stack").meta({ title: "Tab layout" }),
@@ -65,8 +65,8 @@ export const ConfigSchema = z.object({
   name: z.string().default("Homepage").meta({ title: "Site name" }),
   tagline: z.string().default("Welcome").meta({ title: "Tagline" }),
   favicon: z.string().default("").meta({ title: "Favicon URL", description: "Empty = animated gradient ring" }),
-  titleGradient: GradientSchema.default([]).meta({ title: "Title gradient", description: "Empty = solid color" }),
-  taglineGradient: GradientSchema.default([]).meta({ title: "Tagline gradient", description: "Empty = same as title" }),
+  titleGradient: GradientSchema.default([]).meta({ title: "Title gradient", ui: "gradient", description: "Empty = solid color" }),
+  taglineGradient: GradientSchema.default([]).meta({ title: "Tagline gradient", ui: "gradient", description: "Empty = same as title" }),
   layout: LayoutSchema.prefault({}),
   background: BackgroundSchema.prefault({}),
   effects: EffectsSchema.prefault({}),

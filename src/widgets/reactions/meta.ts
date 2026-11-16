@@ -7,7 +7,7 @@ export const schema = z.object({
   ...base("reactions"),
   ...titleFields,
   ...frameField,
-  emojis: z.array(z.string()).optional().meta({ title: "Emojis", description: "Leave empty for the default set" }),
+  emojis: z.array(z.string()).optional().meta({ title: "Emojis", ui: "emoji-list", description: "Leave empty for the default set" }),
 });
 export type ReactionsSection = z.infer<typeof schema>;
 

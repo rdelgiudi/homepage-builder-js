@@ -57,3 +57,30 @@ export function parseConfig(raw: unknown): ParseResult {
   if (!res.success) return { config: null, errors: [describe(res.error)], warnings };
   return { config: res.data, errors: [], warnings };
 }
+
+export interface ConfigIssue {
+  path: string;
+  message: string;
+}
+
+/**
+ * Strict counterpart of `parseConfig` for anything that writes a config (admin draft /
+ * publish): nothing is dropped — every problem is returned as an issue instead.
+ */
+export function strictParseConfig(raw: unknown): { config: HomepageConfig; issues: [] } | { config: null; issues: ConfigIssue[] } {
+  const res = ConfigSchema.safeParse(migrateConfig(raw));
+  if (!res.success) {
+    return { config: null, issues: res.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })) };
+  }
+  const issues: ConfigIssue[] = [];
+  const seen = new Set<string>();
+  res.data.tabs.forEach((tab, ti) => {
+    const check = (id: string, path: string) => {
+      if (seen.has(id)) issues.push({ path, message: `Duplicate id "${id}"` });
+      seen.add(id);
+    };
+    check(tab.id, `tabs.${ti}.id`);
+    tab.sections.forEach((s, si) => check(s.id, `tabs.${ti}.sections.${si}.id`));
+  });
+  return issues.length ? { config: null, issues } : { config: res.data, issues: [] };
+}

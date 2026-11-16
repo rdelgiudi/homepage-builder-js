@@ -7,7 +7,8 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - **Frontend**: Next.js 15 App Router (`src/app/`), React 19, Tailwind CSS
 - **Backend**: Custom Node.js WebSocket server (`websocket-server.js`) — wraps Next.js, adds WebSocket on same port, in-process requires `discord-presence.js`
 - **Presence Module**: `discord-presence.js` — Discord.js bot, exports `start()` / `onPresenceUpdate()` / `getCurrentPresence()`. Websocket-server calls `start()` to begin tracking, subscribes via `onPresenceUpdate()` to receive raw presence in-process (no localhost WS hop).
-- **Single container**: `docker-entrypoint.sh` runs only `websocket-server.js` in the foreground; the presence bot runs in-process.
+- **Single process per container**: `docker-entrypoint.sh` runs only `websocket-server.js` in the foreground; the presence bot runs in-process.
+- **Admin panel**: `/admin` + `/api/admin/*`, same app. Exists only when `ADMIN_PASSWORD_HASH` (or plain `ADMIN_PASSWORD`) is set and `APP_ROLE` is not `public`. Recommended deployment is two containers from one image (public with `APP_ROLE=public`, admin not exposed) sharing `DATA_DIR`, `src/config` and `src/content`.
 
 ## File Layout
 
@@ -25,10 +26,23 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │   ├── presence/route.ts    # Snapshot of current Discord presence (force-dynamic; reads in-memory server state)
 │   │   │   ├── steam/route.ts       # Snapshot of current Steam data (force-dynamic; reads in-memory server state)
 │   │   │   └── overwatch/route.ts   # Snapshot of current Overwatch data (force-dynamic; reads in-memory server state)
+│   │   │   └── admin/               # Admin API — every handler wrapped in withAdmin()
+│   │   │       ├── login/ logout/   # Session create / destroy
+│   │   │       ├── config/route.ts  # GET published+draft, PUT save draft (strict), DELETE discard draft
+│   │   │       ├── config/publish/  # POST: draft → homepage.json (revision kept)
+│   │   │       ├── revisions/       # GET list, POST load one into the draft
+│   │   │       ├── content/         # Markdown files: list/read, PUT, DELETE, POST = render preview
+│   │   │       ├── comments/        # GET list by status, POST bulk; [id] PATCH/DELETE; settings PUT
+│   │   │       └── integrations/    # Which env vars are set, what is writable
+│   │   ├── admin/
+│   │   │   ├── layout.tsx           # notFound() when admin is disabled; wraps in .adm; imports admin.css
+│   │   │   ├── page.tsx             # Redirects to /admin/login without a session; renders AdminApp
+│   │   │   ├── login/page.tsx
+│   │   │   └── admin.css            # All admin styles, scoped under .adm
 │   │   ├── globals.css
-│   │   ├── layout.tsx               # Root layout, generateMetadata reads homepage.json
+│   │   ├── layout.tsx               # Root layout (html/body + metadata only — shared by site and admin)
 │   │   ├── loading.tsx              # Cold-load skeleton
-│   │   └── page.tsx                 # Homepage — reads homepage.json at runtime via fs
+│   │   └── page.tsx                 # Homepage — reads homepage.json at runtime via fs; `?preview=draft` renders the admin draft; mounts ThemeSwitcher, FaviconAnimation, ConfigSync
 │   ├── components/
 │   │   ├── DiscordServer.tsx        # Discord server widget (client-side cache)
 │   │   ├── DiscordUser.tsx          # Discord user presence (WebSocket subscriber, mobile indicator)
@@ -44,6 +58,17 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── Tabs.tsx                 # Tab navigation (bar, mobile drawer, transitions); renders sections via widgets/registry
 │   │   ├── ParticleBackground.tsx   # Canvas floating particles
 │   │   ├── MouseTrail.tsx           # Canvas comet-style mouse trail (gradient line, no draw while stationary)
+│   │   ├── ConfigSync.tsx           # router.refresh() on WS {type:"config"} (live) or on postMessage from the admin panel (preview)
+│   │   ├── admin/                   # Admin panel client code (zod is allowed here — it is a separate route chunk)
+│   │   │   ├── AdminApp.tsx         # Shell: top bar (status, undo/redo, discard, publish), nav, screens
+│   │   │   ├── store.tsx            # AdminProvider/useAdmin: working config, undo history, debounced draft autosave, publish
+│   │   │   ├── schemas.ts           # z.toJSONSchema() views of the config schema for the form generator
+│   │   │   ├── SchemaForm.tsx       # Generic form generator (JSON Schema + `ui` hints → controls)
+│   │   │   ├── Builder.tsx          # useBuilder(): dnd-kit outline (tabs, widgets, palette) + inspector
+│   │   │   ├── PreviewPane.tsx      # iframe of /?preview=draft, refreshed by postMessage
+│   │   │   ├── ConfigScreens.tsx    # Site / Background / Effects
+│   │   │   ├── ContentScreen.tsx  CommentsScreen.tsx  OtherScreens.tsx (Integrations, History)  LoginForm.tsx
+│   │   │   └── api.ts               # fetch helper for /api/admin/*
 │   │   ├── EffectsController.tsx    # Conditionally renders effects based on config
 │   │   └── FaviconAnimation.tsx     # Canvas-based animated favicon (hidden canvas → PNG data URL, self-healing)
 │   ├── config/
@@ -59,6 +84,13 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │   ├── config.ts            # Zod schema for homepage.json v2 — single source of truth for types + defaults
 │   │   │   ├── migrate.ts           # v1 → v2 structural migration + id generation
 │   │   │   └── parse.ts             # parseConfig(): migrate + lenient validation (drops bad tabs/sections with warnings)
+│   │   ├── admin/
+│   │   │   ├── auth.ts              # adminEnabled(), password check, sessions, CSRF, login throttle, withAdmin()
+│   │   │   ├── password.js          # scrypt hash/verify (CommonJS — also loaded by websocket-server.js and scripts/admin-hash.js)
+│   │   │   ├── store.ts             # SQLite: admin_sessions, admin_state (draft, settings), config_revisions, blocked_visitors, audit_log
+│   │   │   └── publish.ts           # publishConfig() (atomic write + revision), getDraftConfig(), isWritable()
+│   │   ├── comments.ts              # comments table + moderation columns, moderation settings, initialStatus()
+│   │   ├── content.ts               # CONTENT_DIR + resolveContentFile() (plain *.md names only)
 │   │   ├── config.ts                # mtime-cached homepage.json loader (uses parseConfig)
 │   │   ├── db.ts                    # Shared better-sqlite3 connection (DATA_DIR/visitors.db, WAL); exports DATA_DIR
 │   │   └── visitor.ts               # visitor_id cookie + hashing helpers (shared by visitors/comments)
@@ -75,6 +107,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   └── types/
 │       ├── gray-matter.d.ts
 │       └── quantize.d.ts
+├── scripts/admin-hash.js            # `npm run admin:hash` — prints an ADMIN_PASSWORD_HASH line
 ├── discord-presence.js              # Discord.js bot (in-process; exports start/onPresenceUpdate)
 ├── websocket-server.js              # Custom Next.js server + WebSocket
 ├── docker-entrypoint.sh             # Execs websocket-server (presence runs in-process)
@@ -100,6 +133,9 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 | `OVERWATCH_BATTLE_TAG` | Overwatch battle tag (e.g. `User-12345`) |
 | `VISITOR_SALT` | Salt for visitor ID hashing |
 | `DATA_DIR` | Directory for runtime-written state (default: `<cwd>/data`) |
+| `ADMIN_PASSWORD_HASH` | Enables the admin panel at `/admin`. scrypt hash from `npm run admin:hash`. |
+| `ADMIN_PASSWORD` | Plain-text alternative for local development; ignored when the hash is set. Neither set = the panel does not exist (404). |
+| `APP_ROLE` | `public` disables the admin panel on this instance even with an admin password set. Anything else / unset = normal. |
 
 ### homepage.json — content config (no secrets), **config v2**:
 
@@ -157,6 +193,46 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - **v1 → v2** (`migrate.ts`): `backgroundColor` → `background.base`; `effects.particleBackground` / `effects.particleEffect` → `background.effect.type` (`false` → `"none"`); ids generated. The user's on-disk `homepage.json` is never rewritten by the loader. New schema changes should be **additive** (new optional fields / enum members); anything else needs a version bump and a new step in `migrateConfig`.
 - **Generated ids** are `slug(label)` for tabs and `<tabId>-<type>` for sections, de-duplicated with `-2`, `-3`… Explicit ids are reserved first. They are stable across loads for an unchanged file, but for an id-less (v1) file reordering two sections of the same type swaps their ids. The `?tab=` URL param still uses `slugify(label)`, not `tab.id`.
 
+### Admin panel: where the guards are
+- "Admin enabled" = (`ADMIN_PASSWORD_HASH` or `ADMIN_PASSWORD` set) **and** `APP_ROLE !== "public"`. It is checked in three places on purpose: `websocket-server.js` answers a plain 404 for `/admin*` and `/api/admin*` before Next.js sees the request; `src/app/admin/layout.tsx` calls `notFound()`; every API handler is wrapped in `withAdmin()` (404 disabled / 403 cross-site write / 401 no session). **There is no middleware** — a new admin route is unprotected unless it is exported as `withAdmin(...)`. `login/route.ts` is the one handler that can't use the wrapper and repeats the enabled + same-origin checks itself.
+- The server-level 404 exists because a page-level `notFound()`/`redirect()` under a `loading.tsx` boundary is streamed with HTTP 200 (the body is the not-found/redirect, but the status is already sent).
+- **Password storage**: `src/lib/admin/password.js` (scrypt, format `scrypt:N:r:p:salt:hash`, base64url — no `$`/`=` so it needs no escaping in `.env` or compose files). It is deliberately plain CommonJS because three things load it: `auth.ts`, `websocket-server.js` (startup validation) and `scripts/admin-hash.js` (the generator behind `npm run admin:hash`). If `ADMIN_PASSWORD_HASH` is set it always wins, and a malformed hash fails closed (no sign-in) instead of falling back to the plain password. `websocket-server.js` logs a warning at startup when plain `ADMIN_PASSWORD` is used in production, and an error when the hash is malformed.
+- CSRF: writes require `Sec-Fetch-Site: same-origin`, or (when the browser doesn't send it, e.g. plain-HTTP non-localhost) an `Origin` whose host equals `X-Forwarded-Host`/`Host`. A reverse proxy in front of the admin container must pass the host through. `curl` needs `-H "Origin: http://host:port"`.
+- The session cookie is `Secure` only when the request arrived over HTTPS (`X-Forwarded-Proto` or the URL), so plain-HTTP LAN access works.
+- Sessions live in SQLite (`admin_sessions`, token stored hashed), so they survive restarts and are shared by containers on the same `DATA_DIR`. The login throttle is in-memory per process.
+- `/api/admin/integrations` reports only *whether* env vars are set. Never return their values from any route.
+
+### Draft, preview and publish
+- Three states: **published** = `src/config/homepage.json` on disk; **draft** = one row in `admin_state` (`config.draft`); **working copy** = React state in `components/admin/store.tsx`. The store autosaves the working copy to the draft 500ms after the last change (`PUT /api/admin/config`), and deletes the draft when the working copy equals the published config again — "has a draft" always means "differs from live".
+- Draft saves and publish use `strictParseConfig` (nothing dropped, duplicate ids rejected). An invalid working copy is simply not saved: the issues are shown in a banner and Publish is disabled. The lenient `parseConfig` is only for reading files and old drafts.
+- `store.tsx` keeps `{ config, past, future }` in **one** state value so updates are pure (Strict Mode double-invokes updaters — don't call another setState inside one). `serverDraft` (ref) mirrors what the server holds so no-op saves are skipped; saves are chained on one promise so they never overlap or reorder.
+- **Preview** = the real page: `page.tsx` renders the draft when the URL has `?preview=draft` *and* the request carries a valid admin session (otherwise the param is ignored). The admin panel embeds it in an iframe and, after each successful draft save, posts `PREVIEW_REFRESH`; `ConfigSync` inside the iframe calls `router.refresh()`. `{ type: PREVIEW_TAB, tab }` makes the preview show the tab selected in the builder. `Tabs.tsx` preserves other query params when switching tabs so the preview doesn't fall out of preview mode.
+- The preview iframe must stay mounted across the Builder/Site/Background/Effects screens — `AdminApp` keeps `<PreviewPane>` at the same position in the tree for all four. Moving it inside a per-screen component would reload the iframe on every screen switch.
+- **Publish** (`publishConfig`): stores the previous file content in `config_revisions` (last 50), writes a temp file and renames it over `homepage.json` (falls back to an in-place write if the file itself is a mount point), then clears the draft. The loader notices via mtime; `websocket-server.js` polls the file with `fs.watchFile` (2s) and broadcasts `{ type: "config" }`, on which `ConfigSync` refreshes every open page. This works across containers because it is driven by the file, not by an in-process call — hand edits trigger it too.
+- Because the tab list can now change under a mounted page, `Tabs.tsx` clamps `activeTab`/`mountedTab` to the current length (`activeIndex`/`mountedIndex`) — index with those, not the raw state.
+- Restoring a revision only loads it into the draft; nothing goes live without Publish.
+- Markdown files (Content screen) and comment moderation are **not** part of the draft — they apply immediately.
+
+### Admin forms are generated from the schema
+- `components/admin/schemas.ts` converts the zod schemas with `z.toJSONSchema(schema, { io: "input" })`; `SchemaForm` walks the result. A control is chosen from the JSON Schema type plus the `ui` hint set via `.meta({ ui })`: `color`, `gradient` (string array as color stops), `textarea`, `icon`, `tristate` (optional boolean: unset = inherit), `content-file` (dropdown of `src/content/*.md`), `emoji-list`. Enums with ≤ 4 options render as a segmented control; bounded numbers get a slider; arrays of objects get a collapsible list editor.
+- "Optional" = not in `required` and no `default`. Clearing an optional string/array/boolean **removes the key** rather than storing `""`/`[]`/`false`.
+- `id`, `version` and any `const` property (a section's `type`, `background.base.type`) are never rendered. Don't hide keys by name beyond that — `background.effect.type` is a real, editable field.
+- Adding a field with `.meta({ title, description })` to a schema is all it takes for it to appear in the panel.
+
+### Builder drag and drop
+- One `DndContext` with prefixed ids: `tab:<id>`, `sec:<id>`, `new:<widget type>` (palette), plus the droppable `section-list`. `onDragEnd` branches on the prefixes: tab→tab reorders tabs; sec→sec reorders within the open tab; sec→tab moves the widget to that tab; new→sec inserts before it; new→tab / new→list appends.
+- The custom collision detection restricts a dragged tab to tab targets and otherwise prefers `pointerWithin` over `closestCenter`.
+- `PointerSensor` has a 6px activation distance so a click on a row still selects it. Rows are draggable as a whole; there is no separate handle. The inspector's "Move to tab" select is the non-drag alternative.
+- New ids come from `uniqueId()` (`<tabId>-<type>`, de-duplicated across the whole config). A tab's id never changes when it is renamed.
+
+### Comment moderation
+- `src/lib/comments.ts` owns the `comments` table: it adds `status` (`pending`/`approved`/`rejected`, default `approved` so pre-existing rows stay visible), `visitor_hash`, `edited_at`, `moderated_at` via `ALTER TABLE` when missing.
+- Moderation settings (`mode: "off" | "pre"`, `holdWords`) are stored in the database (`admin_state` key `comments.moderation`), **not** in `homepage.json`, so they apply immediately and are shared by the public and admin containers. `initialStatus()` decides a new comment's status: `pre` → pending; otherwise pending only if name/body contains a held word (case-insensitive substring).
+- Public `GET /api/comments` returns approved comments plus the requesting visitor's own pending ones, flagged `pending: true` (the widget shows "Awaiting approval — only you can see this"). `status` and `visitor_hash` never leave the server on the public route; the admin list exposes only the first 8 hex chars as an author tag.
+- Blocking is by `visitor_hash` (`blocked_visitors`): a blocked visitor's `POST` gets 403. It is a cookie-based id, so it stops casual repeat offenders, not a determined one. Comments older than the moderation columns have no hash and can't be blocked.
+- Every moderation action is written to `audit_log` (`comment.*`); the Comments screen shows the latest 30.
+- The pending badge in the admin nav is polled every 30s (not pushed), because the admin and public sites may be different processes.
+
 ### Widget registry (`src/widgets/`)
 - Adding a widget = `src/widgets/<type>/meta.ts` + `render.tsx`, then one line each in `widgets/meta.ts` (`SectionSchema` + `widgetMetas`) and `widgets/registry.tsx` (`views`). The `views` map is typed against `SectionType`, so a missing renderer is a compile error.
 - **`meta.ts` must stay server-safe and `render.tsx` must only `import type` from it.** `registry.tsx` is pulled into the client bundle through `Tabs.tsx`; a runtime import of a meta file would ship zod to the browser. Conversely the config loader imports `widgets/meta.ts` on the server, so meta files must never import React components.
@@ -202,7 +278,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - Available via `animate-pulse-glow` class.
 
 ### Markdown files are runtime, not bundled
-- API route `/api/markdown` reads `src/content/` via `fs.readFileSync` at request time.
+- API route `/api/markdown` reads `src/content/` via `fs.readFileSync` at request time. The `file` param goes through `resolveContentFile()` (`src/lib/content.ts`), which only accepts plain `*.md` file names — never build a content path from user input any other way.
 - Renders to HTML server-side via `src/lib/markdown.ts` (using `marked`); mtime-cached.
 - Sets `Cache-Control: public, max-age=300` and `export const revalidate = 300`.
 - Client renders the returned HTML via `dangerouslySetInnerHTML` — `react-markdown` / `remark-gfm` are not in the client bundle.
@@ -443,11 +519,12 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 | `npm run dev` | Next.js dev with WebSocket server (presence bot in-process if env set) |
 | `npm run build` | Next.js production build |
 | `npm run start` | Production start (websocket-server.js) |
+| `npm run admin:hash` | Ask for a password and print the `ADMIN_PASSWORD_HASH=...` line for `.env` |
 
 ## Docker
 
-- Single container, multi-stage build.
+- One image, multi-stage build; started once or twice (public + admin).
 - `docker-entrypoint.sh` execs `websocket-server.js` in the foreground; `discord-presence.js` runs in-process.
-- `docker-compose-example.yml` includes named volume for `visitors.db` and optional bind mounts for config/content.
+- `docker-compose-example.yml` runs two containers from the image: `homepage` (public, `APP_ROLE=public`, config/content mounted `:ro`) and `homepage-admin` (admin panel on `127.0.0.1:3001`, config/content writable), sharing the `homepage_data` volume. Publishing needs `src/config` writable in the container that serves the panel.
 - Traefik recommended as reverse proxy.
 - `.dockerignore` includes node_modules, .next, .env, visitors.db.

@@ -11,7 +11,7 @@ export function base<T extends string>(type: T) {
   };
 }
 
-export const iconField = z.string().optional().meta({ title: "Icon", description: "Emoji or image URL" });
+export const iconField = z.string().optional().meta({ title: "Icon", ui: "icon", description: "Emoji or image URL" });
 export const alignField = AlignSchema.optional().meta({ title: "Alignment" });
 export const invertDarkField = z
   .boolean()
@@ -31,5 +31,5 @@ export const frameField = {
   widgetFrame: z
     .boolean()
     .optional()
-    .meta({ title: "Gradient frame", description: "Overrides the site-wide setting when set" }),
+    .meta({ title: "Gradient frame", ui: "tristate", description: "Follows the site-wide setting unless set here" }),
 };

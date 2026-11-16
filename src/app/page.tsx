@@ -2,7 +2,12 @@ import Tabs from "@/components/Tabs";
 import VisitorCounter from "@/components/VisitorCounter";
 import EffectsController from "@/components/EffectsController";
 import { Suspense } from "react";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
+import FaviconAnimation from "@/components/FaviconAnimation";
+import ConfigSync from "@/components/ConfigSync";
 import { getConfig } from "@/lib/config";
+import { isAdminSession } from "@/lib/admin/auth";
+import { getDraftConfig } from "@/lib/admin/publish";
 import type { WidgetContext } from "@/widgets/types";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +23,11 @@ function TabsFallback() {
   );
 }
 
-export default async function Home() {
-  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, background, effects, counters, tabs } = getConfig();
+export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  // `/?preview=draft` shows the unpublished draft — to a signed-in admin only.
+  const preview = (await searchParams).preview === "draft" && (await isAdminSession());
+  const config = (preview && getDraftConfig()) || getConfig();
+  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, background, effects, counters, tabs } = config;
   const taglineGradient = rawTaglineGradient.length ? rawTaglineGradient : titleGradient;
 
   const bgVars = { '--bg-light': background.base.light, '--bg-dark': background.base.dark } as React.CSSProperties;
@@ -59,6 +67,9 @@ export default async function Home() {
       <div className="fixed bottom-4 left-4 z-30">
         <VisitorCounter showViewers={counters.viewers} showVisitors={counters.visitors} />
       </div>
+      <ConfigSync preview={preview} />
+      {effects.faviconAnimation && !preview && <FaviconAnimation gradient={titleGradient} />}
+      <ThemeSwitcher />
     </main>
   );
 }

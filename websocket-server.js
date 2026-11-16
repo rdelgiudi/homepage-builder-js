@@ -1,6 +1,8 @@
 const { createServer } = require('http');
 const next = require('next');
 const { WebSocketServer } = require('ws');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -961,10 +963,50 @@ async function refreshOverwatch() {
   return overwatchRefreshPromise;
 }
 
+// --- Config change notifications ---
+// homepage.json is re-read by Next.js whenever its mtime changes; tell connected
+// browsers so they re-render without a manual reload. Polling (watchFile) rather
+// than fs.watch because the file may be replaced by rename or live on a bind mount.
+const CONFIG_FILE = path.join(process.cwd(), 'src/config/homepage.json');
+fs.watchFile(CONFIG_FILE, { interval: 2000 }, (curr, prev) => {
+  if (curr.mtimeMs === prev.mtimeMs) return;
+  const count = broadcastMessage({ type: 'config', at: Date.now() });
+  console.log(`[${new Date().toISOString()}] [Config] homepage.json changed, notified ${count || 0} client(s)`);
+});
+
 // --- App setup ---
+
+const { isValidHash } = require('./src/lib/admin/password.js');
+
+const adminEnabled = () => !!(process.env.ADMIN_PASSWORD_HASH || process.env.ADMIN_PASSWORD) && process.env.APP_ROLE !== 'public';
+
+if (adminEnabled()) {
+  const tag = () => `[${new Date().toISOString()}] [Admin]`;
+  if (process.env.ADMIN_PASSWORD_HASH) {
+    if (!isValidHash(process.env.ADMIN_PASSWORD_HASH)) {
+      console.error(`${tag()} ADMIN_PASSWORD_HASH is not a valid hash, so nobody can sign in. Generate one with: npm run admin:hash`);
+    } else if (process.env.ADMIN_PASSWORD) {
+      console.warn(`${tag()} Both ADMIN_PASSWORD_HASH and ADMIN_PASSWORD are set. The hash is used; remove ADMIN_PASSWORD.`);
+    }
+  } else if (!dev) {
+    console.warn(`${tag()} The admin password is stored as plain text (ADMIN_PASSWORD). Run "npm run admin:hash" and use ADMIN_PASSWORD_HASH instead.`);
+  }
+}
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {
+    // The admin panel only exists when an admin password is configured and this instance isn't
+    // public-only (APP_ROLE=public). Answer with a plain 404 before Next.js is involved;
+    // the routes themselves repeat the check (src/lib/admin/auth.ts).
+    if (!adminEnabled()) {
+      const pathname = (req.url || '').split('?')[0].toLowerCase();
+      if (pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin')) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.end('Not found');
+        return;
+      }
+    }
     handle(req, res);
   });
 

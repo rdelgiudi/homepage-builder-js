@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
-import path from "path";
 import matter from "gray-matter";
 import { renderMarkdownToHtml } from "@/lib/markdown";
+import { resolveContentFile } from "@/lib/content";
 
 export const revalidate = 300;
 
-const CONTENT_DIR = path.join(process.cwd(), "src", "content");
 const cache = new Map<string, { mtimeMs: number; html: string }>();
 
 export async function GET(request: Request) {
@@ -17,7 +16,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "No file specified" }, { status: 400 });
   }
 
-  const filePath = path.join(CONTENT_DIR, file);
+  const filePath = resolveContentFile(file);
+  if (!filePath) {
+    return NextResponse.json({ error: "File not found" }, { status: 404 });
+  }
 
   let stat;
   try {

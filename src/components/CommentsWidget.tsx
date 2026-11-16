@@ -7,6 +7,8 @@ interface Comment {
   name: string;
   body: string;
   created_at: string;
+  /** Only ever set on the visitor's own comments that are waiting for approval. */
+  pending?: boolean;
 }
 
 interface CommentsWidgetProps {
@@ -130,10 +132,17 @@ export default function CommentsWidget({ limit = 50, enableGradientBorders }: Co
           {comments.map((c) => (
             <li
               key={c.id}
-              className={`p-4 rounded-lg bg-gray-100 dark:bg-gray-800${enableGradientBorders ? " gradient-border-card" : ""}`}
+              className={`p-4 rounded-lg bg-gray-100 dark:bg-gray-800${enableGradientBorders ? " gradient-border-card" : ""}${c.pending ? " opacity-70" : ""}`}
             >
               <div className="flex items-baseline justify-between gap-2">
-                <span className="font-semibold text-gray-900 dark:text-white truncate">{c.name}</span>
+                <span className="font-semibold text-gray-900 dark:text-white truncate">
+                  {c.name}
+                  {c.pending && (
+                    <span className="ml-2 align-middle text-xs font-normal px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                      Awaiting approval — only you can see this
+                    </span>
+                  )}
+                </span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
                   {new Date(c.created_at).toLocaleString()}
                 </span>

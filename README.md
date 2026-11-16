@@ -492,6 +492,29 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 └── next.config.ts
 ```
 
+## Admin panel
+
+Run `npm run admin:hash`, type a password, paste the printed `ADMIN_PASSWORD_HASH=...` line into `.env`, restart, and open `/admin`. Without an admin password the panel does not exist (`/admin` and `/api/admin/*` answer 404).
+
+The hash (salted scrypt) means the password itself is not stored anywhere — someone who gets to read `.env` or the container environment can't sign in with what they find. For local development you can set a plain `ADMIN_PASSWORD` instead; the server logs a warning if that is used in production. In Docker: `docker compose run --rm homepage-admin node scripts/admin-hash.js`.
+
+| Screen | What it does |
+|---|---|
+| **Builder** | Tabs and their widgets. Drag rows to reorder, drag a widget onto a tab to move it, click or drag from the palette to add. Selecting a row opens its settings on the right. |
+| **Site / Background / Effects** | Every other option in `homepage.json`, as forms. |
+| **Content** | Create, edit and delete the markdown files in `src/content/`, with a rendered preview. |
+| **Comments** | Approve, reject, edit, delete; block a visitor; choose whether new comments publish right away or wait for approval; hold comments containing certain words. |
+| **Integrations** | Which environment variables are set (never their values) and whether config, content and data are writable. |
+| **History** | The last 50 published versions. Loading one puts it into the draft. |
+
+**Draft and publish.** Edits are saved automatically as a *draft* (in the database) and shown in the live preview next to the forms. Nothing changes on the site until you press **Publish**, which writes `homepage.json` and tells open browser tabs to refresh. Markdown files and comment moderation are the exception: they take effect immediately.
+
+**Every option gets a form automatically.** The forms are generated from the config schema (`src/lib/schema/config.ts` and each widget's `meta.ts`), so a new option or widget needs no admin code.
+
+**Security.** One password, stored as a scrypt hash and compared in constant time; server-side sessions (7 days) in an `HttpOnly`, `SameSite=Strict` cookie; cross-site write requests are refused; 8 failed sign-ins per 10 minutes per client. For anything public-facing, the recommended setup is the two-container one in `docker-compose-example.yml`: the public container runs with `APP_ROLE=public` (no admin panel at all, config and content mounted read-only) and a second container, not routed through the public reverse proxy, serves the panel.
+
+**Hand-editing still works.** `homepage.json` stays a plain file; the panel just reads and writes it. Publishing rewrites it in the current format (v2) and keeps the previous content under History.
+
 ## Docker
 
 ```bash
@@ -499,10 +522,12 @@ cp docker-compose-example.yml docker-compose.yml
 docker compose up --build
 ```
 
-Single container with:
+Each container runs:
 - WebSocket server + Next.js + Discord presence bot (all in one Node process)
 - Named volume mounted at `/app/data` for everything written at runtime (`visitors.db`: visitor counter, comments, reactions). Override the location with `DATA_DIR`.
-- Optional bind mounts for `src/config/` and `src/content/`
+- Bind mounts for `src/config/` and `src/content/` (read-only for the public container, writable for the one serving the admin panel)
+
+The example compose file starts two containers from the same image — the public site, and the admin panel on `127.0.0.1:3001` — sharing the data volume and the config/content folders. See the comments in the file for the single-container alternative.
 
 ## Tech Stack
 
