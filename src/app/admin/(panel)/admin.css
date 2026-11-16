@@ -172,14 +172,39 @@
 
 /* ---------- work area ---------- */
 
+/* Column widths come from AdminApp (the side panels are resizable). */
 .adm-work {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 310px minmax(0, 1fr);
 }
-.adm-work.has-inspector {
-  grid-template-columns: 310px minmax(0, 1fr) 340px;
+/* Divider between a side panel and the preview: a hairline with a wider grab area. */
+.adm-resizer {
+  position: relative;
+  width: 9px;
+  margin: 0 -4px;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+}
+.adm-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+  background: var(--a-line);
+}
+.adm-resizer:hover::after,
+.adm-resizer:active::after,
+.adm-resizer:focus-visible::after {
+  left: 3px;
+  width: 3px;
+  background: var(--a-accent);
+}
+.adm-resizer:focus-visible {
+  outline: none;
 }
 .adm-full {
   flex: 1;
@@ -190,14 +215,9 @@
 }
 .adm-panel {
   background: var(--a-panel);
+  overflow-x: hidden;
   overflow-y: auto;
   min-height: 0;
-}
-.adm-panel:first-child {
-  border-right: 1px solid var(--a-line);
-}
-.adm-panel:last-child:not(:first-child) {
-  border-left: 1px solid var(--a-line);
 }
 .adm-panel-head {
   display: flex;
@@ -698,7 +718,7 @@ textarea.adm-input {
 }
 .adm-palette {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   padding: 0 8px 16px;
 }
@@ -895,6 +915,9 @@ textarea.adm-input {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
 }
+.adm-content > .adm-panel {
+  border-right: 1px solid var(--a-line);
+}
 .adm-editor {
   display: flex;
   flex-direction: column;
@@ -946,10 +969,12 @@ textarea.adm-input {
     min-height: 100vh;
   }
   .adm-work,
-  .adm-work.has-inspector,
   .adm-content {
     display: flex;
     flex-direction: column;
+  }
+  .adm-resizer {
+    display: none;
   }
   .adm-panel {
     overflow: visible;
