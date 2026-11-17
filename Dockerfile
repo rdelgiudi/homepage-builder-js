@@ -28,6 +28,7 @@ COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/websocket-server.js ./websocket-server.js
 COPY --from=builder /app/discord-presence.js ./discord-presence.js
+COPY --from=builder /app/play-history.js ./play-history.js
 COPY --from=builder /app/postcss.config.js ./postcss.config.js
 COPY --from=builder /app/tailwind.config.ts ./tailwind.config.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json

@@ -625,6 +625,9 @@ async function fetchSteamData() {
       avatarfull: player.avatarfull,
       personastate: player.personastate,
       gameextrainfo: player.gameextrainfo,
+      // For the "Play with me" widget's join link (a lobby id only; the server IP is never sent).
+      gameid: player.gameid,
+      lobbysteamid: player.lobbysteamid,
     } : null;
 
     return { player: playerObj, recentGames, ownedGames };
@@ -1108,6 +1111,15 @@ app.prepare().then(() => {
 
   if (presenceModule && typeof presenceModule.onPresenceUpdate === 'function') {
     presenceModule.onPresenceUpdate(processRawPresence);
+  }
+
+  // Game sessions for the play-history widget (local SQLite writes; opt-in via the config).
+  if (discordConfig.botToken && discordConfig.userId) {
+    try {
+      require('./play-history').start(presenceModule, CONFIG_FILE);
+    } catch (e) {
+      console.error(`[${new Date().toISOString()}] [Play History] Start error:`, e);
+    }
   }
 
   if (presenceModule && typeof presenceModule.start === 'function') {

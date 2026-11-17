@@ -20,7 +20,7 @@ const config = [
 
   // Plain Node.js files outside the Next.js bundle. They use require() by design.
   {
-    files: ["websocket-server.js", "discord-presence.js", "scripts/**/*.js", "src/lib/admin/password.js"],
+    files: ["websocket-server.js", "discord-presence.js", "play-history.js", "scripts/**/*.js", "src/lib/admin/password.js"],
     languageOptions: { sourceType: "commonjs", globals: { ...globals.node } },
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },

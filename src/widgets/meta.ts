@@ -41,6 +41,14 @@ import * as twitch from "./twitch/meta";
 import * as music from "./music/meta";
 import * as status from "./status/meta";
 import * as contact from "./contact/meta";
+import * as speedrun from "./speedrun/meta";
+import * as tetrio from "./tetrio/meta";
+import * as gameServer from "./game-server/meta";
+import * as steamRare from "./steam-rare/meta";
+import * as playHistory from "./play-history/meta";
+import * as gameShelf from "./game-shelf/meta";
+import * as playWithMe from "./play-with-me/meta";
+import * as gameSuggest from "./game-suggest/meta";
 
 export const SectionSchema = z.discriminatedUnion("type", [
   header.schema,
@@ -79,6 +87,14 @@ export const SectionSchema = z.discriminatedUnion("type", [
   music.schema,
   status.schema,
   contact.schema,
+  speedrun.schema,
+  tetrio.schema,
+  gameServer.schema,
+  steamRare.schema,
+  playHistory.schema,
+  gameShelf.schema,
+  playWithMe.schema,
+  gameSuggest.schema,
 ]);
 export type Section = z.infer<typeof SectionSchema>;
 export type SectionType = Section["type"];
@@ -122,11 +138,19 @@ export const widgetMetas: WidgetMeta[] = [
   steam.meta,
   overwatch.meta,
   chess.meta,
+  playWithMe.meta,
+  steamRare.meta,
+  playHistory.meta,
+  gameShelf.meta,
+  speedrun.meta,
+  tetrio.meta,
+  gameServer.meta,
   // community
   comments.meta,
   reactions.meta,
   poll.meta,
   contact.meta,
+  gameSuggest.meta,
 ];
 
 export const widgetMetaByType: Record<string, WidgetMeta> = Object.fromEntries(widgetMetas.map((m) => [m.type, m]));

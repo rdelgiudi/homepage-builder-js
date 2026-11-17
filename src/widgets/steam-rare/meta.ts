@@ -1,0 +1,31 @@
+import { z } from "zod";
+import { base, titleFields, frameField } from "../fields";
+import type { WidgetMeta } from "../types";
+
+export const schema = z.object({
+  ...base("steam-rare"),
+  ...titleFields,
+  ...frameField,
+  limit: z.number().int().min(1).max(20).default(6).meta({ title: "Achievements to show" }),
+  scanGames: z
+    .number()
+    .int()
+    .min(5)
+    .max(100)
+    .default(40)
+    .meta({ title: "Games to look through", description: "Your most-played games. More = a slower first load (refreshed every 6 hours)" }),
+  layout: z.enum(["list", "grid"]).default("list").meta({ title: "Layout" }),
+});
+
+export type SteamRareSection = z.infer<typeof schema>;
+
+export const meta = {
+  type: "steam-rare",
+  label: "Rarest achievements",
+  icon: "🏆",
+  category: "gaming",
+  description: "Your rarest unlocked Steam achievements, by global unlock rate",
+  schema,
+  defaults: { limit: 6, scanGames: 40, layout: "list" },
+  requiresEnv: ["STEAM_API_KEY", "STEAM_ID"],
+} satisfies WidgetMeta;

@@ -9,6 +9,7 @@ import { BackgroundScreen, EffectsScreen, SiteScreen } from "./ConfigScreens";
 import ContentScreen from "./ContentScreen";
 import CommentsScreen from "./CommentsScreen";
 import InboxScreen from "./InboxScreen";
+import SuggestionsScreen from "./SuggestionsScreen";
 import { HistoryScreen, IntegrationsScreen } from "./OtherScreens";
 
 const SCREENS = [
@@ -19,6 +20,7 @@ const SCREENS = [
   { id: "content", label: "Content" },
   { id: "comments", label: "Comments" },
   { id: "inbox", label: "Inbox" },
+  { id: "suggestions", label: "Suggestions" },
   { id: "integrations", label: "Integrations" },
   { id: "history", label: "History" },
 ] as const;
@@ -120,6 +122,7 @@ function Shell() {
   const [screen, setScreen] = useState<ScreenId>("builder");
   const [pending, setPending] = useState(0);
   const [unread, setUnread] = useState(0);
+  const [suggested, setSuggested] = useState(0);
   const panels = usePanelWidths();
 
   // The screen lives in the URL hash so a reload stays put.
@@ -145,6 +148,9 @@ function Shell() {
       .catch(() => {});
     api<{ counts: { unread: number } }>("messages?counts=1")
       .then((d) => setUnread(d.counts.unread))
+      .catch(() => {});
+    api<{ counts: { unread: number } }>("suggestions?counts=1")
+      .then((d) => setSuggested(d.counts.unread))
       .catch(() => {});
   }, []);
   useEffect(() => {
@@ -191,6 +197,7 @@ function Shell() {
             {s.label}
             {s.id === "comments" && pending > 0 && <span className="adm-count is-draft">{pending}</span>}
             {s.id === "inbox" && unread > 0 && <span className="adm-count is-draft">{unread}</span>}
+            {s.id === "suggestions" && suggested > 0 && <span className="adm-count is-draft">{suggested}</span>}
           </button>
         ))}
       </nav>
@@ -257,6 +264,7 @@ function Shell() {
           {screen === "content" && <ContentScreen />}
           {screen === "comments" && <CommentsScreen onCounts={setPending} />}
           {screen === "inbox" && <InboxScreen onCounts={setUnread} />}
+          {screen === "suggestions" && <SuggestionsScreen onCounts={setSuggested} />}
           {screen === "integrations" && <IntegrationsScreen />}
           {screen === "history" && <HistoryScreen onLoaded={() => go("builder")} />}
         </main>

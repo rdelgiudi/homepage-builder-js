@@ -1,6 +1,6 @@
 # Project Overview
 
-Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON config: 36 widget types (Discord, Steam, Overwatch, GitHub, guestbook, reactions, polls, contact form, weather, feeds, YouTube, Twitch, …), five site layouts, configurable backgrounds and canvas effects, real-time WebSocket updates, and an optional admin panel (`/admin`) with a drag-and-drop builder, live draft preview and publish.
+Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON config: 44 widget types (Discord, Steam, Overwatch, GitHub, guestbook, reactions, polls, contact form, game recommendations, weather, feeds, YouTube, Twitch, Speedrun.com, TETR.IO, game servers, play history, …), five site layouts, configurable backgrounds and canvas effects, real-time WebSocket updates, and an optional admin panel (`/admin`) with a drag-and-drop builder, live draft preview and publish.
 
 ## Architecture
 
@@ -26,6 +26,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   │   ├── reactions/route.ts   # Anonymous emoji reactions (SQLite, GET counts + POST/DELETE, broadcasts to all clients)
 │   │   │   ├── poll/route.ts        # Poll results (GET) and voting (POST); SQLite poll_votes
 │   │   │   ├── contact/route.ts     # Contact form POST → private `messages` row (rate limit, honeypot, block check)
+│   │   │   ├── game-suggestions/    # GET public top list, POST a suggestion (app id checked with Steam); search/ = rate-limited Steam store search
 │   │   │   ├── presence/route.ts    # Snapshot of current Discord presence (force-dynamic; reads in-memory server state)
 │   │   │   ├── steam/route.ts       # Snapshot of current Steam data (force-dynamic; reads in-memory server state)
 │   │   │   ├── overwatch/route.ts   # Snapshot of current Overwatch data (force-dynamic; reads in-memory server state)
@@ -40,6 +41,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   │       ├── content/         # Markdown files: list/read, PUT, DELETE, POST = render preview
 │   │   │       ├── comments/        # GET list by status, POST bulk; [id] PATCH/DELETE; settings PUT
 │   │   │       ├── messages/        # Inbox: GET list (unread/all, ?counts=1), POST bulk; [id] PATCH (read, blockAuthor)/DELETE
+│   │   │       ├── suggestions/     # Game suggestions grouped by game: GET (new/all, ?counts=1), POST game action (read/unread/status/delete); [id] PATCH blockAuthor/DELETE
 │   │   │       └── integrations/    # Which env vars are set, what is writable
 │   │   ├── admin/
 │   │   │   ├── layout.tsx           # Guard only: notFound() when admin is disabled
@@ -92,6 +94,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │       ├── ContentScreen.tsx    # Markdown files editor
 │   │       ├── CommentsScreen.tsx   # Moderation queue, settings, audit log
 │   │       ├── InboxScreen.tsx      # Contact-form messages: unread/all, mark read, reply by email, block, delete
+│   │       ├── SuggestionsScreen.tsx # Game suggestions per game: status (will play / played / dismissed…), read, block, delete
 │   │       ├── OtherScreens.tsx     # Integrations, History
 │   │       ├── LoginForm.tsx
 │   │       └── api.ts               # fetch helper for /api/admin/*
@@ -124,8 +127,12 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   ├── content.ts               # CONTENT_DIR + resolveContentFile() (plain *.md names only)
 │   │   ├── markdown.ts              # Server-side markdown → HTML (marked), mtime-cached
 │   │   ├── widget-data.ts           # cached(), getJson/getText, findSection(), htmlToText(), httpUrl(), WidgetError
-│   │   └── widget-sources.ts        # weather, chess, bluesky, github-activity, rss, mastodon, youtube, twitch, music, status fetchers
-│   ├── widgets/                     # Widget registry — one folder per section type (36 types)
+│   │   ├── widget-sources.ts        # weather, chess, bluesky, github-activity, rss, mastodon, youtube, twitch, music, status fetchers (+ spreads gamingSources)
+│   │   ├── gaming-sources.ts        # speedrun, tetrio, game-server, steam-rare, play-history sources + pure mappers (unit-tested)
+│   │   ├── a2s.ts                   # Valve A2S_INFO over UDP (challenge handshake), parseA2SReply(), parseServerAddress()
+│   │   ├── play-history.ts          # Reads play_sessions; summarizePlay() (per-day minutes in a time zone, top games) — pure, unit-tested
+│   │   └── game-suggestions.ts      # game_suggestions + suggested_games tables, Steam store search/appdetails lookups, topSuggested()
+│   ├── widgets/                     # Widget registry — one folder per section type (44 types)
 │   │   ├── <type>/meta.ts           # Server-safe: zod options schema, label, icon, category, defaults, requiresEnv
 │   │   ├── <type>/render.tsx        # Client: WidgetView { titled, frame, render(section, ctx) }
 │   │   ├── embed/player.ts          # toPlayer(): link → player URL (kept in .ts so tests can import it)
@@ -148,6 +155,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   └── fixtures/homepage.v1.json    # Original v1 config — proves old configs still load
 ├── scripts/admin-hash.js            # `npm run admin:hash` — prints an ADMIN_PASSWORD_HASH line
 ├── discord-presence.js              # Discord.js bot (in-process; exports start/onPresenceUpdate)
+├── play-history.js                  # Game-session recorder (CommonJS, in-process): presence → play_sessions, opt-in via the config
 ├── websocket-server.js              # Custom Next.js server + WebSocket; Steam/Overwatch polling, presence enrichment, config file watch
 ├── docker-entrypoint.sh             # Execs websocket-server (presence runs in-process)
 ├── Dockerfile                       # Multi-stage (node:26 alpine): deps → builder → runner
@@ -250,6 +258,14 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - **twitch** — Live status (`username`, `hideOffline`). Needs `TWITCH_CLIENT_ID` + `TWITCH_CLIENT_SECRET`.
 - **music** — Recently played (`service`: `listenbrainz` | `lastfm`, `username`, `limit`, `showCovers`).
 - **status** — Service status board (`services: [{ label, url, icon? }]` max 20, `showLatency`, `linked`).
+- **speedrun** — Speedrun.com personal bests (`username`, `sort`: `place` | `recent`, `limit`, `levels`).
+- **tetrio** — TETR.IO profile: Tetra League rank/TR/APM/PPS + 40L, Blitz, Quick Play records (`username`, `showRecords`).
+- **game-server** — Minecraft (Java/Bedrock via mcsrvstat.us) and Source/A2S server status (`servers: [{ label, protocol, address, icon? }]` max 10, `showPlayers`, `showAddress`).
+- **steam-rare** — Rarest unlocked Steam achievements by global unlock rate (`limit`, `scanGames` = most-played games looked through, `layout`). Needs `STEAM_API_KEY` + `STEAM_ID`.
+- **play-history** — Heatmap of hours played per day, recorded from Discord presence (`months`, `timezone`, `showGames`, `showRecent`, `hideGames`). Needs the Discord bot.
+- **game-shelf** — Game covers/list (`items: [{ title, appid?, image?, url?, status?, rating? 1–5, note? }]`, `layout`: `covers` | `list`, `columns`).
+- **play-with-me** — Live "up for a game?" card from Discord + Steam status (`availability`: `auto` | `open` | `busy`, `note`, `games`, `showSteam`, `showDiscord`, `joinLink`).
+- **game-suggest** — Visitors search Steam and suggest a game (`intro`, `askName`, `buttonText`, `successText`, `showList`). Suggestions land in the admin **Suggestions** screen.
 
 ## Critical Gotchas
 
@@ -359,6 +375,31 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - Uploaded images are re-encoded with `sharp(input, { animated: true })`, so animated GIF/WebP uploads (88×31 buttons) keep their frames.
 - `src/lib/url.ts` holds `httpUrl()` so client widgets can sanitize config links without importing `widget-data.ts` (which pulls in the config loader).
 
+### Gaming widgets (speedrun, tetrio, game-server, steam-rare, play-history, game-shelf, play-with-me)
+- Sources live in `src/lib/gaming-sources.ts` and are spread into `widgetSources`, so they go through `/api/widgets/<type>` and `cached()` like the other data widgets. TTLs: speedrun 30 min, tetrio 10 min, game-server 1 min, steam-rare 6 h (each game's achievements 12 h), play-history 5 min.
+- **Fixed hosts** (speedrun, tetrio) take a validated username from the query. **game-server** takes a section id (`findSection`), because the owner types the addresses and A2S sends UDP to them; **steam-rare** takes a section id because it spends `STEAM_API_KEY`.
+- **A2S** (`src/lib/a2s.ts`): only A2S_INFO (one packet). Modern servers first answer `0x41` + a 4-byte challenge that must be appended to a resent request; the parser ignores split (`0xFFFFFFFE`) packets. 3 s timeout, DNS resolved first so IPv6 hosts work. Player count = players − bots.
+- **mcsrvstat.us** gets the address exactly as typed: it resolves Minecraft SRV records only when no port is given (`2b2t.org` is online, `2b2t.org:25565` is not), so never append a default port for Minecraft. A2S does get the default 27015.
+- **mcsrvstat.us** returns a MOTD with HTML entities in `clean` (decoded) and a base64 `icon`; only a `data:image/png;base64,` icon under 30 kB is passed on. Player names are filtered to plain characters.
+- **steam-rare**: `GetOwnedGames` (with `include_appinfo`) → the `scanGames` most-played games that have stats → per game `GetPlayerAchievements` (unlocked only), `GetGlobalAchievementPercentagesForApp` (no key; `percent` is a **string** now — always `Number()` it) and `GetSchemaForGame` (display names + icons). 4 games in flight at once. A private "Game details" setting shows a clear error.
+- **TETR.IO** (`ch.tetr.io/api/users/<name>` + `/summaries`): league `rank` `"z"` = unranked this season, `standing: -1` = no global rank; Quick Play altitude is under `zenith.record` or, outside the current week, `zenith.best.record`. TETR.IO and Speedrun.com block some image requests (Speedrun.com covers sit behind a Cloudflare challenge; TETR.IO rejects headless browsers), so their `<img>`s fall back to an initial on `onError` — don't remove that.
+- **game-shelf** is static (no endpoint). Covers try the owner's image, then `store_item_assets/steam/apps/<appid>/library_600x900.jpg`, then `header.jpg` (both plain paths still work for new games), then a title tile.
+- **play-with-me** is client-only: it subscribes to the existing `presence` and `steam` WS messages and fetches `/api/presence` + `/api/steam` on mount. Logic is in `widgets/play-with-me/status.ts` (pure, unit-tested). `fetchSteamData` passes `gameid` and `lobbysteamid` for the opt-in `steam://joinlobby` link — **never** `gameserverip`.
+
+### Play history recorder (`play-history.js` + `src/lib/play-history.ts`)
+- `websocket-server.js` starts `play-history.js` (CommonJS — it can't use `db.ts`) when the Discord bot env vars are set. It opens its **own** better-sqlite3 connection to `DATA_DIR/visitors.db` (same path logic as `db.ts`, WAL, `busy_timeout`) and registers a **separate** `onPresenceUpdate` callback — not inside `processRawPresence`, whose idle skip would stop recording while nobody is on the site (a local write costs nothing).
+- **Opt-in**: it records only while the *published* `homepage.json` contains a `play-history` section (re-read when the mtime changes); removing the widget closes open sessions. The draft doesn't count.
+- `play_sessions(game, started_at, ended_at, open)`: a row per Discord "Playing" activity (type 0) while status ≠ offline. Open rows get `ended_at = now` every 60 s (heartbeat), so after a crash a session ends at its last heartbeat; on startup all rows are closed. A new session is back-dated to Discord's start time (≤ 12 h) but never before the game's last recorded `ended_at`, so restarts don't double-count. Rows older than 400 days are deleted on startup.
+- The reader (`summarizePlay`) splits sessions at local midnight in the widget's `timezone` (invalid → UTC), ignores sessions < 2 min (launcher flicker), applies `hideGames` (case-insensitive; still recorded), and reports "playing now" only for open rows with a heartbeat < 3 min old. Levels: ≥1 min, ≥1 h, ≥2 h, ≥4 h.
+- `play-history.js` must be listed wherever the other root CommonJS files are: `Dockerfile` (runner `COPY`), `eslint.config.mjs` (CommonJS block) and `tests/integration/server.ts` (`LINKED`).
+
+### Game recommendations (`game-suggest` + `/api/game-suggestions` + `/api/admin/suggestions`)
+- Search: `GET /api/game-suggestions/search?id=<section>&q=` → Steam `storesearch` (no key), only for a `game-suggest` section on the site (so it isn't an open search proxy). Terms 2–60 chars, cached 1 h per term; soundtracks/artbooks filtered out. Limits: 30 searches/min per visitor hash (a first search sets the `visitor_id` cookie) and 60 *uncached* searches/min overall. The widget debounces 350 ms and aborts stale requests.
+- Submit: `POST /api/game-suggestions { id, appid, name?, note?, website? }`. The client sends **only the app id**; the server checks it with `appdetails` (`type === "game"`, cached 24 h) and stores Steam's title — never a title from the request. Honeypot `website` (201, nothing stored), `isBlocked()` (same `blocked_visitors` as comments/messages), 1 per visitor per 20 s + 30 per 10 min overall — counted **before** the Steam lookup, so invalid app ids can't be used to hammer the store (whose `appdetails` the Steam widget's name lookup also uses) — `cleanText()` for name (40) and note (300).
+- Tables (`src/lib/game-suggestions.ts`): `game_suggestions` (one row per visitor per game, `UNIQUE(appid, visitor_hash)`; suggesting again replaces the note and marks it unread, answered with `again: true`) and `suggested_games` (title + owner status `open | planned | playing | played | dismissed`).
+- `GET /api/game-suggestions?id=` is the public top 10 (only when the section has `showList`); dismissed games never appear, and only `appid/title/status/count` leave the server.
+- Admin: the **Suggestions** screen groups by game; status, read/unread and delete act on the game, block/delete on one suggestion. Its nav badge is polled every 30 s with the comments/inbox badges. Deletes and blocks are audited (`suggestion.*`).
+
 ### Widget registry (`src/widgets/`)
 - Adding a widget = `src/widgets/<type>/meta.ts` + `render.tsx`, then one line each in `widgets/meta.ts` (`SectionSchema` + `widgetMetas`) and `widgets/registry.tsx` (`views`). The `views` map is typed against `SectionType`, so a missing renderer is a compile error.
 - **`meta.ts` must stay server-safe and `render.tsx` must only `import type` from it.** `registry.tsx` is pulled into the client bundle through `TabSections.tsx`; a runtime import of a meta file would ship zod to the browser. Conversely the config loader imports `widgets/meta.ts` on the server, so meta files must never import React components.
@@ -367,7 +408,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - The widget components themselves still live in `src/components/`.
 
 ### Runtime data lives in `DATA_DIR`
-- Everything the app writes goes under `DATA_DIR` (default `<cwd>/data`, `/app/data` in Docker), exported from `src/lib/db.ts`: `visitors.db` (+ `-wal`/`-shm`; visitors, comments, reactions, poll votes, contact messages, admin sessions/draft/revisions/audit log) and `uploads/` (background media). New writable state belongs there too, so one read-write volume persists it. `homepage.json` is the exception — it lives in `src/config/`.
+- Everything the app writes goes under `DATA_DIR` (default `<cwd>/data`, `/app/data` in Docker), exported from `src/lib/db.ts`: `visitors.db` (+ `-wal`/`-shm`; visitors, comments, reactions, poll votes, contact messages, game suggestions, play sessions, admin sessions/draft/revisions/audit log) and `uploads/` (background media). New writable state belongs there too, so one read-write volume persists it. `homepage.json` is the exception — it lives in `src/config/`.
 - On first `getDb()`, if `DATA_DIR/visitors.db` doesn't exist but the old `<cwd>/visitors.db` file does, it is copied with `VACUUM INTO` (consistent snapshot including un-checkpointed WAL; original left untouched).
 
 ### `HOST` vs `HOSTNAME`
@@ -687,7 +728,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - **No SQLite in unit tests:** `db.ts` loads better-sqlite3 with `require()`, which doesn't exist in the ES-module scope Node uses for `.ts` files. Code that touches the database is covered by the integration tests instead (or takes its inputs as parameters, like `initialStatus(name, body, settings)`).
 - The `MODULE_TYPELESS_PACKAGE_JSON` warning is silenced in the scripts. Don't add `"type": "module"` to `package.json` to get rid of it — that would turn `websocket-server.js` and the other CommonJS files into ES modules and break them.
 - `tests/fixtures/homepage.v1.json` is the original v1 example (from before config v2). Keep it as is: it is what proves old configs still load.
-- **Integration tests** (`tests/integration/server.ts`) start the built `websocket-server.js` in production mode in a temp folder with symlinks to `.next`, `node_modules` etc., their own `homepage.json`, content and `DATA_DIR`, on a free port. Every integration env var is set to an empty string so the real `.env` (dotenv never overrides a set variable) can't log the Discord bot in. Node's `fetch` keeps no cookies and sends no `Origin`; the `Client` helper does both. Limits to keep in mind when adding tests: 8 failed sign-ins per server start, one comment per visitor per 5s, one poll vote per visitor per second, one contact message per visitor per 30s (30 per 10 min in total).
+- **Integration tests** (`tests/integration/server.ts`) start the built `websocket-server.js` in production mode in a temp folder with symlinks to `.next`, `node_modules` etc., their own `homepage.json`, content and `DATA_DIR`, on a free port. Every integration env var is set to an empty string so the real `.env` (dotenv never overrides a set variable) can't log the Discord bot in. Node's `fetch` keeps no cookies and sends no `Origin`; the `Client` helper does both. Limits to keep in mind when adding tests: 8 failed sign-ins per server start, one comment per visitor per 5s, one poll vote per visitor per second, one contact message per visitor per 30s (30 per 10 min in total), one game suggestion per visitor per 20s (30 per 10 min). Valid suggestions and searches need Steam, so the tests only cover the paths that don't reach it.
 - Tests are type-checked by `tsc` and by `next build` (tsconfig includes `**/*.ts`), so **a type error in a test fails the production and Docker build**. Use `@/` imports, not `.ts` extensions.
 - `tests/unit/tailwind.test.ts` fails when a folder with `.tsx` files is missing from Tailwind's `content` list (the Phase 0 regression where widget styles were silently dropped).
 

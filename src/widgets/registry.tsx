@@ -42,6 +42,14 @@ import { view as twitch } from "./twitch/render";
 import { view as music } from "./music/render";
 import { view as status } from "./status/render";
 import { view as contact } from "./contact/render";
+import { view as speedrun } from "./speedrun/render";
+import { view as tetrio } from "./tetrio/render";
+import { view as gameServer } from "./game-server/render";
+import { view as steamRare } from "./steam-rare/render";
+import { view as playHistory } from "./play-history/render";
+import { view as gameShelf } from "./game-shelf/render";
+import { view as playWithMe } from "./play-with-me/render";
+import { view as gameSuggest } from "./game-suggest/render";
 
 const views: { [K in SectionType]: WidgetView<Extract<Section, { type: K }>> } = {
   header,
@@ -80,6 +88,14 @@ const views: { [K in SectionType]: WidgetView<Extract<Section, { type: K }>> } =
   music,
   status,
   contact,
+  speedrun,
+  tetrio,
+  "game-server": gameServer,
+  "steam-rare": steamRare,
+  "play-history": playHistory,
+  "game-shelf": gameShelf,
+  "play-with-me": playWithMe,
+  "game-suggest": gameSuggest,
 };
 
 /** Renders one section: optional title row, optional gradient frame, then the widget body. */

@@ -11,7 +11,7 @@ import path from "node:path";
 
 const ROOT = path.join(import.meta.dirname, "../..");
 /** Linked into the throwaway folder; everything else there is the test's own. */
-const LINKED = [".next", "node_modules", "package.json", "next.config.ts", "websocket-server.js", "discord-presence.js"];
+const LINKED = [".next", "node_modules", "package.json", "next.config.ts", "websocket-server.js", "discord-presence.js", "play-history.js"];
 
 export interface TestServer {
   url: string;

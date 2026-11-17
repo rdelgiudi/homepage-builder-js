@@ -3,6 +3,7 @@
  * Called by /api/widgets/[type]. Fixed-host sources take validated values from the query;
  * sources whose host the site owner chose (rss, mastodon) take a section id instead.
  */
+import { gamingSources } from "@/lib/gaming-sources";
 import { cached, decodeEntities, findSection, getJson, getText, htmlToText, httpUrl, USER_AGENT, WidgetError } from "@/lib/widget-data";
 
 const MIN = 60 * 1000;
@@ -497,4 +498,5 @@ export const widgetSources: Record<string, (params: Params) => Promise<unknown>>
   twitch,
   music,
   status,
+  ...gamingSources,
 };

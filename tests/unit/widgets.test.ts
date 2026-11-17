@@ -7,6 +7,11 @@ import { zonedTimeToMs, zoneOffsetMinutes } from "@/widgets/time";
 import { initialStatus } from "@/lib/comments";
 import { backgroundLayer } from "@/lib/background";
 import { BackgroundBaseSchema } from "@/lib/schema/config";
+import { infoRequest, parseA2SReply, parseServerAddress } from "@/lib/a2s";
+import { minecraftStatus, rareAchievements, speedrunRun, tetrioLevel, tetrioProfile } from "@/lib/gaming-sources";
+import { summarizePlay } from "@/lib/play-history";
+import { playStatus } from "@/widgets/play-with-me/status";
+import { searchTerm, storeResults } from "@/lib/game-suggestions";
 
 describe("feed parsing", () => {
   it("reads RSS items, including CDATA and entities", () => {
@@ -234,5 +239,204 @@ describe("contact messages", () => {
     assert.ok(!isEmail("me@example"));
     assert.ok(!isEmail("me example@x.com"));
     assert.ok(!isEmail("<a>@x.com"));
+  });
+});
+
+describe("A2S server query", () => {
+  const info = (extra: number[] = []) =>
+    Buffer.concat([
+      Buffer.from([0xff, 0xff, 0xff, 0xff, 0x49, 17]),
+      Buffer.from("My Server\0de_dust2\0csgo\0Counter-Strike 2\0", "utf8"),
+      Buffer.from([0xda, 0x02, 12, 24, 2, 0x64, 0x6c, 0, 1]),
+      Buffer.from("1.40.2.3\0", "utf8"),
+      Buffer.from(extra),
+    ]);
+
+  it("reads an A2S_INFO answer", () => {
+    const reply = parseA2SReply(info([0x80, 0x87, 0x69]));
+    assert.equal(reply?.kind, "info");
+    if (reply?.kind !== "info") return;
+    assert.deepEqual(
+      { ...reply.info },
+      { name: "My Server", map: "de_dust2", folder: "csgo", game: "Counter-Strike 2", appId: 730, players: 12, maxPlayers: 24, bots: 2, serverType: "d", environment: "l", passworded: false, vac: true, version: "1.40.2.3" }
+    );
+  });
+
+  it("returns the challenge so the request can be sent again", () => {
+    const reply = parseA2SReply(Buffer.from([0xff, 0xff, 0xff, 0xff, 0x41, 1, 2, 3, 4]));
+    assert.equal(reply?.kind, "challenge");
+    if (reply?.kind === "challenge") {
+      assert.deepEqual([...reply.challenge], [1, 2, 3, 4]);
+      assert.deepEqual([...infoRequest(reply.challenge).subarray(-4)], [1, 2, 3, 4]);
+    }
+  });
+
+  it("ignores truncated, split and unknown packets", () => {
+    assert.equal(parseA2SReply(info().subarray(0, 20)), null);
+    assert.equal(parseA2SReply(Buffer.from([0xfe, 0xff, 0xff, 0xff, 0x49])), null);
+    assert.equal(parseA2SReply(Buffer.from([0xff, 0xff, 0xff, 0xff, 0x6d, 0])), null);
+  });
+
+  it("accepts host[:port] only", () => {
+    assert.deepEqual(parseServerAddress("play.example.com", 27015), { host: "play.example.com", port: 27015 });
+    assert.deepEqual(parseServerAddress("10.0.0.5:27016", 27015), { host: "10.0.0.5", port: 27016 });
+    assert.equal(parseServerAddress("http://example.com", 27015), null);
+    assert.equal(parseServerAddress("example.com:99999", 27015), null);
+    assert.equal(parseServerAddress("a b", 27015), null);
+  });
+});
+
+describe("gaming sources", () => {
+  it("maps a Speedrun.com personal best, with the level in the category", () => {
+    const run = speedrunRun({
+      place: 2,
+      run: { weblink: "https://www.speedrun.com/game/runs/abc", date: "2026-01-02", times: { primary_t: 145.976 }, level: "x" },
+      game: { data: { names: { international: "Game" }, weblink: "https://www.speedrun.com/game", assets: { "cover-medium": { uri: "https://www.speedrun.com/static/game/1/cover" } } } },
+      category: { data: { name: "Any%" } },
+      level: { data: { name: "1-3" } },
+    });
+    assert.deepEqual(run, { game: "Game", category: "1-3: Any%", level: true, place: 2, seconds: 145.976, date: "2026-01-02", url: "https://www.speedrun.com/game/runs/abc", cover: "https://www.speedrun.com/static/game/1/cover" });
+    const full = speedrunRun({ ...{ place: 1, run: { weblink: "javascript:alert(1)", date: null, times: { primary_t: 1 }, level: null } }, game: { data: { names: { international: "G" }, weblink: "" } }, category: { data: { name: "Any%" } }, level: { data: [] } });
+    assert.equal(full.category, "Any%");
+    assert.equal(full.level, false);
+    assert.equal(full.url, null);
+  });
+
+  it("reads a TETR.IO profile and its records", () => {
+    const p = tetrioProfile(
+      { _id: "5e32fc85ab319c2ab1beb07c", username: "osk", role: "user", xp: 1525202, gamesplayed: 1936, gameswon: 240, gametime: 504015, country: "XM", avatar_revision: 17 },
+      {
+        "40l": { record: { results: { stats: { finaltime: 49091.6 } } }, rank: 1 },
+        blitz: { record: null, rank: -1 },
+        zenith: { record: null, best: { record: { results: { stats: { zenith: { altitude: 1127.09 } } } } } },
+        league: { gamesplayed: 14, gameswon: 8, tr: 9499.13, gxe: 60.9097, rank: "z", bestrank: "a-", apm: 35.59, pps: 1.44, vs: 75.57, standing: -1 },
+      }
+    );
+    assert.equal(p.level, tetrioLevel(1525202));
+    assert.equal(p.sprint, 49091.6);
+    assert.equal(p.blitz, null);
+    assert.equal(p.zenith, 1127.09);
+    assert.equal(p.league?.rank, "z");
+    assert.equal(p.league?.standing, null);
+    assert.equal(p.hours, 140);
+    assert.match(p.avatar!, /^https:\/\/tetr\.io\/user-content\/avatars\/5e32fc85ab319c2ab1beb07c\.jpg\?rv=17$/);
+    assert.equal(tetrioProfile({ _id: "x", username: "new", role: "user", xp: 0, gamesplayed: 0, gameswon: 0, gametime: -1, country: null }, {}).league, null);
+  });
+
+  it("reads a Minecraft status and keeps only a PNG data URL as the icon", () => {
+    const s = minecraftStatus({ online: true, version: "1.21", motd: { clean: ["  &gt;&gt; Welcome  ", ""] }, players: { online: 3, max: 20, list: [{ name: "Steve" }, { name: "<b>x</b>" }] }, icon: "data:image/png;base64,AAAA" });
+    assert.equal(s.name, ">> Welcome");
+    assert.deepEqual(s.names, ["Steve"]);
+    assert.equal(s.icon, "data:image/png;base64,AAAA");
+    assert.equal(minecraftStatus({ online: true, icon: "javascript:alert(1)" }).icon, null);
+    assert.equal(minecraftStatus({ online: false }).online, false);
+  });
+
+  it("joins unlocked achievements with their global rate", () => {
+    const list = rareAchievements(
+      10,
+      "Game",
+      [
+        { apiname: "A", achieved: 1, unlocktime: 1700000000 },
+        { apiname: "B", achieved: 0, unlocktime: 0 },
+        { apiname: "C", achieved: 1, unlocktime: 0 },
+      ],
+      [
+        { name: "A", percent: "3.4" },
+        { name: "B", percent: 1 },
+      ],
+      [{ name: "A", displayName: "Alpha", description: "Do it", icon: "https://cdn.example/a.jpg" }]
+    );
+    assert.deepEqual(list, [{ appid: 10, game: "Game", name: "Alpha", description: "Do it", icon: "https://cdn.example/a.jpg", percent: 3.4, unlockedAt: "2023-11-14T22:13:20.000Z" }]);
+  });
+});
+
+describe("play history", () => {
+  const H = 3600 * 1000;
+  const now = Date.parse("2026-11-17T12:00:00Z");
+
+  it("splits sessions at local midnight and totals per game", () => {
+    // 22:00–02:00 in Rome (UTC+1 in November) = 21:00–01:00 UTC.
+    const s = summarizePlay([{ game: "Hades", started_at: Date.parse("2026-11-15T21:00:00Z"), ended_at: Date.parse("2026-11-16T01:00:00Z"), open: 0 }], { weeks: 4, timeZone: "Europe/Rome", now });
+    assert.equal(s.days.length, 28);
+    assert.equal(s.days.at(-1)!.date, "2026-11-17");
+    assert.equal(s.days.find((d) => d.date === "2026-11-15")!.minutes, 120);
+    assert.equal(s.days.find((d) => d.date === "2026-11-16")!.minutes, 120);
+    assert.equal(s.days.find((d) => d.date === "2026-11-16")!.level, 3);
+    assert.deepEqual(s.games, [{ name: "Hades", minutes: 240 }]);
+    assert.equal(s.totalMinutes, 240);
+  });
+
+  it("drops flicker, hidden games and time before the range, and knows what is playing now", () => {
+    const s = summarizePlay(
+      [
+        { game: "Blip", started_at: now - 3 * H, ended_at: now - 3 * H + 60000, open: 0 },
+        { game: "Secret", started_at: now - 2 * H, ended_at: now - H, open: 0 },
+        { game: "Old", started_at: now - 400 * 24 * H, ended_at: now - 399 * 24 * H, open: 0 },
+        { game: "Now", started_at: now - H, ended_at: now - 60000, open: 1 },
+      ],
+      { weeks: 4, timeZone: "UTC", now, hide: ["secret"] }
+    );
+    assert.deepEqual(s.games, [{ name: "Now", minutes: 59 }]);
+    assert.deepEqual(s.playing, ["Now"]);
+    assert.equal(s.recent.some((r) => r.game === "Blip" || r.game === "Secret"), false);
+  });
+
+  it("falls back to UTC for an unknown time zone", () => {
+    assert.equal(summarizePlay([], { weeks: 4, timeZone: "Mars/Olympus", now }).timeZone, "UTC");
+  });
+});
+
+describe("play with me", () => {
+  const steam = { player: { steamid: "76561198000000000", personastate: 1, gameid: "730", lobbysteamid: "109775240000000000" } };
+
+  it("prefers the Discord game and builds a Steam join link from a lobby", () => {
+    const s = playStatus({ id: "123", status: "online", activities: [{ type: 2, name: "Spotify" }, { type: 0, name: "Hades", timestamps: { start: 5 } }] }, steam, "auto");
+    assert.equal(s.state, "playing");
+    assert.equal(s.game, "Hades");
+    assert.equal(s.since, 5);
+    assert.equal(s.join, "steam://joinlobby/730/109775240000000000/76561198000000000");
+  });
+
+  it("follows the status, unless the owner overrides it", () => {
+    assert.equal(playStatus({ status: "dnd", activities: [] }, null, "auto").state, "busy");
+    assert.equal(playStatus({ status: "idle", activities: [] }, null, "auto").state, "away");
+    assert.equal(playStatus({ status: "offline", activities: [] }, { player: { personastate: 0 } }, "auto").state, "offline");
+    assert.equal(playStatus(null, null, "auto").state, "unknown");
+    assert.equal(playStatus(null, null, "open").state, "open");
+    const busy = playStatus({ status: "online", activities: [{ type: 0, name: "Hades" }] }, steam, "busy");
+    assert.equal(busy.state, "busy");
+    assert.equal(busy.join, null);
+  });
+
+  it("never builds a link from ids that aren't numbers", () => {
+    const s = playStatus({ id: "javascript:x" }, { player: { steamid: "1", gameid: "730", lobbysteamid: "x" } }, "auto");
+    assert.equal(s.discordId, null);
+    assert.equal(s.steamId, null);
+    assert.equal(s.join, null);
+  });
+});
+
+describe("game suggestions", () => {
+  it("normalises search terms and rejects ones that are too short or long", () => {
+    assert.equal(searchTerm("  Hollow\tKnight "), "hollow knight");
+    assert.equal(searchTerm("a"), null);
+    assert.equal(searchTerm("x".repeat(61)), null);
+    assert.equal(searchTerm(null), null);
+  });
+
+  it("keeps only apps from the store's search answer", () => {
+    assert.deepEqual(
+      storeResults({
+        items: [
+          { type: "app", name: "Hollow Knight", id: 367520 },
+          { type: "sub", name: "Bundle", id: 1 },
+          { type: "app", name: "Bad", id: -1 },
+          { type: "app", name: "Hollow Knight - Official Soundtrack", id: 598190 },
+        ],
+      }),
+      [{ appid: 367520, title: "Hollow Knight" }]
+    );
+    assert.deepEqual(storeResults({}), []);
   });
 });

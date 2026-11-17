@@ -108,6 +108,8 @@ describe("admin panel switched on", () => {
       draft.name = "Draft Only Name";
       draft.tabs[0].sections.push({ id: "test-poll", type: "poll", question: "Pasta?", options: ["Carbonara", "Amatriciana"] });
       draft.tabs[0].sections.push({ id: "test-contact", type: "contact", askEmail: "optional" });
+      draft.tabs[0].sections.push({ id: "test-suggest", type: "game-suggest", showList: true });
+      draft.tabs[0].sections.push({ id: "test-history", type: "play-history", timezone: "Europe/Rome", months: 2 });
       assert.equal((await admin.json("/api/admin/config", { method: "PUT", json: { config: draft } })).status, 200);
 
       assert.doesNotMatch(await (await fetch(server.url + "/")).text(), /Draft Only Name/, "the live site");
@@ -211,6 +213,53 @@ describe("admin panel switched on", () => {
       assert.equal((await visitor.json("/api/contact", { json: { id: "test-contact", name: "Pest", body: "second" } })).status, 403);
       assert.equal((await admin.json(`/api/admin/messages/${id}`, { method: "DELETE" })).status, 200);
       assert.ok(!(await inbox()).messages.some((m) => m.id === id));
+    });
+  });
+
+  describe("game suggestions", () => {
+    it("searches and accepts suggestions only for a widget that is on the site", async () => {
+      const visitor = new Client(server.url);
+      assert.equal((await visitor.json("/api/game-suggestions/search?id=no-such-widget&q=hollow")).status, 404);
+      assert.equal((await visitor.json("/api/game-suggestions/search?id=test-suggest&q=h")).status, 400, "too short");
+      assert.equal((await visitor.json("/api/game-suggestions", { json: { id: "no-such-widget", appid: 367520 } })).status, 404);
+      assert.equal((await visitor.json("/api/game-suggestions", { json: { id: "test-suggest", appid: "367520" } })).status, 400, "app id must be a number");
+      assert.equal((await visitor.json("/api/game-suggestions", { json: { id: "test-suggest", appid: 0 } })).status, 400);
+      assert.equal((await visitor.json("/api/game-suggestions", { json: { id: "test-suggest", appid: 1, note: "x".repeat(301) } })).status, 400, "note too long");
+      // That attempt counted: a second one within 20s is refused before anything is looked up on Steam.
+      assert.equal((await visitor.json("/api/game-suggestions", { json: { id: "test-suggest", appid: 2 } })).status, 429);
+    });
+
+    it("silently drops suggestions that fill the honeypot", async () => {
+      const bot = new Client(server.url);
+      assert.equal((await bot.json("/api/game-suggestions", { json: { id: "test-suggest", appid: 367520, website: "http://spam.example" } })).status, 201);
+      const { data } = await admin.json("/api/admin/suggestions?filter=all");
+      assert.deepEqual(data.games, []);
+      assert.deepEqual((await bot.json("/api/game-suggestions?id=test-suggest")).data, { games: [] });
+    });
+
+    it("keeps the suggestions list behind the admin session", async () => {
+      const visitor = new Client(server.url);
+      assert.equal((await visitor.json("/api/admin/suggestions")).status, 401);
+      assert.equal((await visitor.json("/api/admin/suggestions", { json: { appids: [1], action: "delete" } })).status, 401);
+      assert.equal((await admin.json("/api/admin/suggestions", { json: { appids: [1], action: "explode" } })).status, 400);
+      assert.equal((await admin.json("/api/admin/suggestions", { json: { appids: [1], action: "status", status: "nope" } })).status, 400);
+      assert.deepEqual((await admin.json("/api/admin/suggestions?counts=1")).data, { counts: { unread: 0, total: 0 } });
+    });
+  });
+
+  describe("gaming widgets", () => {
+    it("serves an empty play history from the database", async () => {
+      const res = await new Client(server.url).json("/api/widgets/play-history?id=test-history");
+      assert.equal(res.status, 200);
+      const data = res.data.data as { days: unknown[]; totalMinutes: number; timeZone: string };
+      assert.equal(data.totalMinutes, 0);
+      assert.equal(data.timeZone, "Europe/Rome");
+      assert.equal(data.days.length % 7, 0);
+    });
+
+    it("only checks game servers that are in the config", async () => {
+      assert.equal((await new Client(server.url).json("/api/widgets/game-server?id=no-such-widget")).status, 404);
+      assert.equal((await new Client(server.url).json("/api/widgets/steam-rare?id=no-such-widget")).status, 404);
     });
   });
 
