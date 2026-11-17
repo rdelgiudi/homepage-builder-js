@@ -84,18 +84,26 @@ function ListRow({ item, showStatus }: { item: ShelfItem; showStatus: boolean })
   );
 }
 
-function CoverTile({ item, showStatus, gradientBorders }: { item: ShelfItem; showStatus: boolean; gradientBorders: boolean }) {
+// Shown on hover, and on keyboard focus so it isn't mouse-only.
+const ON_HOVER = "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100";
+const GROW_ON_HOVER = "max-h-0 group-hover:max-h-40 group-focus-visible:max-h-40";
+
+/** A cover with the title (when `hoverTitle`), stars and note on a dark fade at the bottom. */
+function CoverTile({ item, showStatus, hoverTitle, gradientBorders }: { item: ShelfItem; showStatus: boolean; hoverTitle: boolean; gradientBorders: boolean }) {
+  const always = !!item.rating; // stars stay visible; everything else appears on hover
+  const overlay = always || item.note || hoverTitle;
   return (
     <Wrap
       href={link(item)}
-      className={`group block relative overflow-hidden rounded-lg shadow-sm transition-transform hover:scale-[1.03]${gradientBorders ? " gradient-border-card" : ""}`}
+      className={`group block relative overflow-hidden rounded-lg shadow-sm transition-[transform,box-shadow] duration-200 hover:scale-110 hover:z-10 hover:shadow-xl focus-visible:scale-110 focus-visible:z-10${gradientBorders ? " gradient-border-card" : ""}`}
     >
       <Cover item={item} portrait className="w-full aspect-[2/3]" />
       {showStatus && item.status && <span className={`absolute top-1.5 left-1.5 rounded px-1.5 py-px text-[10px] font-semibold uppercase shadow ${STATUS[item.status].className}`}>{STATUS[item.status].label}</span>}
-      {(item.rating || item.note) && (
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/60 to-transparent p-2 pt-6 text-white">
+      {overlay && (
+        <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-2 pt-6 group-hover:pt-10 group-focus-visible:pt-10 text-white transition-all${always ? "" : ` ${ON_HOVER}`}`}>
+          {hoverTitle && <p className={`text-sm font-semibold leading-tight line-clamp-2 overflow-hidden transition-all ${ON_HOVER} ${GROW_ON_HOVER}`}>{item.title}</p>}
           {item.rating && <Stars rating={item.rating} />}
-          {item.note && <p className="text-xs leading-snug line-clamp-3 opacity-0 max-h-0 group-hover:opacity-100 group-hover:max-h-24 transition-all">{item.note}</p>}
+          {item.note && <p className={`text-xs leading-snug line-clamp-[8] overflow-hidden transition-all ${ON_HOVER} ${GROW_ON_HOVER}`}>{item.note}</p>}
         </div>
       )}
     </Wrap>
@@ -119,7 +127,7 @@ function Grid({ items, columns, showStatus, gradientBorders }: { items: ShelfIte
     <ul className={`grid grid-cols-2 ${COLUMNS[columns] ?? COLUMNS[4]} gap-3 text-left`}>
       {items.map((item, i) => (
         <li key={i}>
-          <CoverTile item={item} showStatus={showStatus} gradientBorders={gradientBorders} />
+          <CoverTile item={item} showStatus={showStatus} hoverTitle gradientBorders={gradientBorders} />
         </li>
       ))}
     </ul>
@@ -128,12 +136,13 @@ function Grid({ items, columns, showStatus, gradientBorders }: { items: ShelfIte
 
 /** One row that scrolls sideways, like the Steam widget's game rows. Tile width follows `columns`. */
 function Line({ items, columns, showStatus, gradientBorders }: { items: ShelfItem[]; columns: number; showStatus: boolean; gradientBorders: boolean }) {
+  // Padding leaves room for a cover's hover zoom, which the scroll container would otherwise clip.
   return (
-    <ul className="flex gap-3 overflow-x-auto pt-1 pb-2 px-1 -mx-1 snap-x scroll-px-1 text-left">
+    <ul className="flex gap-3 overflow-x-auto py-3 px-2 -mx-2 -mt-2 snap-x scroll-px-2 text-left">
       {items.map((item, i) => (
         <li key={i} className={`shrink-0 snap-start ${LINE_WIDTH[columns] ?? LINE_WIDTH[4]}`}>
-          <CoverTile item={item} showStatus={showStatus} gradientBorders={gradientBorders} />
-          <p className="mt-1 truncate text-xs text-gray-600 dark:text-gray-400">{item.title}</p>
+          <CoverTile item={item} showStatus={showStatus} hoverTitle={false} gradientBorders={gradientBorders} />
+          <p className="mt-3 truncate text-xs text-gray-600 dark:text-gray-400">{item.title}</p>
         </li>
       ))}
     </ul>
