@@ -11,6 +11,7 @@ import { infoRequest, parseA2SReply, parseServerAddress } from "@/lib/a2s";
 import { fromGameAchievements, minecraftStatus, rareAchievements, speedrunRun, tetrioLevel, tetrioProfile } from "@/lib/gaming-sources";
 import { summarizePlay } from "@/lib/play-history";
 import { playStatus } from "@/widgets/play-with-me/status";
+import { groupShelf, groupShelfCustom } from "@/widgets/game-shelf/groups";
 import { searchTerm, storeResults } from "@/lib/game-suggestions";
 
 describe("feed parsing", () => {
@@ -457,5 +458,48 @@ describe("game suggestions", () => {
       [{ appid: 367520, title: "Hollow Knight" }]
     );
     assert.deepEqual(storeResults({}), []);
+  });
+});
+
+describe("game shelf groups", () => {
+  it("groups by status in a fixed order, keeps item order and skips empty groups", () => {
+    const groups = groupShelf([
+      { title: "A", status: "backlog" as const },
+      { title: "B" },
+      { title: "C", status: "favourite" as const },
+      { title: "D", status: "backlog" as const },
+    ]);
+    assert.deepEqual(
+      groups.map((g) => [g.title, g.items.map((i) => i.title)]),
+      [
+        ["Favourites", ["C"]],
+        ["Backlog", ["A", "D"]],
+        ["Other", ["B"]],
+      ]
+    );
+  });
+
+  it("groups by the owner's own names, ordered as asked, case-insensitively", () => {
+    const groups = groupShelfCustom(
+      [
+        { title: "A", group: "Co-op" },
+        { title: "B", group: "Retro" },
+        { title: "C" },
+        { title: "D", group: "co-op " },
+        { title: "E", group: "Indie" },
+      ],
+      ["indie", "Nothing here"]
+    );
+    assert.deepEqual(
+      groups.map((g) => [g.title, g.items.map((i) => i.title)]),
+      [
+        ["Indie", ["E"]],
+        ["Co-op", ["A", "D"]],
+        ["Retro", ["B"]],
+        ["Other", ["C"]],
+      ]
+    );
+    const ungrouped: { title: string; group?: string }[] = [{ title: "X" }];
+    assert.deepEqual(groupShelfCustom(ungrouped).map((g) => g.title), ["Other"]);
   });
 });

@@ -15,6 +15,10 @@ export const shelfItemSchema = z.object({
   status: z.enum(["playing", "finished", "favourite", "backlog", "dropped"]).optional().meta({ title: "Status" }),
   rating: z.number().int().min(1).max(5).optional().meta({ title: "Rating", description: "1–5 stars" }),
   note: z.string().optional().meta({ title: "Note", ui: "textarea" }),
+  group: z
+    .string()
+    .optional()
+    .meta({ title: "Group", description: "Any name. Used when the shelf's Group is Custom; games with the same name share a row" }),
 });
 
 export const schema = z.object({
@@ -24,6 +28,29 @@ export const schema = z.object({
   items: z.array(shelfItemSchema).max(60).default([]).meta({ title: "Games" }),
   layout: z.enum(["covers", "list"]).default("covers").meta({ title: "Layout" }),
   columns: z.number().int().min(2).max(6).default(4).meta({ title: "Columns", description: "Covers layout, on wide screens" }),
+  groupBy: z
+    .enum(["none", "status", "custom"])
+    .default("none")
+    .meta({
+      title: "Group",
+      description: "Status = Favourites, Currently playing, Finished, Backlog, Dropped. Custom = by each game's own Group name",
+    }),
+  groupStyle: z
+    .enum(["line", "wrap"])
+    .default("line")
+    .meta({
+      title: "Group style",
+      description: "Line = each group in one row that scrolls sideways. Wrap = each group's games wrap onto several rows",
+      showIf: { groupBy: ["status", "custom"] },
+    }),
+  groupOrder: z
+    .array(z.string())
+    .default([])
+    .meta({
+      title: "Group order",
+      description: "Custom groups listed here come first, in this order; the rest follow in the order they first appear. Games without a group go last, under \"Other\"",
+      showIf: { groupBy: ["custom"] },
+    }),
 });
 
 export type GameShelfSection = z.infer<typeof schema>;
@@ -43,5 +70,7 @@ export const meta = {
     ],
     layout: "covers",
     columns: 4,
+    groupBy: "none",
+    groupStyle: "line",
   },
 } satisfies WidgetMeta;

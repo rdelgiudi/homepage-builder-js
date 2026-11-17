@@ -263,7 +263,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - **game-server** — Minecraft (Java/Bedrock via mcsrvstat.us) and Source/A2S server status (`servers: [{ label, protocol, address, icon? }]` max 10, `showPlayers`, `showAddress`).
 - **steam-rare** — Rarest unlocked Steam achievements by global unlock rate (`limit`, `scanGames` = most-played games looked through, `layout`). Needs `STEAM_API_KEY` + `STEAM_ID`.
 - **play-history** — Heatmap of hours played per day, recorded from Discord presence (`months`, `timezone`, `showGames`, `showRecent`, `hideGames`). Needs the Discord bot.
-- **game-shelf** — Game covers/list (`items: [{ title, appid?, image?, url?, status?, rating? 1–5, note? }]`, `layout`: `covers` | `list`, `columns`).
+- **game-shelf** — Game covers/list (`items: [{ title, appid?, image?, url?, status?, rating? 1–5, note? }]`, `layout`: `covers` | `list`, `columns`, `groupBy`: `none` | `status` | `custom`, `groupStyle`: `line` (one sideways-scrolling row per group) | `wrap`, `groupOrder`). Status groups: fixed order/headings in `SHELF_GROUPS` (`widgets/game-shelf/groups.ts`), status badges hidden. Custom groups: each item's free-text `group`, matched case-insensitively (heading = first spelling), `groupOrder` names first, the rest in first-appearance order, no group → "Other" last; badges stay. Both pure functions are unit-tested.
 - **play-with-me** — Live "up for a game?" card from Discord + Steam status (`availability`: `auto` | `open` | `busy`, `note`, `games`, `showSteam`, `showDiscord`, `joinLink`).
 - **game-suggest** — Visitors search Steam and suggest a game (`intro`, `askName`, `buttonText`, `successText`, `showList`). Suggestions land in the admin **Suggestions** screen.
 
