@@ -13,6 +13,7 @@ import { summarizePlay } from "@/lib/play-history";
 import { playStatus } from "@/widgets/play-with-me/status";
 import { groupShelf, groupShelfCustom } from "@/widgets/game-shelf/groups";
 import { searchTerm, storeResults } from "@/lib/game-suggestions";
+import { cached } from "@/lib/widget-data";
 
 describe("feed parsing", () => {
   it("reads RSS items, including CDATA and entities", () => {
@@ -501,5 +502,20 @@ describe("game shelf groups", () => {
     );
     const ungrouped: { title: string; group?: string }[] = [{ title: "X" }];
     assert.deepEqual(groupShelfCustom(ungrouped).map((g) => g.title), ["Other"]);
+  });
+});
+
+describe("widget cache", () => {
+  it("can keep a result for a time that depends on the result", async () => {
+    let calls = 0;
+    const ttl = (v: string[]) => (v.length ? 60_000 : 0);
+    const empty = () => cached("test:empty", ttl, async () => (calls++, [] as string[]));
+    await empty();
+    await empty();
+    assert.equal(calls, 2, "an empty answer kept for 0 ms is fetched again");
+    const full = () => cached("test:full", ttl, async () => (calls++, ["x"]));
+    await full();
+    await full();
+    assert.equal(calls, 3, "a real answer is served from the cache");
   });
 });

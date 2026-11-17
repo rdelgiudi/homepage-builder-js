@@ -22,10 +22,11 @@ const cache = new Map<string, { expiry: number; value?: unknown; error?: WidgetE
 const inFlight = new Map<string, Promise<unknown>>();
 
 /**
- * Returns `fn()`'s result, cached for `ttlMs`. Failures are cached too (5 minutes) so a
- * broken source isn't hammered, and concurrent requests for one key share one fetch.
+ * Returns `fn()`'s result, cached for `ttlMs` (or `ttlMs(result)`, e.g. to keep an empty
+ * answer only briefly). Failures are cached too (5 minutes) so a broken source isn't
+ * hammered, and concurrent requests for one key share one fetch.
  */
-export async function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+export async function cached<T>(key: string, ttlMs: number | ((value: T) => number), fn: () => Promise<T>): Promise<T> {
   const hit = cache.get(key);
   if (hit && hit.expiry > Date.now()) {
     if (hit.error) throw hit.error;
@@ -37,7 +38,7 @@ export async function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>
   const promise = (async () => {
     try {
       const value = await fn();
-      cache.set(key, { expiry: Date.now() + ttlMs, value });
+      cache.set(key, { expiry: Date.now() + (typeof ttlMs === "function" ? ttlMs(value) : ttlMs), value });
       return value;
     } catch (err) {
       const error = err instanceof WidgetError ? err : new WidgetError("The source could not be reached.");

@@ -106,17 +106,26 @@ export function storeResults(d: StoreSearch): StoreApp[] {
     .map((i) => ({ appid: i.id, title: i.name.slice(0, 200) }));
 }
 
-/** Whether `term` is already cached (cache hits don't count toward the global search cap). */
-const searchedAt = new Map<string, number>();
 const SEARCH_TTL = 60 * 60 * 1000;
-export const isCachedSearch = (term: string) => (searchedAt.get(term) ?? 0) > Date.now() - SEARCH_TTL;
+/**
+ * An empty answer is kept only briefly: during a Steam search outage the store answers
+ * every term with an empty list (HTTP 200), and caching that for an hour would keep
+ * showing "No games found" long after Steam recovers.
+ */
+const EMPTY_SEARCH_TTL = 2 * 60 * 1000;
+const searchTtl = (results: StoreApp[]) => (results.length ? SEARCH_TTL : EMPTY_SEARCH_TTL);
+
+/** When each term's cached answer expires (cache hits don't count toward the global search cap). */
+const searchExpiry = new Map<string, number>();
+export const isCachedSearch = (term: string) => (searchExpiry.get(term) ?? 0) > Date.now();
 
 export async function searchSteam(term: string): Promise<StoreApp[]> {
-  const results = await cached(`steam-search:${term}`, SEARCH_TTL, async () =>
+  const results = await cached(`steam-search:${term}`, searchTtl, async () =>
     storeResults(await getJson<StoreSearch>(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(term)}&l=english&cc=US`))
   );
-  if (searchedAt.size > 2000) searchedAt.clear();
-  searchedAt.set(term, Date.now());
+  if (searchExpiry.size > 2000) searchExpiry.clear();
+  // Approximate (a hit refreshes it), but only decides whether a search counts toward the cap.
+  if (!isCachedSearch(term)) searchExpiry.set(term, Date.now() + searchTtl(results));
   return results;
 }
 
