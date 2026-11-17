@@ -33,6 +33,15 @@ import { view as timeline } from "./timeline/render";
 import { view as quote } from "./quote/render";
 import { view as divider } from "./divider/render";
 import { view as poll } from "./poll/render";
+import { view as faq } from "./faq/render";
+import { view as support } from "./support/render";
+import { view as now } from "./now/render";
+import { view as buttons } from "./buttons/render";
+import { view as youtube } from "./youtube/render";
+import { view as twitch } from "./twitch/render";
+import { view as music } from "./music/render";
+import { view as status } from "./status/render";
+import { view as contact } from "./contact/render";
 
 const views: { [K in SectionType]: WidgetView<Extract<Section, { type: K }>> } = {
   header,
@@ -62,6 +71,15 @@ const views: { [K in SectionType]: WidgetView<Extract<Section, { type: K }>> } =
   quote,
   divider,
   poll,
+  faq,
+  support,
+  now,
+  buttons,
+  youtube,
+  twitch,
+  music,
+  status,
+  contact,
 };
 
 /** Renders one section: optional title row, optional gradient frame, then the widget body. */

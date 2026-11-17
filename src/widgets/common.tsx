@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /** The card surface the data widgets share (same colours as the GitHub cards). */
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -26,28 +26,44 @@ interface WidgetData<T> {
   loading: boolean;
 }
 
-/** Loads `{ data }` from one of this site's widget endpoints. `url = null` means "not set up yet". */
-export function useWidgetData<T>(url: string | null): WidgetData<T> {
+/**
+ * Loads `{ data }` from one of this site's widget endpoints. `url = null` means "not set up yet".
+ * `refreshMs` reloads it on that interval while the page is visible (keeping the old data on
+ * screen meanwhile) — for things that change while someone is looking, like a live stream.
+ */
+export function useWidgetData<T>(url: string | null, refreshMs?: number): WidgetData<T> {
   const [state, setState] = useState<WidgetData<T>>({ data: null, error: null, loading: !!url });
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!url || !refreshMs) return;
+    const timer = setInterval(() => !document.hidden && setTick((n) => n + 1), refreshMs);
+    return () => clearInterval(timer);
+  }, [url, refreshMs]);
+  const loadedUrl = useRef<string | null>(null);
   useEffect(() => {
     if (!url) {
+      loadedUrl.current = null;
       setState({ data: null, error: null, loading: false });
       return;
     }
     let cancelled = false;
-    setState((s) => ({ ...s, loading: true, error: null }));
+    // A failed refresh of the same address keeps what is on screen.
+    const refresh = loadedUrl.current === url;
+    const fail = (error: string) => setState((s) => (refresh && s.data ? { ...s, loading: false } : { data: null, error, loading: false }));
+    setState((s) => ({ ...s, loading: true, error: refresh ? s.error : null }));
     fetch(url)
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
         if (cancelled) return;
+        loadedUrl.current = url;
         if (res.ok && body.data) setState({ data: body.data as T, error: null, loading: false });
-        else setState({ data: null, error: body.error || "Could not load this widget.", loading: false });
+        else fail(body.error || "Could not load this widget.");
       })
-      .catch(() => !cancelled && setState({ data: null, error: "Could not load this widget.", loading: false }));
+      .catch(() => !cancelled && fail("Could not load this widget."));
     return () => {
       cancelled = true;
     };
-  }, [url]);
+  }, [url, tick]);
   return state;
 }
 

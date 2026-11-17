@@ -50,6 +50,9 @@ services:
       - STEAM_API_KEY=${STEAM_API_KEY:-}
       - STEAM_ID=${STEAM_ID:-}
       - OVERWATCH_BATTLE_TAG=${OVERWATCH_BATTLE_TAG:-}
+      - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID:-}
+      - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET:-}
+      - LASTFM_API_KEY=${LASTFM_API_KEY:-}
       - VISITOR_SALT=${VISITOR_SALT:-}
     # labels:
     #   - traefik.enable=true

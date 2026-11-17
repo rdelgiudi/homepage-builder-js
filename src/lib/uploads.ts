@@ -50,7 +50,11 @@ export async function storeImage(input: Buffer): Promise<string> {
     if (!meta.format || !["jpeg", "png", "webp", "avif", "gif", "tiff"].includes(meta.format)) {
       throw new UploadError("Use a JPEG, PNG, WebP, AVIF or GIF image.");
     }
-    output = await sharp(input).rotate().resize({ width: MAX_IMAGE_EDGE, height: MAX_IMAGE_EDGE, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+    const encode = (animated: boolean) =>
+      sharp(input, { animated }).rotate().resize({ width: MAX_IMAGE_EDGE, height: MAX_IMAGE_EDGE, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+    // Keep every frame of an animated GIF / WebP (88×31 buttons, stickers…). One too big to
+    // decode as a whole (all frames together exceed sharp's pixel limit) is stored as a still.
+    output = (meta.pages ?? 1) > 1 ? await encode(true).catch(() => encode(false)) : await encode(false);
   } catch (err) {
     if (err instanceof UploadError) throw err;
     throw new UploadError("That file could not be read as an image.");

@@ -275,6 +275,7 @@
 /* ---------- controls ---------- */
 
 .adm-btn {
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -933,6 +934,10 @@ textarea.adm-input {
   color: var(--a-bad);
   border-color: currentColor;
 }
+.adm-tag.is-draft {
+  color: var(--a-draft);
+  border-color: currentColor;
+}
 .adm-table {
   width: 100%;
   border-collapse: collapse;
@@ -986,6 +991,10 @@ textarea.adm-input {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
   gap: 12px;
+}
+/* Inbox: unread messages get an accent edge. */
+.adm-comment.is-unread {
+  box-shadow: inset 3px 0 0 var(--a-draft);
 }
 .adm-comment > input {
   margin-top: 3px;

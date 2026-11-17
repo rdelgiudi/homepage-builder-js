@@ -8,15 +8,15 @@ A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integ
 
 - **One JSON config** (`src/config/homepage.json`) for everything, validated on load and editable without a rebuild — or through the admin panel
 - **Five site layouts**: top tabs, sidebar, one-page scroll, bento grid, link-in-bio; each tab can stack its widgets or lay them out on a 12-column grid
-- **27 widget types**:
+- **36 widget types**:
   - Gaming and presence: Discord user presence (real-time over WebSocket, mobile indicator), Discord server, Steam (with achievement progress), Overwatch, chess ratings
-  - Social and feeds: GitHub project cards, GitHub contribution heatmap, Mastodon, Bluesky, RSS/Atom
-  - Visitors: guestbook comments (with optional moderation), anonymous emoji reactions, polls
-  - Info and media: weather, clock, countdown, images and galleries, YouTube/Vimeo/Spotify/SoundCloud embeds, random memes
-  - Text and structure: headers, text, links, markdown files, skills, timeline, quotes, dividers
+  - Social and feeds: GitHub project cards, GitHub contribution heatmap, Mastodon, Bluesky, RSS/Atom, support buttons (Ko-fi, GitHub Sponsors, Patreon…), 88×31 button wall and webring
+  - Visitors: guestbook comments (with optional moderation), anonymous emoji reactions, polls, a private contact form (read in the admin Inbox)
+  - Info and media: weather, clock, countdown, service status board, images and galleries, YouTube/Vimeo/Spotify/SoundCloud embeds, latest YouTube uploads, Twitch live status, recently played music (ListenBrainz / Last.fm), random memes
+  - Text and structure: headers, text, links, markdown files, "now" card, FAQ, skills, timeline, quotes, dividers
 - **Backgrounds**: solid, gradient, image, video or pattern, with readability overlay, per-tab backgrounds (crossfaded) and adjustable header/card transparency
 - **Canvas effects**: stars, comet, snow, fireflies, constellation, aurora; optional mouse trail and a flying emoji whenever someone reacts
-- **Admin panel** (optional): drag-and-drop builder, schema-generated forms, live draft preview, publish with version history, media uploads, markdown editor, comment moderation
+- **Admin panel** (optional): drag-and-drop builder, schema-generated forms, live draft preview, publish with version history, media uploads, markdown editor, comment moderation, contact-form inbox
 - Live viewer count and total visitor counter
 - Light/dark mode, animated gradient title and favicon, gradient widget frames
 - Responsive: under 768px the tab bar collapses into a compact bar with a slide-in menu
@@ -212,8 +212,17 @@ The boolean effects default to `true` if omitted, except `widgetFrame` and `mous
 | `quote` | A quote; with several in `quotes`, each visitor sees a random one | yes |
 | `divider` | A line, dots or empty space (`style`, `size`) | no |
 | `poll` | A question visitors vote on (`question`, `options`; one vote per visitor, changeable; `results`: `after` / `always`) | yes |
+| `contact` | Private contact form (`intro`, `askEmail`: `optional` / `required` / `hidden`, `buttonText`, `successText`). Messages go to the admin panel's Inbox; rate-limited, honeypot, blockable | yes |
+| `now` | "What I'm doing now" lines (`items`: `icon`, `label`, `text`, `url`) with `updated` (`YYYY-MM-DD`, shown as "Updated 3 days ago") | yes |
+| `faq` | Questions that open to show the answer (`items`: `question`, `answer`; `openFirst`) | yes |
+| `support` | Support buttons in brand colours (`items`: `platform` = `kofi` / `github` / `patreon` / `buymeacoffee` / `liberapay` / `paypal` / `opencollective`, `username`, `label`) | no |
+| `buttons` | Wall of 88×31 buttons (`items`: `image`, `label`, `url`; `pixelated`) plus optional webring links (`ringName`, `ringHome`, `ringPrev`, `ringNext`, `ringRandom`) | no |
+| `youtube` | Latest uploads of a channel (`channel`: `@handle` or `UC…` id, `limit`, `hideShorts`, `layout`: `grid` / `list`). No API key | yes |
+| `twitch` | Live status, stream title, game and viewers (`username`, `hideOffline`). Needs `TWITCH_CLIENT_ID` + `TWITCH_CLIENT_SECRET` | yes |
+| `music` | Recently played tracks with covers (`service`: `listenbrainz` / `lastfm`, `username`, `limit`, `showCovers`). Last.fm needs `LASTFM_API_KEY` | yes |
+| `status` | Up/down and response time of your sites and services (`services`: `label`, `url`, `icon`; `showLatency`, `linked`). The addresses are visible in the page source | yes |
 
-Every section also accepts `span` (grid width, see Layouts) and `widgetFrame`; most accept `icon` and `text` for a title row. Only `discord-server`, `discord-user`, `steam` and `overwatch` need environment variables; none of the widgets from `image` down needs an API key. Those that show data from another site fetch it through this server only when a visitor's page asks for it, and cache it (weather 15 min, feeds and chess 30 min, Mastodon and Bluesky 10 min, GitHub activity 3 h).
+Every section also accepts `span` (grid width, see Layouts) and `widgetFrame`; most accept `icon` and `text` for a title row. Only `discord-server`, `discord-user`, `steam`, `overwatch` and `twitch` need environment variables (`music` too, for Last.fm only). Widgets that show data from another site fetch it through this server only when a visitor's page asks for it, and cache it (weather 15 min, feeds, YouTube and chess 30 min, Mastodon and Bluesky 10 min, Twitch and music 2 min, status checks 1 min, GitHub activity 3 h). Twitch, music and status also re-check while the page stays open.
 
 ## Components Reference
 
@@ -495,7 +504,8 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 | Reactions | **REST + WebSocket** (server API + broadcast) | SQLite-backed `/api/reactions`; toggle per emoji keyed by `visitor_hash` (UNIQUE). A new reaction broadcasts `{type:"reaction", emoji}` to all clients via the WebSocket server for the background flyer |
 | Live viewers | **WebSocket** (push) + REST | Count of distinct visitors with an open connection; `/api/viewers` gives the initial value |
 | Poll | **REST** (server API) | SQLite-backed `/api/poll`, one vote per visitor (changeable) |
-| Weather, RSS, Mastodon, Bluesky, chess, GitHub activity | **REST** (`/api/widgets/<type>`) | Fetched only when a visitor's widget asks, cached in memory (10 min – 3 h); never polled |
+| Weather, RSS, Mastodon, Bluesky, chess, GitHub activity, YouTube, Twitch, music, status | **REST** (`/api/widgets/<type>`) | Fetched only when a visitor's widget asks, cached in memory (1 min – 3 h); the server never polls on its own |
+| Contact form | **REST** (server API) | `/api/contact` stores private messages in SQLite; read in the admin Inbox (`/api/admin/messages`) |
 | Config | **WebSocket** (push) | The server watches `homepage.json`; on change every open page refreshes itself |
 | Discord/Steam/Overwatch (mount) | **REST** (server API snapshots) | `/api/presence`, `/api/steam`, `/api/overwatch` return the current in-memory server state so the widgets repopulate instantly on mount (e.g. after a tab switch remounts them) instead of waiting for the next re-broadcast |
 
@@ -509,10 +519,10 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 │   │   ├── page.tsx / layout.tsx / loading.tsx   # Homepage (renders <SitePage> from homepage.json)
 │   │   ├── admin/                   # /admin (panel, sign-in) and /admin/preview (draft preview)
 │   │   └── api/                     # Public APIs: github, markdown, meme, visitors, viewers, comments,
-│   │       │                        #   reactions, poll, presence, steam, overwatch, favicon,
+│   │       │                        #   reactions, poll, contact, presence, steam, overwatch, favicon,
 │   │       │                        #   widgets/[type] (data widgets), uploads/[name] (uploaded media)
 │   │       └── admin/               # Admin APIs: login/logout, config + publish, revisions, upload,
-│   │                                #   content, comments, integrations
+│   │                                #   content, comments, messages, integrations
 │   ├── components/                  # SitePage, Tabs, OnePage, TabSections, BackgroundLayer, effects,
 │   │   │                            #   theme switch, counters, and the larger widget components
 │   │   └── admin/                   # Admin panel UI (builder, schema forms, preview, screens)
@@ -583,7 +593,7 @@ docker compose up --build
 
 Each container runs:
 - WebSocket server + Next.js + Discord presence bot (all in one Node process)
-- Named volume mounted at `/app/data` for everything written at runtime: `visitors.db` (visitor counter, comments, reactions, poll votes, admin sessions, drafts and history) and `uploads/` (background images and videos). Override the location with `DATA_DIR`.
+- Named volume mounted at `/app/data` for everything written at runtime: `visitors.db` (visitor counter, comments, reactions, poll votes, contact messages, admin sessions, drafts and history) and `uploads/` (background images and videos). Override the location with `DATA_DIR`.
 - Bind mounts for `src/config/` and `src/content/` (read-only for the public container, writable for the one serving the admin panel)
 
 The example compose file starts two containers from the same image — the public site and the admin panel — sharing the data volume and the config/content folders, meant to sit behind one hostname with the proxy rule described under *Admin panel*. The comments in the file cover the own-port and single-container alternatives.

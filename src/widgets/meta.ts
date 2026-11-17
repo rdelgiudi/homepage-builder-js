@@ -32,6 +32,15 @@ import * as timeline from "./timeline/meta";
 import * as quote from "./quote/meta";
 import * as divider from "./divider/meta";
 import * as poll from "./poll/meta";
+import * as faq from "./faq/meta";
+import * as support from "./support/meta";
+import * as now from "./now/meta";
+import * as buttons from "./buttons/meta";
+import * as youtube from "./youtube/meta";
+import * as twitch from "./twitch/meta";
+import * as music from "./music/meta";
+import * as status from "./status/meta";
+import * as contact from "./contact/meta";
 
 export const SectionSchema = z.discriminatedUnion("type", [
   header.schema,
@@ -61,6 +70,15 @@ export const SectionSchema = z.discriminatedUnion("type", [
   quote.schema,
   divider.schema,
   poll.schema,
+  faq.schema,
+  support.schema,
+  now.schema,
+  buttons.schema,
+  youtube.schema,
+  twitch.schema,
+  music.schema,
+  status.schema,
+  contact.schema,
 ]);
 export type Section = z.infer<typeof SectionSchema>;
 export type SectionType = Section["type"];
@@ -72,20 +90,28 @@ export const widgetMetas: WidgetMeta[] = [
   text.meta,
   markdown.meta,
   quote.meta,
+  now.meta,
+  faq.meta,
   skills.meta,
   timeline.meta,
   divider.meta,
   // media
   image.meta,
   embed.meta,
+  youtube.meta,
+  twitch.meta,
+  music.meta,
   meme.meta,
   // info
   clock.meta,
   countdown.meta,
   weather.meta,
   rss.meta,
+  status.meta,
   // social
   links.meta,
+  support.meta,
+  buttons.meta,
   github.meta,
   githubActivity.meta,
   mastodon.meta,
@@ -100,6 +126,7 @@ export const widgetMetas: WidgetMeta[] = [
   comments.meta,
   reactions.meta,
   poll.meta,
+  contact.meta,
 ];
 
 export const widgetMetaByType: Record<string, WidgetMeta> = Object.fromEntries(widgetMetas.map((m) => [m.type, m]));

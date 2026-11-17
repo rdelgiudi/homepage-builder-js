@@ -8,6 +8,7 @@ import PreviewPane from "./PreviewPane";
 import { BackgroundScreen, EffectsScreen, SiteScreen } from "./ConfigScreens";
 import ContentScreen from "./ContentScreen";
 import CommentsScreen from "./CommentsScreen";
+import InboxScreen from "./InboxScreen";
 import { HistoryScreen, IntegrationsScreen } from "./OtherScreens";
 
 const SCREENS = [
@@ -17,6 +18,7 @@ const SCREENS = [
   { id: "effects", label: "Effects" },
   { id: "content", label: "Content" },
   { id: "comments", label: "Comments" },
+  { id: "inbox", label: "Inbox" },
   { id: "integrations", label: "Integrations" },
   { id: "history", label: "History" },
 ] as const;
@@ -117,6 +119,7 @@ function Shell() {
   const builder = useBuilder();
   const [screen, setScreen] = useState<ScreenId>("builder");
   const [pending, setPending] = useState(0);
+  const [unread, setUnread] = useState(0);
   const panels = usePanelWidths();
 
   // The screen lives in the URL hash so a reload stays put.
@@ -134,10 +137,14 @@ function Shell() {
     setScreen(id);
   };
 
-  // Keep the "waiting" badge fresh while the panel is open.
+  // Keep the "waiting" and "unread" badges fresh while the panel is open (polled: the public
+  // site that receives comments and messages may be a different process).
   const refreshPending = useCallback(() => {
     api<{ counts: { pending: number } }>("comments?status=pending")
       .then((d) => setPending(d.counts.pending))
+      .catch(() => {});
+    api<{ counts: { unread: number } }>("messages?counts=1")
+      .then((d) => setUnread(d.counts.unread))
       .catch(() => {});
   }, []);
   useEffect(() => {
@@ -183,6 +190,7 @@ function Shell() {
           <button key={s.id} type="button" aria-current={s.id === screen ? "page" : undefined} onClick={() => go(s.id)}>
             {s.label}
             {s.id === "comments" && pending > 0 && <span className="adm-count is-draft">{pending}</span>}
+            {s.id === "inbox" && unread > 0 && <span className="adm-count is-draft">{unread}</span>}
           </button>
         ))}
       </nav>
@@ -248,6 +256,7 @@ function Shell() {
         <main className="adm-full">
           {screen === "content" && <ContentScreen />}
           {screen === "comments" && <CommentsScreen onCounts={setPending} />}
+          {screen === "inbox" && <InboxScreen onCounts={setUnread} />}
           {screen === "integrations" && <IntegrationsScreen />}
           {screen === "history" && <HistoryScreen onLoaded={() => go("builder")} />}
         </main>

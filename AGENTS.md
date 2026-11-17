@@ -1,6 +1,6 @@
 # Project Overview
 
-Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON config: 27 widget types (Discord, Steam, Overwatch, GitHub, guestbook, reactions, polls, weather, feeds, …), five site layouts, configurable backgrounds and canvas effects, real-time WebSocket updates, and an optional admin panel (`/admin`) with a drag-and-drop builder, live draft preview and publish.
+Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON config: 36 widget types (Discord, Steam, Overwatch, GitHub, guestbook, reactions, polls, contact form, weather, feeds, YouTube, Twitch, …), five site layouts, configurable backgrounds and canvas effects, real-time WebSocket updates, and an optional admin panel (`/admin`) with a drag-and-drop builder, live draft preview and publish.
 
 ## Architecture
 
@@ -25,6 +25,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   │   ├── comments/route.ts    # Guestbook comments (SQLite, GET list + POST create; moderation-aware)
 │   │   │   ├── reactions/route.ts   # Anonymous emoji reactions (SQLite, GET counts + POST/DELETE, broadcasts to all clients)
 │   │   │   ├── poll/route.ts        # Poll results (GET) and voting (POST); SQLite poll_votes
+│   │   │   ├── contact/route.ts     # Contact form POST → private `messages` row (rate limit, honeypot, block check)
 │   │   │   ├── presence/route.ts    # Snapshot of current Discord presence (force-dynamic; reads in-memory server state)
 │   │   │   ├── steam/route.ts       # Snapshot of current Steam data (force-dynamic; reads in-memory server state)
 │   │   │   ├── overwatch/route.ts   # Snapshot of current Overwatch data (force-dynamic; reads in-memory server state)
@@ -38,6 +39,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   │       ├── upload/          # Background media: GET list, POST multipart upload, DELETE
 │   │   │       ├── content/         # Markdown files: list/read, PUT, DELETE, POST = render preview
 │   │   │       ├── comments/        # GET list by status, POST bulk; [id] PATCH/DELETE; settings PUT
+│   │   │       ├── messages/        # Inbox: GET list (unread/all, ?counts=1), POST bulk; [id] PATCH (read, blockAuthor)/DELETE
 │   │   │       └── integrations/    # Which env vars are set, what is writable
 │   │   ├── admin/
 │   │   │   ├── layout.tsx           # Guard only: notFound() when admin is disabled
@@ -89,6 +91,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │       ├── LayoutControls.tsx   # LayoutPicker (site layout thumbnails) + SpanControl (widget width in a grid)
 │   │       ├── ContentScreen.tsx    # Markdown files editor
 │   │       ├── CommentsScreen.tsx   # Moderation queue, settings, audit log
+│   │       ├── InboxScreen.tsx      # Contact-form messages: unread/all, mark read, reply by email, block, delete
 │   │       ├── OtherScreens.tsx     # Integrations, History
 │   │       ├── LoginForm.tsx
 │   │       └── api.ts               # fetch helper for /api/admin/*
@@ -112,6 +115,8 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   ├── db.ts                    # Shared better-sqlite3 connection (DATA_DIR/visitors.db, WAL); exports DATA_DIR
 │   │   ├── visitor.ts               # visitor_id cookie + hashing helpers (shared by visitors/comments/reactions/poll)
 │   │   ├── comments.ts              # comments table + moderation columns, moderation settings, initialStatus()
+│   │   ├── messages.ts              # messages table (contact form), cleanText() (keeps newlines), isEmail(), messageCounts()
+│   │   ├── url.ts                   # httpUrl() — pure, client-safe (re-exported by widget-data.ts)
 │   │   ├── reactions.ts             # DEFAULT_EMOJIS constant shared by API + widget
 │   │   ├── reaction-bus.ts          # broadcastReaction() — pushes a reaction to all WS clients via globalThis.__wssBroadcast
 │   │   ├── background.ts            # backgroundLayer(): background.base → CSS variables/classes (pure); safeUrl()
@@ -119,16 +124,17 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   ├── content.ts               # CONTENT_DIR + resolveContentFile() (plain *.md names only)
 │   │   ├── markdown.ts              # Server-side markdown → HTML (marked), mtime-cached
 │   │   ├── widget-data.ts           # cached(), getJson/getText, findSection(), htmlToText(), httpUrl(), WidgetError
-│   │   └── widget-sources.ts        # weather, chess, bluesky, github-activity, rss, mastodon fetchers
-│   ├── widgets/                     # Widget registry — one folder per section type (27 types)
+│   │   └── widget-sources.ts        # weather, chess, bluesky, github-activity, rss, mastodon, youtube, twitch, music, status fetchers
+│   ├── widgets/                     # Widget registry — one folder per section type (36 types)
 │   │   ├── <type>/meta.ts           # Server-safe: zod options schema, label, icon, category, defaults, requiresEnv
 │   │   ├── <type>/render.tsx        # Client: WidgetView { titled, frame, render(section, ctx) }
 │   │   ├── embed/player.ts          # toPlayer(): link → player URL (kept in .ts so tests can import it)
+│   │   ├── support/platforms.ts     # Support platforms: brand classes + supportUrl() (fixed host + validated username)
 │   │   ├── meta.ts                  # Server-safe index: SectionSchema (discriminated union), widgetMetas
 │   │   ├── registry.tsx             # Client index: renderSection(section, ctx)
 │   │   ├── fields.ts                # Shared zod fields (base id/type/span, titleFields, frameField)
 │   │   ├── shared.tsx               # Icon, SectionTitle, WidgetFrame, alignClass
-│   │   ├── common.tsx               # For data widgets: Card, Notice, Skeleton, useWidgetData, DataCard, timeAgo
+│   │   ├── common.tsx               # For data widgets: Card, Notice, Skeleton, useWidgetData (optional refresh interval), DataCard, timeAgo
 │   │   ├── posts.tsx                # PostList shared by mastodon + bluesky
 │   │   ├── time.ts                  # Time-zone maths for clock + countdown (Intl only)
 │   │   └── types.ts                 # WidgetMeta, WidgetView, WidgetContext
@@ -166,6 +172,8 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 | `STEAM_API_KEY` | Steam API key |
 | `STEAM_ID` | Steam 64-bit ID |
 | `OVERWATCH_BATTLE_TAG` | Overwatch battle tag (e.g. `User-12345`) |
+| `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` | Twitch app credentials for the `twitch` widget (client-credentials token, cached until it expires) |
+| `LASTFM_API_KEY` | Only for the `music` widget with `service: "lastfm"` (ListenBrainz needs no key) |
 | `VISITOR_SALT` | Salt for visitor ID hashing |
 | `DATA_DIR` | Directory for runtime-written state (default: `<cwd>/data`) |
 | `ADMIN_PASSWORD_HASH` | Enables the admin panel at `/admin`. scrypt hash from `npm run admin:hash`. |
@@ -233,6 +241,15 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - **quote** — `quotes: [{ text, author? }]`; several = a random one per visit (first one on the server render).
 - **divider** — `style` (`line` | `dots` | `space`), `size`. No title, no frame.
 - **poll** — `question`, `options` (strings), `results` (`after` | `always`). Votes in SQLite via `/api/poll`.
+- **contact** — Private contact form (`intro`, `askEmail`: `optional` | `required` | `hidden`, `buttonText`, `successText`). Messages land in the admin **Inbox**.
+- **now** — "Now" card: `items: [{ icon?, label, text, url? }]`, `updated` (`YYYY-MM-DD`, shown as "Updated 3 days ago" after mount).
+- **faq** — `items: [{ question, answer }]`, `openFirst`. Native `<details>`.
+- **support** — Brand-coloured buttons: `items: [{ platform, username, label? }]` (`kofi`, `github`, `patreon`, `buymeacoffee`, `liberapay`, `paypal`, `opencollective`).
+- **buttons** — 88×31 button wall (`items: [{ image, label, url? }]`, `pixelated`) + optional webring (`ringName`, `ringHome`, `ringPrev`, `ringNext`, `ringRandom`).
+- **youtube** — Latest uploads (`channel`: `@handle` or `UC…` id, `limit`, `hideShorts`, `layout`: `grid` | `list`). Public channel RSS, no key.
+- **twitch** — Live status (`username`, `hideOffline`). Needs `TWITCH_CLIENT_ID` + `TWITCH_CLIENT_SECRET`.
+- **music** — Recently played (`service`: `listenbrainz` | `lastfm`, `username`, `limit`, `showCovers`).
+- **status** — Service status board (`services: [{ label, url, icon? }]` max 20, `showLatency`, `linked`).
 
 ## Critical Gotchas
 
@@ -267,7 +284,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - **Publish** (`publishConfig`): stores the previous file content in `config_revisions` (last 50), writes a temp file and renames it over `homepage.json` (falls back to an in-place write if the file itself is a mount point), then clears the draft. The loader notices via mtime; `websocket-server.js` polls the file with `fs.watchFile` (2s) and broadcasts `{ type: "config" }`, on which `ConfigSync` refreshes every open page. This works across containers because it is driven by the file, not by an in-process call — hand edits trigger it too.
 - Because the tab list can now change under a mounted page, `Tabs.tsx` clamps `activeTab`/`mountedTab` to the current length (`activeIndex`/`mountedIndex`) — index with those, not the raw state.
 - Restoring a revision only loads it into the draft; nothing goes live without Publish.
-- Markdown files (Content screen) and comment moderation are **not** part of the draft — they apply immediately.
+- Markdown files (Content screen), comment moderation and the Inbox are **not** part of the draft — they apply immediately.
 
 ### Admin forms are generated from the schema
 - `components/admin/schemas.ts` converts the zod schemas with `z.toJSONSchema(schema, { io: "input" })`; `SchemaForm` walks the result. A control is chosen from the JSON Schema type plus the `ui` hint set via `.meta({ ui })`: `color`, `gradient` (string array as color stops), `textarea`, `icon`, `tristate` (optional boolean: unset = inherit), `content-file` (dropdown of `src/content/*.md`), `emoji-list`. Enums with ≤ 4 options render as a segmented control; bounded numbers get a slider; arrays of objects get a collapsible list editor.
@@ -312,10 +329,10 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - The divider uses pointer capture so a drag keeps working while the pointer is over the preview iframe (an iframe otherwise swallows the move events).
 - Below 1000px the panels stack and the dividers are hidden.
 
-### Data widgets (weather, rss, github-activity, mastodon, bluesky, chess)
-- Flow: the widget (client) calls `/api/widgets/<type>` → `widgetSources[type]` in `src/lib/widget-sources.ts` → the outside service → a trimmed result (only the fields the widget shows). Everything goes through `cached()` (in-memory, per key): success TTLs are 15 min weather, 30 min rss/chess, 10 min mastodon/bluesky, 3 h github-activity; failures are cached 5 minutes; concurrent requests share one fetch.
+### Data widgets (weather, rss, github-activity, mastodon, bluesky, chess, youtube, twitch, music, status)
+- Flow: the widget (client) calls `/api/widgets/<type>` → `widgetSources[type]` in `src/lib/widget-sources.ts` → the outside service → a trimmed result (only the fields the widget shows). Everything goes through `cached()` (in-memory, per key): success TTLs are 15 min weather, 30 min rss/chess/youtube, 10 min mastodon/bluesky, 2 min twitch/music, 1 min status, 3 h github-activity (24 h for a YouTube handle → id); failures are cached 5 minutes; concurrent requests share one fetch.
 - **Nothing polls.** Data is fetched only when a visitor's widget asks, so "no viewers → no outbound queries" holds without touching the idle-pause logic in `websocket-server.js`.
-- **Never fetch a URL taken from the request.** Sources with a fixed host (weather, chess, bluesky, github-activity) take strictly validated values from the query string. Sources whose host the site owner typed (rss, mastodon) take a **section id** and read the address from the config via `findSection()` — otherwise the endpoint would be an open proxy. `findSection` looks in the published config first, then the admin draft, so the panel's preview works before publishing. Those widgets still add the address to their request URL as an ignored param (`u=` / `k=`) only so the URL changes — and the widget refetches — when the setting changes.
+- **Never fetch a URL taken from the request.** Sources with a fixed host (weather, chess, bluesky, github-activity) take strictly validated values from the query string. Sources whose host the site owner typed (rss, mastodon, status), and sources that spend the owner's API key (twitch, music — otherwise anyone could look up any account on that quota), take a **section id** and read the address from the config via `findSection()` — otherwise the endpoint would be an open proxy. `findSection` looks in the published config first, then the admin draft, so the panel's preview works before publishing. Those widgets still add the address to their request URL as an ignored param (`u=` / `k=`) only so the URL changes — and the widget refetches — when the setting changes.
 - Errors meant for the widget are `WidgetError` (message shown as-is, in the interface's voice: say what to fix). Anything else is logged with `[Widgets]` and shown as a generic line.
 - `github-activity` has no key-less API; it parses the public calendar fragment GitHub's own profile page loads (`/users/<name>/contributions`): `data-date` / `data-level` on the cells, counts from the matching `<tool-tip for="…">`. If GitHub changes that markup the widget shows "could not be read" — the parser in `widget-sources.ts` is the one place to fix.
 - `rss` uses a small regex parser (RSS `<item>` and Atom `<entry>`), not an XML library. Titles are plain text (`htmlToText`); links pass `httpUrl()` so only http(s) reaches the browser.
@@ -324,7 +341,23 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - `clock` / `countdown` render the time only after mount (server and client HTML must match); the countdown's `target` is wall time in the widget's `timezone`, converted with `zonedTimeToMs`.
 - `poll`: votes in `poll_votes` (primary key `poll_id` + `visitor_hash`, so one vote per visitor, replaced on re-vote), keyed by **option text** — renaming an option starts it from zero, removed options' votes are ignored. The poll must exist in the config (`findSection`) for votes to be accepted.
 - Client-side building blocks are in `src/widgets/common.tsx`: `useWidgetData(url | null)` + `DataCard` handle "not set up yet" / loading / error so each widget only writes its success state. `Card` uses `bg-white dark:bg-[#2b2d31]`, which is already in the card-opacity selector list.
-- The admin palette groups widgets by `meta.category` (`PALETTE_GROUPS` in `Builder.tsx`); a new category needs an entry there. New form hints: `datetime`, `timezone`.
+- The admin palette groups widgets by `meta.category` (`PALETTE_GROUPS` in `Builder.tsx`); a new category needs an entry there. New form hints: `date`, `datetime`, `timezone`.
+
+### Contact form and Inbox (`contact` section + `/api/contact` + `/api/admin/messages`)
+- `POST /api/contact` is public (served by the public container); the message is stored in `messages` (`src/lib/messages.ts`, same `visitors.db`) and read only through the admin routes, so both containers see it via the shared `DATA_DIR`. A message is accepted only for a `contact` section that exists (`findSection`), so a site without the widget accepts nothing.
+- Abuse limits: one message per visitor hash per 30s, **plus** a global cap (30 per 10 min across everyone — a fresh cookie is a fresh visitor, so the per-visitor limit alone doesn't stop a flood), `isBlocked()` (the same `blocked_visitors` table as comments — blocking from either screen blocks both), and a honeypot field `website` that is answered with 201 but never stored.
+- Use `cleanText()` from `messages.ts`, not `comments.ts`'s `sanitize()`: `sanitize` strips `\n`, which a message needs.
+- The admin nav's Inbox badge is polled every 30s together with the comments badge (`messages?counts=1`). Only deletions and blocks are audited (`message.*`); marking read is not.
+- Message text is rendered as React text everywhere (the widget never shows messages back; the Inbox uses `white-space: pre-wrap`).
+
+### New data widgets (youtube, twitch, music, status)
+- **youtube**: `@handle` is resolved to a `UC…` id once per day by reading the channel page (canonical link / `externalId`) with the `SOCS=CAI` cookie so the EU consent interstitial doesn't hide it; the feed is `youtube.com/feeds/videos.xml?channel_id=…` parsed by `parseYouTubeFeed()` (not `parseFeed`, which drops `yt:videoId`/`media:*`). Shorts are recognised by a `/shorts/` link. Thumbnails are built as `i.ytimg.com/vi/<id>/mqdefault.jpg` (16:9).
+- **twitch**: the app access token lives in a module variable until a minute before `expires_in`; a 401 from Helix clears it. Missing env → a `WidgetError` naming the variables. With `hideOffline` the widget draws its own title row and frame (`titled: false`, `frame: "self"`) so nothing at all is left on the page while offline.
+- **music**: ListenBrainz (`playing-now` + `listens`) or Last.fm (`user.getrecenttracks`, `LASTFM_API_KEY`). Covers come from the Cover Art Archive only for valid MBIDs; Last.fm's grey-star placeholder image is dropped. No `requiresEnv` on the meta, because ListenBrainz needs nothing.
+- **status**: like rss, the request carries only the section id (`u=` is ignored); addresses come from the config. It uses its own `fetch` (`redirect: "manual"`, 8s timeout, body cancelled) instead of `getJson`/`getText`, because a non-2xx answer is a result, not an error, and the cached function never throws. `serviceState()`: <400, 401 and 403 = up, other 4xx = degraded, 5xx / no answer = down. Only `{ state, code, ms }` per service is returned. The owner can point it at LAN addresses on purpose; the section (addresses included) is serialized into the page, so the field description says they are public.
+- `useWidgetData(url, refreshMs)` re-fetches on that interval while the document is visible (twitch and music 2 min, status 1 min). A failed refresh keeps the data already shown. This is client polling only while someone is looking, so "no viewers → no outbound queries" still holds.
+- Uploaded images are re-encoded with `sharp(input, { animated: true })`, so animated GIF/WebP uploads (88×31 buttons) keep their frames.
+- `src/lib/url.ts` holds `httpUrl()` so client widgets can sanitize config links without importing `widget-data.ts` (which pulls in the config loader).
 
 ### Widget registry (`src/widgets/`)
 - Adding a widget = `src/widgets/<type>/meta.ts` + `render.tsx`, then one line each in `widgets/meta.ts` (`SectionSchema` + `widgetMetas`) and `widgets/registry.tsx` (`views`). The `views` map is typed against `SectionType`, so a missing renderer is a compile error.
@@ -334,7 +367,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - The widget components themselves still live in `src/components/`.
 
 ### Runtime data lives in `DATA_DIR`
-- Everything the app writes goes under `DATA_DIR` (default `<cwd>/data`, `/app/data` in Docker), exported from `src/lib/db.ts`: `visitors.db` (+ `-wal`/`-shm`; visitors, comments, reactions, poll votes, admin sessions/draft/revisions/audit log) and `uploads/` (background media). New writable state belongs there too, so one read-write volume persists it. `homepage.json` is the exception — it lives in `src/config/`.
+- Everything the app writes goes under `DATA_DIR` (default `<cwd>/data`, `/app/data` in Docker), exported from `src/lib/db.ts`: `visitors.db` (+ `-wal`/`-shm`; visitors, comments, reactions, poll votes, contact messages, admin sessions/draft/revisions/audit log) and `uploads/` (background media). New writable state belongs there too, so one read-write volume persists it. `homepage.json` is the exception — it lives in `src/config/`.
 - On first `getDb()`, if `DATA_DIR/visitors.db` doesn't exist but the old `<cwd>/visitors.db` file does, it is copied with `VACUUM INTO` (consistent snapshot including un-checkpointed WAL; original left untouched).
 
 ### `HOST` vs `HOSTNAME`
@@ -654,7 +687,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - **No SQLite in unit tests:** `db.ts` loads better-sqlite3 with `require()`, which doesn't exist in the ES-module scope Node uses for `.ts` files. Code that touches the database is covered by the integration tests instead (or takes its inputs as parameters, like `initialStatus(name, body, settings)`).
 - The `MODULE_TYPELESS_PACKAGE_JSON` warning is silenced in the scripts. Don't add `"type": "module"` to `package.json` to get rid of it — that would turn `websocket-server.js` and the other CommonJS files into ES modules and break them.
 - `tests/fixtures/homepage.v1.json` is the original v1 example (from before config v2). Keep it as is: it is what proves old configs still load.
-- **Integration tests** (`tests/integration/server.ts`) start the built `websocket-server.js` in production mode in a temp folder with symlinks to `.next`, `node_modules` etc., their own `homepage.json`, content and `DATA_DIR`, on a free port. Every integration env var is set to an empty string so the real `.env` (dotenv never overrides a set variable) can't log the Discord bot in. Node's `fetch` keeps no cookies and sends no `Origin`; the `Client` helper does both. Limits to keep in mind when adding tests: 8 failed sign-ins per server start, one comment per visitor per 5s, one poll vote per visitor per second.
+- **Integration tests** (`tests/integration/server.ts`) start the built `websocket-server.js` in production mode in a temp folder with symlinks to `.next`, `node_modules` etc., their own `homepage.json`, content and `DATA_DIR`, on a free port. Every integration env var is set to an empty string so the real `.env` (dotenv never overrides a set variable) can't log the Discord bot in. Node's `fetch` keeps no cookies and sends no `Origin`; the `Client` helper does both. Limits to keep in mind when adding tests: 8 failed sign-ins per server start, one comment per visitor per 5s, one poll vote per visitor per second, one contact message per visitor per 30s (30 per 10 min in total).
 - Tests are type-checked by `tsc` and by `next build` (tsconfig includes `**/*.ts`), so **a type error in a test fails the production and Docker build**. Use `@/` imports, not `.ts` extensions.
 - `tests/unit/tailwind.test.ts` fails when a folder with `.tsx` files is missing from Tailwind's `content` list (the Phase 0 regression where widget styles were silently dropped).
 

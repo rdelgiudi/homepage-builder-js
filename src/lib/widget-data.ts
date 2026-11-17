@@ -56,23 +56,25 @@ export async function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>
   return promise;
 }
 
-const USER_AGENT = "homepage-widget/1.0";
+export const USER_AGENT = "homepage-widget/1.0";
 const TIMEOUT_MS = 10000;
 const MAX_TEXT_BYTES = 3 * 1024 * 1024;
 
-async function request(url: string, accept: string): Promise<Response> {
-  const res = await fetch(url, { headers: { "User-Agent": USER_AGENT, Accept: accept }, signal: AbortSignal.timeout(TIMEOUT_MS), cache: "no-store" });
+type ExtraHeaders = Record<string, string>;
+
+async function request(url: string, accept: string, headers: ExtraHeaders = {}, method = "GET"): Promise<Response> {
+  const res = await fetch(url, { method, headers: { "User-Agent": USER_AGENT, Accept: accept, ...headers }, signal: AbortSignal.timeout(TIMEOUT_MS), cache: "no-store" });
   if (res.status === 404) throw new WidgetError("Not found. Check the name or address in this widget's settings.", 404);
   if (!res.ok) throw new WidgetError(`The source answered with an error (${res.status}).`);
   return res;
 }
 
-export async function getJson<T = unknown>(url: string): Promise<T> {
-  return (await request(url, "application/json")).json() as Promise<T>;
+export async function getJson<T = unknown>(url: string, headers?: ExtraHeaders, method?: "GET" | "POST"): Promise<T> {
+  return (await request(url, "application/json", headers, method)).json() as Promise<T>;
 }
 
-export async function getText(url: string, accept = "*/*"): Promise<string> {
-  const text = await (await request(url, accept)).text();
+export async function getText(url: string, accept = "*/*", headers?: ExtraHeaders): Promise<string> {
+  const text = await (await request(url, accept, headers)).text();
   if (text.length > MAX_TEXT_BYTES) throw new WidgetError("The source is too large to read.");
   return text;
 }
@@ -114,13 +116,4 @@ export function htmlToText(html: string): string {
   ).trim();
 }
 
-/** Only http(s) links are ever handed to the browser. */
-export function httpUrl(value: string | undefined | null): string | null {
-  if (!value) return null;
-  try {
-    const url = new URL(value.trim());
-    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
-  } catch {
-    return null;
-  }
-}
+export { httpUrl } from "@/lib/url";

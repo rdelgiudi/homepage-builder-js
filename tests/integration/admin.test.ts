@@ -107,6 +107,7 @@ describe("admin panel switched on", () => {
       const draft = structuredClone(published) as { name: string; tabs: { sections: unknown[] }[] };
       draft.name = "Draft Only Name";
       draft.tabs[0].sections.push({ id: "test-poll", type: "poll", question: "Pasta?", options: ["Carbonara", "Amatriciana"] });
+      draft.tabs[0].sections.push({ id: "test-contact", type: "contact", askEmail: "optional" });
       assert.equal((await admin.json("/api/admin/config", { method: "PUT", json: { config: draft } })).status, 200);
 
       assert.doesNotMatch(await (await fetch(server.url + "/")).text(), /Draft Only Name/, "the live site");
@@ -166,6 +167,50 @@ describe("admin panel switched on", () => {
       await new Promise((r) => setTimeout(r, 5100)); // past the per-visitor posting limit
       const again = await visitor.json("/api/comments", { json: { name: "Spam", body: "second" } });
       assert.equal(again.status, 403);
+    });
+  });
+
+  describe("contact form and inbox", () => {
+    type Message = { id: number; name: string; email: string | null; body: string; read_at: number | null };
+    const inbox = async () => (await admin.json("/api/admin/messages?filter=all")).data as { messages: Message[]; counts: { unread: number; total: number } };
+
+    it("accepts a message only for a contact widget that is on the site", async () => {
+      const visitor = new Client(server.url);
+      assert.equal((await visitor.json("/api/contact", { json: { id: "no-such-form", name: "Ann", body: "Hi" } })).status, 404);
+      assert.equal((await visitor.json("/api/contact", { json: { id: "test-contact", name: "", body: "Hi" } })).status, 400);
+      assert.equal((await visitor.json("/api/contact", { json: { id: "test-contact", name: "Ann", email: "nope", body: "Hi" } })).status, 400);
+    });
+
+    it("stores a message privately and lets the admin mark it read", async () => {
+      const visitor = new Client(server.url);
+      const res = await visitor.json("/api/contact", { json: { id: "test-contact", name: "Ann", email: "ann@example.com", body: "Line one\nLine two" } });
+      assert.equal(res.status, 201);
+      assert.equal((await visitor.json("/api/contact", { json: { id: "test-contact", name: "Ann", body: "Again" } })).status, 429, "one message per visitor per 30s");
+      assert.equal((await new Client(server.url).json("/api/admin/messages")).status, 401, "the inbox needs a session");
+
+      const { messages, counts } = await inbox();
+      const message = messages.find((m) => m.body === "Line one\nLine two")!;
+      assert.ok(message, "newlines are kept");
+      assert.equal(message.email, "ann@example.com");
+      assert.equal(counts.unread, 1);
+      assert.equal((await admin.json(`/api/admin/messages/${message.id}`, { method: "PATCH", json: { read: true } })).status, 200);
+      assert.equal(((await admin.json("/api/admin/messages?counts=1")).data.counts as { unread: number }).unread, 0);
+    });
+
+    it("silently drops messages that fill the honeypot", async () => {
+      const bot = new Client(server.url);
+      assert.equal((await bot.json("/api/contact", { json: { id: "test-contact", name: "Bot", body: "Buy now", website: "http://spam.example" } })).status, 201);
+      assert.ok(!(await inbox()).messages.some((m) => m.name === "Bot"));
+    });
+
+    it("refuses messages from a blocked visitor", async () => {
+      const visitor = new Client(server.url);
+      await visitor.json("/api/contact", { json: { id: "test-contact", name: "Pest", body: "first" } });
+      const id = (await inbox()).messages.find((m) => m.name === "Pest")!.id;
+      assert.equal((await admin.json(`/api/admin/messages/${id}`, { method: "PATCH", json: { blockAuthor: true } })).status, 200);
+      assert.equal((await visitor.json("/api/contact", { json: { id: "test-contact", name: "Pest", body: "second" } })).status, 403);
+      assert.equal((await admin.json(`/api/admin/messages/${id}`, { method: "DELETE" })).status, 200);
+      assert.ok(!(await inbox()).messages.some((m) => m.id === id));
     });
   });
 
