@@ -6,20 +6,21 @@ A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integ
 
 ## Features
 
-- Tab-based navigation
-- Discord server widget showing member count
-- Discord user presence via WebSocket (instant updates, no polling, mobile indicator)
-- Steam integration showing recently played games and game library
-- Overwatch stats integration (ranks, hero stats, performance metrics)
-- GitHub project cards (via public API, no key needed)
-- Fully customizable sections (text, links with primary/secondary styles, headers)
-- Guestbook / comments widget — visitors post name + comment, stored in SQLite (open posting, rate-limited)
-- Anonymous emoji reactions — visitors tap an emoji to react (no account); real-time background flyer shows the reaction to everyone currently viewing
-- Icon support using emoji or image URLs
-- Responsive design with Tailwind CSS — on screens under 768px (`md`), the tab bar collapses into a compact bar with the current tab label and a hamburger toggle that opens a slide-in side menu (hamburger morphs to an X, menu starts level with the tab bar leaving the site title visible)
-- Light/dark mode support
-- Auto-generated animated gradient favicon (when not specified, uses title colors)
-- Easy to customize via JSON config files
+- **One JSON config** (`src/config/homepage.json`) for everything, validated on load and editable without a rebuild — or through the admin panel
+- **Five site layouts**: top tabs, sidebar, one-page scroll, bento grid, link-in-bio; each tab can stack its widgets or lay them out on a 12-column grid
+- **27 widget types**:
+  - Gaming and presence: Discord user presence (real-time over WebSocket, mobile indicator), Discord server, Steam (with achievement progress), Overwatch, chess ratings
+  - Social and feeds: GitHub project cards, GitHub contribution heatmap, Mastodon, Bluesky, RSS/Atom
+  - Visitors: guestbook comments (with optional moderation), anonymous emoji reactions, polls
+  - Info and media: weather, clock, countdown, images and galleries, YouTube/Vimeo/Spotify/SoundCloud embeds, random memes
+  - Text and structure: headers, text, links, markdown files, skills, timeline, quotes, dividers
+- **Backgrounds**: solid, gradient, image, video or pattern, with readability overlay, per-tab backgrounds (crossfaded) and adjustable header/card transparency
+- **Canvas effects**: stars, comet, snow, fireflies, constellation, aurora; optional mouse trail and a flying emoji whenever someone reacts
+- **Admin panel** (optional): drag-and-drop builder, schema-generated forms, live draft preview, publish with version history, media uploads, markdown editor, comment moderation
+- Live viewer count and total visitor counter
+- Light/dark mode, animated gradient title and favicon, gradient widget frames
+- Responsive: under 768px the tab bar collapses into a compact bar with a slide-in menu
+- No outbound API requests while nobody is on the site (Steam, Overwatch and Discord enrichment pause; data widgets only fetch when a visitor's page asks)
 
 ## Mobile
 
@@ -29,16 +30,18 @@ On screens narrower than 768px (`md` breakpoint), the horizontal tab bar is repl
 
 ### Prerequisites
 
-- Node.js 18+ installed
+- Node.js 26 (the version the Dockerfile uses; the tests require it)
 
 ### Installation
 
 ```bash
 npm install
+cp .env.example .env                                         # fill in only the integrations you use
+cp src/config/homepage.example.json src/config/homepage.json
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view your homepage.
+Open [http://localhost:3000](http://localhost:3000) to view your homepage. Without `homepage.json` the site starts with an empty default config. `homepage.json` and `src/content/*.md` are gitignored, so your own content stays out of the repository. To use the admin panel locally, set `ADMIN_PASSWORD` (or `ADMIN_PASSWORD_HASH`, see [Admin panel](#admin-panel)) in `.env` and open `/admin`.
 
 ### Checks
 
@@ -65,7 +68,7 @@ The tests need Node 26, the version the Dockerfile uses. The integration tests s
   "layout": { "site": "tabs" },  // "tabs" | "sidebar" | "onepage" | "bento" | "linkinbio"
   "background": {
     "base": { "type": "solid", "light": "#f3f4f6", "dark": "#111827" },
-    "effect": { "type": "comet" }  // "none" | "stars" | "comet"
+    "effect": { "type": "comet" }  // "none" | "stars" | "comet" | "snow" | "fireflies" | "constellation" | "aurora"
   },
   "effects": {
     "gradientBorders": true,
@@ -169,13 +172,14 @@ Toggle visual effects on or off:
 | `widgetFrameWidth` | number | `2` | Border width in pixels for the widget gradient frame |
 | `mouseTrail` | boolean | `false` | Comet-style mouse trail — a continuous tapering gradient line that follows the cursor; draws nothing while the cursor is stationary |
 | `mouseTrailColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the mouse trail (falls back to `titleGradient`, then default blue→purple→pink) |
+| `faviconAnimation` | boolean | `true` | Animated gradient-ring favicon when `favicon` is empty; `false` uses the static SVG version |
 | `reactionFlyer` | boolean | `true` | Background emoji flyer — when someone reacts, an emoji flies up the screen (bottom→top) for all connected visitors. Toggle off to disable |
 
-All effects default to `true` if omitted (except `widgetFrame`/`widgetFrameWidth`/`mouseTrail`). Set any to `false` to disable.
+The boolean effects default to `true` if omitted, except `widgetFrame` and `mouseTrail` (default `false`). Set any to `false` to disable.
 
 `progressGradientColors` accepts an array of CSS color strings. When unset it inherits `titleGradient` colors, falling back to a default blue→purple→pink gradient. On track change, the progress bar smoothly shrinks to the new position with burst sparkle particles.
 
-`widgetFrame` can be set globally in effects or overridden per-section by adding `"widgetFrame": true` to individual section objects (discord-server, discord-user, steam, overwatch, markdown, meme, github, comments).
+`widgetFrame` can be set globally in effects or overridden per-section by adding `"widgetFrame": true` (or `false`) to individual section objects — see the "Supports `widgetFrame`" column below.
 
 ### Section Types
 
@@ -191,7 +195,7 @@ All effects default to `true` if omitted (except `widgetFrame`/`widgetFrameWidth
 | `markdown` | Renders a markdown file from `content/` directory | yes |
 | `meme` | Shows a random meme (supports `popular` flag; NSFW/spoiler always filtered) | yes (frame wraps only the image, not the button) |
 | `github` | GitHub project cards from public repos | yes |
-| `comments` | Guestbook widget: visitors post a name + comment, listed newest-first (open posting) | yes |
+| `comments` | Guestbook widget: visitors post a name + comment, listed newest-first (optional moderation in the admin panel) | yes |
 | `reactions` | Anonymous emoji reactions (toggle per emoji, rate-limited, background flyer on react) | yes |
 | `image` | One image or a gallery: `images` (`src`, `alt`, `caption`, `link`), `columns` (1–4, at most 2 on phones), `shape` (`original` / `square` / `wide`) | yes |
 | `embed` | A YouTube or Vimeo video, or a Spotify or SoundCloud player, from its normal link (`url`) | yes |
@@ -209,7 +213,7 @@ All effects default to `true` if omitted (except `widgetFrame`/`widgetFrameWidth
 | `divider` | A line, dots or empty space (`style`, `size`) | no |
 | `poll` | A question visitors vote on (`question`, `options`; one vote per visitor, changeable; `results`: `after` / `always`) | yes |
 
-None of the widgets added in this table's second half needs an API key. Those that show data from another site fetch it through this server only when a visitor's page asks for it, and cache it (weather 15 min, feeds and chess 30 min, Mastodon and Bluesky 10 min, GitHub activity 3 h).
+Every section also accepts `span` (grid width, see Layouts) and `widgetFrame`; most accept `icon` and `text` for a title row. Only `discord-server`, `discord-user`, `steam` and `overwatch` need environment variables; none of the widgets from `image` down needs an API key. Those that show data from another site fetch it through this server only when a visitor's page asks for it, and cache it (weather 15 min, feeds and chess 30 min, Mastodon and Bluesky 10 min, GitHub activity 3 h).
 
 ## Components Reference
 
@@ -300,8 +304,9 @@ Displays Steam profile, recently played games, and top games by playtime.
 - Current game being played with elapsed time
 
 **Caching:**
-- API caches data for 10 seconds
+- The server refreshes profile and game data every 10 seconds (achievements every 10 minutes) and pushes changes over WebSocket; refreshing pauses while nobody is on the site
 - Game box art is fetched from Steam CDN
+- Achievement progress needs the Steam profile's "Game details" set to **Public**
 
 ---
 
@@ -333,10 +338,9 @@ Displays Overwatch competitive ranks, hero statistics, and performance metrics.
 **Rank Colors:**
 - Bronze, Silver, Gold, Platinum, Diamond, Master, Grandmaster, Champion
 
-**Caching:**
-- API caches data for **24 hours**
-- Refreshes automatically around 6 AM local time
-- Stats older than 24 hours are considered stale
+**Refreshing:**
+- The server refetches the profile every 30 seconds and pushes it over WebSocket only when it changed
+- Refreshing pauses while nobody is on the site
 
 **API Source:**
 - Uses the OverFast API (https://overfast-api.tekrop.fr)
@@ -396,7 +400,7 @@ Displays a random meme from an external API.
 
 ### CommentsWidget (`comments`)
 
-Lets visitors leave a name + comment on a guestbook tab. Posts are open (no account) but rate-limited per visitor and validated server-side.
+Lets visitors leave a name + comment on a guestbook tab. No account needed; posts are rate-limited per visitor and validated server-side, and can be moderated in the admin panel.
 
 **Config:** no environment variables needed
 
@@ -406,6 +410,7 @@ Lets visitors leave a name + comment on a guestbook tab. Posts are open (no acco
 - Per-visitor rate limit (1 post / 5s) keyed by the `visitor_id` cookie, shared with the visitor counter
 - Control characters stripped; XSS-safe rendering (plain React text, never `dangerouslySetInnerHTML`)
 - Loading skeleton, empty state, and error fallback
+- Moderation (admin panel → Comments): publish immediately or hold every comment for approval, hold comments containing certain words, approve/reject/edit/delete, block a visitor. A held comment is shown only to its author, marked "Awaiting approval".
 - Respects `widgetFrame` / `widgetFrameWidth` and `gradientBorders` effects
 
 **Storage:** comments live in the same `data/visitors.db` SQLite file as the visitor counter (a `comments` table), so the existing Docker volume keeps them persisted.
@@ -488,6 +493,10 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 | Visitor Counter | **REST** (server API) | SQLite-backed `/api/visitors` with hashed visitor IDs |
 | Comments | **REST** (server API) | SQLite-backed `/api/comments`; same `visitors.db`, shared `visitor_id` cookie for rate-limiting |
 | Reactions | **REST + WebSocket** (server API + broadcast) | SQLite-backed `/api/reactions`; toggle per emoji keyed by `visitor_hash` (UNIQUE). A new reaction broadcasts `{type:"reaction", emoji}` to all clients via the WebSocket server for the background flyer |
+| Live viewers | **WebSocket** (push) + REST | Count of distinct visitors with an open connection; `/api/viewers` gives the initial value |
+| Poll | **REST** (server API) | SQLite-backed `/api/poll`, one vote per visitor (changeable) |
+| Weather, RSS, Mastodon, Bluesky, chess, GitHub activity | **REST** (`/api/widgets/<type>`) | Fetched only when a visitor's widget asks, cached in memory (10 min – 3 h); never polled |
+| Config | **WebSocket** (push) | The server watches `homepage.json`; on change every open page refreshes itself |
 | Discord/Steam/Overwatch (mount) | **REST** (server API snapshots) | `/api/presence`, `/api/steam`, `/api/overwatch` return the current in-memory server state so the widgets repopulate instantly on mount (e.g. after a tab switch remounts them) instead of waiting for the next re-broadcast |
 
 ---
@@ -496,69 +505,41 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 
 ```
 ├── src/
-│   ├── config/
-│   │   ├── homepage.json            # All site config
-│   │   └── homepage.example.json
-│   ├── content/
-│   │   ├── about.md
-│   │   └── about-example.md
 │   ├── app/
-│   │   ├── api/
-│   │   │   ├── favicon/route.ts     # Animated SVG favicon fallback
-│   │   │   ├── github/route.ts      # GitHub repo data (6h cache)
-│   │   │   ├── markdown/route.ts    # Markdown API (server-rendered HTML, mtime-cached)
-│   │   │   ├── meme/route.ts        # Random meme
-│   │   │   ├── visitors/route.ts    # Visitor counter (SQLite, write-behind)
-│   │   │   ├── comments/route.ts    # Guestbook comments (SQLite, GET list + POST create)
-│   │   │   ├── reactions/route.ts   # Anonymous emoji reactions (SQLite, GET counts + POST/DELETE, broadcasts)
-│   │   │   ├── presence/route.ts    # Snapshot of current Discord presence (reads in-memory server state)
-│   │   │   ├── steam/route.ts       # Snapshot of current Steam data (reads in-memory server state)
-│   │   │   └── overwatch/route.ts   # Snapshot of current Overwatch data (reads in-memory server state)
-│   │   ├── globals.css
-│   │   ├── layout.tsx
-│   │   ├── loading.tsx              # Cold-load skeleton
-│   │   └── page.tsx
-│   ├── components/
-│   │   ├── DiscordServer.tsx        # Discord server widget (60s client cache)
-│   │   ├── DiscordUser.tsx          # Discord user presence
-│   │   ├── SteamStatus.tsx          # Steam profile & games
-│   │   ├── OverwatchStatus.tsx      # Overwatch stats
-│   │   ├── MemeWidget.tsx           # Random meme
-│   │   ├── MarkdownWidget.tsx       # Renders pre-rendered HTML
-│   │   ├── VisitorCounter.tsx       # Live viewer and total visitor counters
-│   │   ├── CommentsWidget.tsx       # Guestbook: post + list visitor comments (SQLite)
-│   │   ├── ReactionsWidget.tsx   # Anonymous emoji reactions (toggle, visitor-hash keyed, rate-limited, GUI lock)
-│   │   │   ├── ReactionFlyer.tsx     # Background layer that flies an emoji up the screen when anyone reacts
-│   │   │   ├── GitHubProjects.tsx    # GitHub repo cards
-│   │   ├── Tabs.tsx                 # Tab navigation
-│   │   ├── ParticleBackground.tsx   # Canvas particle effect (stars/comet modes)
-│   │   ├── MouseTrail.tsx           # Canvas comet-style mouse trail (gradient line, idle = no draw)
-│   │   ├── EffectsController.tsx    # Conditional effects renderer
-│   │   └── FaviconAnimation.tsx     # Canvas animated favicon (self-healing)
-│   ├── hooks/
-│   │   └── useWebSocket.ts          # WebSocket hook (rAF-coalesced per type; supports `coalesce: false` for event streams)
+│   │   ├── page.tsx / layout.tsx / loading.tsx   # Homepage (renders <SitePage> from homepage.json)
+│   │   ├── admin/                   # /admin (panel, sign-in) and /admin/preview (draft preview)
+│   │   └── api/                     # Public APIs: github, markdown, meme, visitors, viewers, comments,
+│   │       │                        #   reactions, poll, presence, steam, overwatch, favicon,
+│   │       │                        #   widgets/[type] (data widgets), uploads/[name] (uploaded media)
+│   │       └── admin/               # Admin APIs: login/logout, config + publish, revisions, upload,
+│   │                                #   content, comments, integrations
+│   ├── components/                  # SitePage, Tabs, OnePage, TabSections, BackgroundLayer, effects,
+│   │   │                            #   theme switch, counters, and the larger widget components
+│   │   └── admin/                   # Admin panel UI (builder, schema forms, preview, screens)
 │   ├── widgets/                     # Widget registry — one folder per section type
-│   │   ├── <type>/meta.ts           # Options schema (zod), label, defaults, required env vars (server-safe)
+│   │   ├── <type>/meta.ts           # Options schema (zod), label, category, defaults, required env vars (server-safe)
 │   │   ├── <type>/render.tsx        # How the section renders
 │   │   ├── meta.ts                  # All widget metas + SectionSchema
-│   │   ├── registry.tsx             # renderSection(): title row + gradient frame + widget body
-│   │   └── shared.tsx / fields.ts / types.ts
-│   └── lib/
-│       ├── schema/                  # Config v2 schema (zod), v1→v2 migration, lenient parser
-│       ├── config.ts                # mtime-cached homepage.json loader (migrates + validates)
-│       ├── markdown.ts              # Server-side markdown → HTML (marked)
-│       ├── db.ts                    # Shared better-sqlite3 connection (data/visitors.db, WAL)
-│       └── visitor.ts               # visitor_id cookie + hashing helpers (shared by visitors/comments)
-│   │   ├── reactions.ts             # DEFAULT_EMOJIS constant shared by API + widget
-│   │   └── reaction-bus.ts          # broadcastReaction() — pushes a reaction to all WS clients via globalThis.__wssBroadcast
-├── discord-presence.js              # Discord.js bot (in-process module)
-├── websocket-server.js              # Custom server + WebSocket
-├── docker-entrypoint.sh
-├── Dockerfile
-├── docker-compose-example.yml
-├── .env.example
-└── next.config.ts
+│   │   └── registry.tsx             # renderSection(): title row + gradient frame + widget body
+│   ├── lib/
+│   │   ├── schema/                  # Config v2 schema (zod), v1→v2 migration, lenient/strict parsers
+│   │   ├── admin/                   # Auth, sessions, password hashing, draft/revisions store, publish
+│   │   ├── config.ts                # mtime-cached homepage.json loader
+│   │   ├── db.ts                    # Shared SQLite connection (DATA_DIR/visitors.db)
+│   │   ├── widget-sources.ts        # Fetchers for weather, rss, mastodon, bluesky, chess, github-activity
+│   │   └── …                        # comments, reactions, uploads, background, markdown, visitor helpers
+│   ├── hooks/useWebSocket.ts        # Shared WebSocket connection, per-type subscriptions
+│   ├── config/                      # homepage.json (yours, gitignored) + homepage.example.json
+│   └── content/                     # Markdown files for markdown widgets (gitignored)
+├── tests/                           # Unit and integration tests (node --test)
+├── scripts/admin-hash.js            # npm run admin:hash
+├── websocket-server.js              # Custom server: Next.js + WebSocket, Steam/Overwatch/Discord data
+├── discord-presence.js              # Discord bot (runs in the same process)
+├── Dockerfile, docker-compose-example.yml, docker-entrypoint.sh
+└── .env.example
 ```
+
+See `AGENTS.md` for a file-by-file layout and implementation notes.
 
 ## Admin panel
 
@@ -602,20 +583,22 @@ docker compose up --build
 
 Each container runs:
 - WebSocket server + Next.js + Discord presence bot (all in one Node process)
-- Named volume mounted at `/app/data` for everything written at runtime (`visitors.db`: visitor counter, comments, reactions). Override the location with `DATA_DIR`.
+- Named volume mounted at `/app/data` for everything written at runtime: `visitors.db` (visitor counter, comments, reactions, poll votes, admin sessions, drafts and history) and `uploads/` (background images and videos). Override the location with `DATA_DIR`.
 - Bind mounts for `src/config/` and `src/content/` (read-only for the public container, writable for the one serving the admin panel)
 
 The example compose file starts two containers from the same image — the public site and the admin panel — sharing the data volume and the config/content folders, meant to sit behind one hostname with the proxy rule described under *Admin panel*. The comments in the file cover the own-port and single-container alternatives.
 
 ## Tech Stack
 
-- **Next.js** - React framework
-- **TypeScript** - Type safety
-- **Tailwind CSS** - Styling
-- **Discord API** - User presence & server widget
-- **Steam API** - Game library
-- **OverFast API** - Overwatch stats
-- **GitHub API** - Repo data
+- **Next.js 15 / React 19** - framework, with a custom Node server for WebSockets (`ws`)
+- **TypeScript** - type safety
+- **Tailwind CSS** - styling
+- **zod** - config schema, validation and the admin panel's generated forms
+- **better-sqlite3** - visitors, comments, reactions, polls, admin state
+- **sharp** - re-encoding uploaded images
+- **dnd-kit** - drag and drop in the admin builder
+- **discord.js** - user presence; **Steam Web API**, **OverFast API** (Overwatch), **GitHub API**
+- **Open-Meteo, Lichess, Chess.com, Mastodon, Bluesky** - data widgets (no keys needed)
 
 ## License
 

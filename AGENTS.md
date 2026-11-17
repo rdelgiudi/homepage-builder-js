@@ -1,6 +1,6 @@
 # Project Overview
 
-Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch status, and GitHub project cards. Tab-based UI with real-time WebSocket updates.
+Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON config: 27 widget types (Discord, Steam, Overwatch, GitHub, guestbook, reactions, polls, weather, feeds, …), five site layouts, configurable backgrounds and canvas effects, real-time WebSocket updates, and an optional admin panel (`/admin`) with a drag-and-drop builder, live draft preview and publish.
 
 ## Architecture
 
@@ -20,16 +20,17 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch s
 │   │   │   ├── github/route.ts      # GitHub repo data with 6h cache, 10m error cache
 │   │   │   ├── markdown/route.ts    # Reads markdown from src/content/ at runtime, renders to HTML
 │   │   │   ├── meme/route.ts        # Random meme from external API (NSFW/spoiler always filtered; popular mode supported)
-│   │   │   ├── visitors/route.ts    # Visitor counter (SQLite, write-behind queue)
-│   │   │   ├── comments/route.ts    # Guestbook comments (SQLite, GET list + POST create)
+│   │   │   ├── visitors/route.ts    # Total visitor counter (SQLite, write-behind queue)
+│   │   │   ├── viewers/route.ts     # Live viewer count snapshot (reads globalThis.__serverSnapshots.getViewers)
+│   │   │   ├── comments/route.ts    # Guestbook comments (SQLite, GET list + POST create; moderation-aware)
 │   │   │   ├── reactions/route.ts   # Anonymous emoji reactions (SQLite, GET counts + POST/DELETE, broadcasts to all clients)
+│   │   │   ├── poll/route.ts        # Poll results (GET) and voting (POST); SQLite poll_votes
 │   │   │   ├── presence/route.ts    # Snapshot of current Discord presence (force-dynamic; reads in-memory server state)
 │   │   │   ├── steam/route.ts       # Snapshot of current Steam data (force-dynamic; reads in-memory server state)
-│   │   │   └── overwatch/route.ts   # Snapshot of current Overwatch data (force-dynamic; reads in-memory server state)
+│   │   │   ├── overwatch/route.ts   # Snapshot of current Overwatch data (force-dynamic; reads in-memory server state)
 │   │   │   ├── widgets/[type]/route.ts  # Data for widgets that show another site's data (dispatches to lib/widget-sources.ts)
-│   │   │   ├── poll/route.ts        # Poll results (GET) and voting (POST); SQLite poll_votes
 │   │   │   ├── uploads/[name]/route.ts  # Public: serves an uploaded background image/video (immutable cache, byte ranges)
-│   │   │   └── admin/               # Admin API — every handler wrapped in withAdmin()
+│   │   │   └── admin/               # Admin API — every handler wrapped in withAdmin() (except login)
 │   │   │       ├── login/ logout/   # Session create / destroy
 │   │   │       ├── config/route.ts  # GET published+draft, PUT save draft (strict), DELETE discard draft
 │   │   │       ├── config/publish/  # POST: draft → homepage.json (revision kept)
@@ -42,6 +43,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch s
 │   │   │   ├── layout.tsx           # Guard only: notFound() when admin is disabled
 │   │   │   ├── (panel)/             # The panel's own chrome
 │   │   │   │   ├── layout.tsx       # Wraps in .adm; imports admin.css
+│   │   │   │   ├── loading.tsx      # Panel loading state (replaces the site skeleton under /admin)
 │   │   │   │   ├── page.tsx         # /admin — redirects to /admin/login without a session; renders AdminApp
 │   │   │   │   ├── login/page.tsx   # /admin/login
 │   │   │   │   └── admin.css        # All admin styles, scoped under .adm
@@ -51,75 +53,81 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch s
 │   │   ├── loading.tsx              # Cold-load skeleton
 │   │   └── page.tsx                 # Homepage — <SitePage> with the published config (homepage.json read at runtime via fs)
 │   ├── components/
-│   │   ├── DiscordServer.tsx        # Discord server widget (client-side cache)
-│   │   ├── DiscordUser.tsx          # Discord user presence (WebSocket subscriber, mobile indicator)
-│   │   ├── SteamStatus.tsx          # Steam profile & games with achievement progress
-│   │   ├── OverwatchStatus.tsx      # Overwatch stats
-│   │   ├── MemeWidget.tsx           # Random meme display
-│   │   ├── MarkdownWidget.tsx       # Renders pre-rendered HTML from /api/markdown
-│   │   ├── VisitorCounter.tsx       # Live viewer + total visitor counters (see "Visitor counters")
-│   │   ├── CommentsWidget.tsx       # Guestbook: post + list visitor comments (SQLite)
-│   │   │   ├── ReactionsWidget.tsx      # Anonymous emoji reactions (toggle, visitor-hash keyed, rate-limited, GUI lock)
-│   │   │   ├── ReactionFlyer.tsx        # Background layer that flies an emoji up the screen when anyone reacts (WebSocket subscriber, coalesce:false)
-│   │   ├── GitHubProjects.tsx       # GitHub repo cards (public API, no key needed)
+│   │   ├── SitePage.tsx             # The whole site rendered from a config; used by / and /admin/preview. Builds WidgetContext; mounts ThemeSwitcher, FaviconAnimation, ConfigSync
 │   │   ├── SiteHeader.tsx           # Site name + tagline (`top` / `side` variants)
 │   │   ├── Tabs.tsx                 # Tab navigation (top bar or side column, mobile drawer, transitions)
 │   │   ├── OnePage.tsx              # "onepage" layout: all tabs as sections, sticky jump bar with scroll-spy
 │   │   ├── TabSections.tsx          # One tab's widgets as a stack or 12-column grid; renders via widgets/registry
-│   │   ├── BackgroundLayer.tsx      # Gradient / image / video / pattern layer + overlay; per-tab crossfade
-│   │   ├── AmbientEffects.tsx       # Canvas effects: snow, fireflies, constellation, aurora
-│   │   ├── ParticleBackground.tsx   # Canvas effects: stars, comet
-│   │   ├── MouseTrail.tsx           # Canvas comet-style mouse trail (gradient line, no draw while stationary)
-│   │   ├── SitePage.tsx             # The whole site rendered from a config; used by / and /admin/preview. Mounts ThemeSwitcher, FaviconAnimation, ConfigSync
 │   │   ├── ConfigSync.tsx           # router.refresh() on WS {type:"config"} (live) or on postMessage from the admin panel (preview)
-│   │   ├── admin/                   # Admin panel client code (zod is allowed here — it is a separate route chunk)
-│   │   │   ├── AdminApp.tsx         # Shell: top bar (status, undo/redo, discard, publish), nav, screens
-│   │   │   ├── store.tsx            # AdminProvider/useAdmin: working config, undo history, debounced draft autosave, publish
-│   │   │   ├── schemas.ts           # z.toJSONSchema() views of the config schema for the form generator
-│   │   │   ├── SchemaForm.tsx       # Generic form generator (JSON Schema + `ui` hints → controls)
-│   │   │   ├── Builder.tsx          # useBuilder(): dnd-kit outline (tabs, widgets, palette) + inspector
-│   │   │   ├── PreviewPane.tsx      # iframe of /admin/preview, refreshed by postMessage
-│   │   │   ├── ConfigScreens.tsx    # Site / Background / Effects
-│   │   │   ├── LayoutControls.tsx   # LayoutPicker (site layout thumbnails) + SpanControl (widget width in a grid)
-│   │   │   ├── ContentScreen.tsx  CommentsScreen.tsx  OtherScreens.tsx (Integrations, History)  LoginForm.tsx
-│   │   │   └── api.ts               # fetch helper for /api/admin/*
-│   │   ├── EffectsController.tsx    # Conditionally renders effects based on config
-│   │   └── FaviconAnimation.tsx     # Canvas-based animated favicon (hidden canvas → PNG data URL, self-healing)
+│   │   ├── BackgroundLayer.tsx      # Gradient / image / video / pattern layer + overlay; per-tab crossfade
+│   │   ├── EffectsController.tsx    # Conditionally renders the particle effect, mouse trail and reaction flyer
+│   │   ├── ParticleBackground.tsx   # Canvas effects: stars, comet
+│   │   ├── AmbientEffects.tsx       # Canvas effects: snow, fireflies, constellation, aurora
+│   │   ├── MouseTrail.tsx           # Canvas comet-style mouse trail (gradient line, no draw while stationary)
+│   │   ├── ReactionFlyer.tsx        # Background layer that flies an emoji up the screen when anyone reacts (WebSocket subscriber, coalesce:false)
+│   │   ├── FaviconAnimation.tsx     # Canvas-based animated favicon (hidden canvas → PNG data URL, self-healing)
+│   │   ├── ThemeSwitcher.tsx        # Fixed light/dark toggle (bottom right)
+│   │   ├── useTheme.ts              # Theme state: `dark`/`light` class on <html>, persisted in localStorage
+│   │   ├── ThemeProvider.tsx        # Context version of useTheme — currently unused
+│   │   ├── VisitorCounter.tsx       # Live viewer + total visitor counters (see "Visitor counters")
+│   │   ├── DiscordServer.tsx        # Discord server widget (60s client-side cache)
+│   │   ├── DiscordUser.tsx          # Discord user presence (WebSocket subscriber, mobile indicator)
+│   │   ├── SteamStatus.tsx          # Steam profile & games with achievement progress
+│   │   ├── OverwatchStatus.tsx      # Overwatch stats
+│   │   ├── GitHubProjects.tsx       # GitHub repo cards (public API, no key needed)
+│   │   ├── MemeWidget.tsx           # Random meme display
+│   │   ├── MarkdownWidget.tsx       # Renders pre-rendered HTML from /api/markdown
+│   │   ├── CommentsWidget.tsx       # Guestbook: post + list visitor comments (SQLite)
+│   │   ├── ReactionsWidget.tsx      # Anonymous emoji reactions (toggle, visitor-hash keyed, rate-limited, GUI lock)
+│   │   └── admin/                   # Admin panel client code (zod is allowed here — it is a separate route chunk)
+│   │       ├── AdminApp.tsx         # Shell: top bar (status, undo/redo, discard, publish), nav, screens, resizable panels
+│   │       ├── store.tsx            # AdminProvider/useAdmin: working config, undo history, debounced draft autosave, publish
+│   │       ├── schemas.ts           # z.toJSONSchema() views of the config schema for the form generator
+│   │       ├── SchemaForm.tsx       # Generic form generator (JSON Schema + `ui` hints → controls)
+│   │       ├── Builder.tsx          # useBuilder(): dnd-kit outline (tabs, widgets, palette) + inspector
+│   │       ├── PreviewPane.tsx      # iframe of /admin/preview, refreshed by postMessage
+│   │       ├── ConfigScreens.tsx    # Site / Background / Effects
+│   │       ├── LayoutControls.tsx   # LayoutPicker (site layout thumbnails) + SpanControl (widget width in a grid)
+│   │       ├── ContentScreen.tsx    # Markdown files editor
+│   │       ├── CommentsScreen.tsx   # Moderation queue, settings, audit log
+│   │       ├── OtherScreens.tsx     # Integrations, History
+│   │       ├── LoginForm.tsx
+│   │       └── api.ts               # fetch helper for /api/admin/*
 │   ├── config/
-│   │   ├── homepage.json            # ALL site config: name, tagline, favicon, tabs
+│   │   ├── homepage.json            # ALL site config (gitignored — copy from the example)
 │   │   └── homepage.example.json
-│   ├── content/
-│   │   ├── about.md                 # Runtime markdown (not bundled)
-│   │   └── about-example.md
+│   ├── content/                     # Runtime markdown, *.md (gitignored, not bundled)
 │   ├── hooks/
 │   │   └── useWebSocket.ts          # Singleton WebSocket hook (rAF-coalesced per type; supports `coalesce: false` for event streams like reaction flyers)
 │   ├── lib/
 │   │   ├── schema/
 │   │   │   ├── config.ts            # Zod schema for homepage.json v2 — single source of truth for types + defaults
 │   │   │   ├── migrate.ts           # v1 → v2 structural migration + id generation
-│   │   │   └── parse.ts             # parseConfig(): migrate + lenient validation (drops bad tabs/sections with warnings)
+│   │   │   └── parse.ts             # parseConfig() (lenient) / strictParseConfig()
 │   │   ├── admin/
 │   │   │   ├── auth.ts              # adminEnabled(), password check, sessions, CSRF, login throttle, withAdmin()
 │   │   │   ├── password.js          # scrypt hash/verify (CommonJS — also loaded by websocket-server.js and scripts/admin-hash.js)
 │   │   │   ├── store.ts             # SQLite: admin_sessions, admin_state (draft, settings), config_revisions, blocked_visitors, audit_log
 │   │   │   └── publish.ts           # publishConfig() (atomic write + revision), getDraftConfig(), isWritable()
-│   │   ├── comments.ts              # comments table + moderation columns, moderation settings, initialStatus()
-│   │   ├── background.ts            # backgroundLayer(): background.base → CSS variables/classes (pure); safeUrl()
-│   │   ├── widget-data.ts           # cached(), getJson/getText, findSection(), htmlToText(), httpUrl(), WidgetError
-│   │   ├── widget-sources.ts        # weather, chess, bluesky, github-activity, rss, mastodon fetchers
-│   │   ├── uploads.ts               # DATA_DIR/uploads: storeImage (sharp → WebP), storeVideo, resolveUpload, listUploads
-│   │   ├── content.ts               # CONTENT_DIR + resolveContentFile() (plain *.md names only)
 │   │   ├── config.ts                # mtime-cached homepage.json loader (uses parseConfig)
 │   │   ├── db.ts                    # Shared better-sqlite3 connection (DATA_DIR/visitors.db, WAL); exports DATA_DIR
-│   │   └── visitor.ts               # visitor_id cookie + hashing helpers (shared by visitors/comments)
-│   │   │   ├── reactions.ts             # DEFAULT_EMOJIS constant shared by API + widget
-│   │   │   └── reaction-bus.ts          # broadcastReaction() — pushes a reaction to all WS clients via globalThis.__wssBroadcast
-│   ├── widgets/                     # Widget registry — one folder per section type
+│   │   ├── visitor.ts               # visitor_id cookie + hashing helpers (shared by visitors/comments/reactions/poll)
+│   │   ├── comments.ts              # comments table + moderation columns, moderation settings, initialStatus()
+│   │   ├── reactions.ts             # DEFAULT_EMOJIS constant shared by API + widget
+│   │   ├── reaction-bus.ts          # broadcastReaction() — pushes a reaction to all WS clients via globalThis.__wssBroadcast
+│   │   ├── background.ts            # backgroundLayer(): background.base → CSS variables/classes (pure); safeUrl()
+│   │   ├── uploads.ts               # DATA_DIR/uploads: storeImage (sharp → WebP), storeVideo, resolveUpload, listUploads
+│   │   ├── content.ts               # CONTENT_DIR + resolveContentFile() (plain *.md names only)
+│   │   ├── markdown.ts              # Server-side markdown → HTML (marked), mtime-cached
+│   │   ├── widget-data.ts           # cached(), getJson/getText, findSection(), htmlToText(), httpUrl(), WidgetError
+│   │   └── widget-sources.ts        # weather, chess, bluesky, github-activity, rss, mastodon fetchers
+│   ├── widgets/                     # Widget registry — one folder per section type (27 types)
 │   │   ├── <type>/meta.ts           # Server-safe: zod options schema, label, icon, category, defaults, requiresEnv
 │   │   ├── <type>/render.tsx        # Client: WidgetView { titled, frame, render(section, ctx) }
+│   │   ├── embed/player.ts          # toPlayer(): link → player URL (kept in .ts so tests can import it)
 │   │   ├── meta.ts                  # Server-safe index: SectionSchema (discriminated union), widgetMetas
 │   │   ├── registry.tsx             # Client index: renderSection(section, ctx)
-│   │   ├── fields.ts                # Shared zod fields (base id/type, titleFields, frameField)
+│   │   ├── fields.ts                # Shared zod fields (base id/type/span, titleFields, frameField)
 │   │   ├── shared.tsx               # Icon, SectionTitle, WidgetFrame, alignClass
 │   │   ├── common.tsx               # For data widgets: Card, Notice, Skeleton, useWidgetData, DataCard, timeAgo
 │   │   ├── posts.tsx                # PostList shared by mastodon + bluesky
@@ -128,12 +136,19 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch s
 │   └── types/
 │       ├── gray-matter.d.ts
 │       └── quantize.d.ts
+├── tests/
+│   ├── register.mjs                 # Node module hooks: `@/` alias + extensionless imports
+│   ├── unit/                        # config, security, widgets, tailwind (no network, no database)
+│   ├── integration/                 # server.ts (starts the built server) + admin.test.ts (HTTP tests)
+│   └── fixtures/homepage.v1.json    # Original v1 config — proves old configs still load
 ├── scripts/admin-hash.js            # `npm run admin:hash` — prints an ADMIN_PASSWORD_HASH line
 ├── discord-presence.js              # Discord.js bot (in-process; exports start/onPresenceUpdate)
-├── websocket-server.js              # Custom Next.js server + WebSocket
+├── websocket-server.js              # Custom Next.js server + WebSocket; Steam/Overwatch polling, presence enrichment, config file watch
 ├── docker-entrypoint.sh             # Execs websocket-server (presence runs in-process)
-├── Dockerfile                       # Multi-stage: deps → builder → runner
-├── docker-compose-example.yml
+├── Dockerfile                       # Multi-stage (node:26 alpine): deps → builder → runner
+├── docker-compose-example.yml       # Public + admin containers sharing one data volume
+├── eslint.config.mjs                # ESLint 9 flat config
+├── tailwind.config.ts               # `content` must list every folder with class names (incl. src/widgets)
 ├── .env.example
 └── next.config.ts
 ```
@@ -183,7 +198,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch s
 | `customScrollbar` | boolean | `true` | Thin rounded scrollbar styling |
 | `progressGradient` | boolean | `true` | Animated gradient fill on music activity progress bar + tiny sparkle particles at the current position |
 | `progressGradientColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the progress bar; falls back to `titleGradient` colors, then to a default blue→purple→pink gradient |
-| `widgetFrame` | boolean | `false` | Animated gradient frame around widget sections (discord-server, discord-user, steam, overwatch, markdown, meme, github, comments) using title gradient colors. Can be overridden per section with a `widgetFrame` field on the section object. |
+| `widgetFrame` | boolean | `false` | Animated gradient frame around widget sections using title gradient colors — every widget whose view has `frame: "wrap"` or `"self"` (all except header, text, links, divider). Can be overridden per section with a `widgetFrame` field on the section object. |
 | `widgetFrameWidth` | number | `2` | Border width in pixels for the widget gradient frame |
 | `mouseTrail` | boolean | `false` | Comet-style mouse trail — continuous tapering gradient line following the cursor (no trail drawn while stationary) |
 | `mouseTrailColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the mouse trail; falls back to `titleGradient` colors, then to a default blue→purple→pink gradient |
@@ -314,13 +329,13 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch s
 
 ### Widget registry (`src/widgets/`)
 - Adding a widget = `src/widgets/<type>/meta.ts` + `render.tsx`, then one line each in `widgets/meta.ts` (`SectionSchema` + `widgetMetas`) and `widgets/registry.tsx` (`views`). The `views` map is typed against `SectionType`, so a missing renderer is a compile error.
-- **`meta.ts` must stay server-safe and `render.tsx` must only `import type` from it.** `registry.tsx` is pulled into the client bundle through `Tabs.tsx`; a runtime import of a meta file would ship zod to the browser. Conversely the config loader imports `widgets/meta.ts` on the server, so meta files must never import React components.
+- **`meta.ts` must stay server-safe and `render.tsx` must only `import type` from it.** `registry.tsx` is pulled into the client bundle through `TabSections.tsx`; a runtime import of a meta file would ship zod to the browser. Conversely the config loader imports `widgets/meta.ts` on the server, so meta files must never import React components.
 - `renderSection` owns the shared chrome: the icon + text title row (`view.titled`, uses `titleFields`) and the gradient frame (`view.frame`: `wrap` = shell wraps the body, `self` = widget draws its own frame from `ctx.framed`, `none`). `ctx.framed` is `section.widgetFrame ?? effects.widgetFrame`.
-- Site-wide values reach widgets through one `WidgetContext` object built in `page.tsx` — add a field there instead of threading new props through `Tabs`.
+- Site-wide values reach widgets through one `WidgetContext` object built in `SitePage.tsx` — add a field there instead of threading new props through `Tabs` / `OnePage` / `TabSections`.
 - The widget components themselves still live in `src/components/`.
 
 ### Runtime data lives in `DATA_DIR`
-- Everything the app writes (currently `visitors.db` + its `-wal`/`-shm`) goes under `DATA_DIR` (default `<cwd>/data`, `/app/data` in Docker), exported from `src/lib/db.ts`. New writable state (uploads, config revisions) belongs there too, so one read-write volume persists it.
+- Everything the app writes goes under `DATA_DIR` (default `<cwd>/data`, `/app/data` in Docker), exported from `src/lib/db.ts`: `visitors.db` (+ `-wal`/`-shm`; visitors, comments, reactions, poll votes, admin sessions/draft/revisions/audit log) and `uploads/` (background media). New writable state belongs there too, so one read-write volume persists it. `homepage.json` is the exception — it lives in `src/config/`.
 - On first `getDb()`, if `DATA_DIR/visitors.db` doesn't exist but the old `<cwd>/visitors.db` file does, it is copied with `VACUUM INTO` (consistent snapshot including un-checkpointed WAL; original left untouched).
 
 ### `HOST` vs `HOSTNAME`
@@ -340,7 +355,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch s
 
 ### homepage.json is runtime, not bundled
 - Read via `fs.readFileSync` in `src/lib/config.ts` (mtime-cached; re-parsed, migrated and validated only when the file's mtime changes).
-- Imported by `src/app/page.tsx` and `src/app/layout.tsx`.
+- `getConfig()` is used by `src/app/page.tsx`, `src/app/layout.tsx` (metadata), `/api/favicon`, `findSection()` and the admin routes; `/admin/preview` renders the draft instead.
 - `export const dynamic = "force-dynamic"` prevents static prerendering.
 - Allows editing without rebuild; can be volume-mounted in Docker.
 
@@ -540,17 +555,17 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch s
 - Status text appends " · On Mobile" when mobile-only.
 
 ### Docker persistence
-- `/app/data` (`DATA_DIR`) holds `visitors.db` — `docker-compose-example.yml` mounts the named volume `homepage_data` there to persist it. (Older setups mounted a volume at `/app/visitors.db`; that data needs to be copied into the new volume by hand.)
+- `/app/data` (`DATA_DIR`) holds `visitors.db` and `uploads/` — `docker-compose-example.yml` mounts the named volume `homepage_data` there to persist it. (Older setups mounted a volume at `/app/visitors.db`; that data needs to be copied into the new volume by hand.)
 - `src/config/` and `src/content/` can be bind-mounted at runtime for live config edits without rebuild.
 
 ### Comments guestbook (`comments` section + `/api/comments`)
-- Comments are stored in the **same** `data/visitors.db` SQLite file as the visitor counter, in a `comments` table (columns: `id`, `name`, `body`, `created_at`). The shared connection lives in `src/lib/db.ts` (WAL mode); both `/api/visitors` and `/api/comments` call `getDb()` so there is exactly one connection per process.
+- Comments are stored in the **same** `data/visitors.db` SQLite file as the visitor counter, in a `comments` table (`id`, `name`, `body`, `created_at`, plus the moderation columns `status`, `visitor_hash`, `edited_at`, `moderated_at` — see "Comment moderation"). The shared connection lives in `src/lib/db.ts` (WAL mode); both `/api/visitors` and `/api/comments` call `getDb()` so there is exactly one connection per process.
 - `src/lib/visitor.ts` holds the shared `visitor_id` cookie logic (name, salt, hashing, parsing) used by both routes for identification and rate-limiting.
 - **POST `/api/comments`**: body `{ name, body }` (both trimmed, required). Server validates name ≤ 40 chars, body ≤ 500 chars, strips control characters (`\u0000-\u001f`, `\u007f`), and rate-limits per hashed `visitor_id` to one post / 5s. A new `visitor_id` cookie is set if absent. Returns `201` with the created row.
 - **GET `/api/comments?limit=N`**: returns the most recent `N` comments newest-first (`ORDER BY id DESC`), `limit` clamped to 1–200 (default 50).
 - **XSS safety**: `CommentsWidget` renders `name` and `body` as plain React text (`whitespace-pre-wrap break-words`) — never `dangerouslySetInnerHTML` — so user input cannot inject markup. All length/clamp limits are re-enforced server-side, not just client-side.
-- v1 is **open posting** (no moderation). Spam protection is the per-visitor rate limit only; add pre-moderation/blocklist if needed later.
-- The `comments` section is wrapped by `maybeWrapFrame` in `Tabs.tsx`, so `widgetFrame`/`widgetFrameWidth` apply like other widgets. The section title (`icon`/`text`) renders above the frame, consistent with `discord-user`/`steam`/etc.
+- New comments are published immediately unless moderation holds them (pre-moderation mode, held words) and blocked visitors can't post — see "Comment moderation". The per-visitor rate limit applies either way.
+- The `comments` view uses `frame: "wrap"`, so `renderSection` (`widgets/registry.tsx`) applies `widgetFrame`/`widgetFrameWidth` like for other widgets. The section title (`icon`/`text`) renders above the frame, consistent with `discord-user`/`steam`/etc.
 
 ### Reactions (`reactions` section + `/api/reactions`)
 - Anonymous emoji reactions — an alternative to leaving a comment. A visitor taps an emoji to react; no name/body required.
@@ -562,7 +577,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch s
 - **Rate limit**: a global `RATE_LIMIT_MS` (250ms) per hashed `visitor_id`. A `429` is not a hard failure — `ReactionsWidget` retries the request after the window elapses so the visitor's intent is honored rather than dropped, and the whole widget stays locked (grayed out) until the request resolves, matching the rate-limit window.
 - **Keyed by visitor hash, not localStorage**: the `reacted` state comes from the server (`GET`/`POST`/`DELETE` responses), not client storage, so toggling is consistent with the `UNIQUE` constraint.
 - **Real-time flyer**: on a new reaction the server broadcasts `{ type: "reaction", emoji }` to every client. `ReactionFlyer` (rendered by `EffectsController` when `effects.reactionFlyer` is not `false`) subscribes with `coalesce: false` and spawns an emoji that animates bottom→top in the background; capped at 40 concurrent, removed on animation end.
-- The `reactions` section is wrapped by `maybeWrapFrame` in `Tabs.tsx`, so `widgetFrame`/`widgetFrameWidth` apply like other widgets.
+- The `reactions` view uses `frame: "wrap"`, so `widgetFrame`/`widgetFrameWidth` apply like for other widgets.
 
 ### Gradient widget frame stacking
 - `.gradient-frame::before` needs `z-index: 1` and `.gradient-frame` needs `isolation: isolate` because Next.js `Image fill` uses `position: absolute`, putting it in the same stacking level as the `::before`. Without these, the image renders on top of the gradient border at the left/right edges of full-width content like the Discord banner.
@@ -570,11 +585,11 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch s
 
 ### `framed` prop on DiscordUser
 - `DiscordUser` accepts a `framed` boolean prop. When `true`: no `border` classes applied, and `paddingTop: var(--gf-width, 2px)` added via inline style. The CSS variable cascades from the `.gradient-frame` wrapper which sets `--gf-width`.
-- Passed from `Tabs.tsx` as `framed={section.widgetFrame ?? widgetFrame}`.
+- Passed from `widgets/discord-user/render.tsx` as `framed={ctx.framed}` (`ctx.framed` = `section.widgetFrame ?? effects.widgetFrame`).
 - The loading skeleton, error fallback, and main render all handle `framed` identically.
 
 ### Meme widget frame wraps only the image, not the whole widget
-- `MemeWidget` accepts `widgetFrameEnabled`, `widgetFrameWidth`, `widgetFrameGradient` props directly (not wrapped by `maybeWrapFrame`).
+- The `meme` view uses `frame: "self"`: `renderSection` does not wrap it; `widgets/meme/render.tsx` passes `widgetFrameEnabled={ctx.framed}`, `widgetFrameWidth`, `widgetFrameGradient` to `MemeWidget`.
 - When enabled, the `gradient-frame` class and CSS variables are applied only to the image container `<div>`, leaving the title, metadata, and "New Meme" button outside the framed area.
 
 ### Meme API always filters NSFW, and de-duplicates via client history
