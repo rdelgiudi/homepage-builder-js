@@ -15,6 +15,11 @@ export const schema = z.object({
     .default(40)
     .meta({ title: "Games to look through", description: "Your most-played games. More = a slower first load (refreshed every 6 hours)" }),
   layout: z.enum(["list", "grid"]).default("list").meta({ title: "Layout" }),
+  showHidden: z
+    .boolean()
+    .default(false)
+    .meta({ title: "Uncover hidden achievements", description: "Off = spoiler achievements show only the game until a visitor clicks to see them" }),
+  rareBorder: z.boolean().default(true).meta({ title: "Rare border", description: "Animated gold ring around achievements fewer than 10% of players have" }),
 });
 
 export type SteamRareSection = z.infer<typeof schema>;
@@ -26,6 +31,6 @@ export const meta = {
   category: "gaming",
   description: "Your rarest unlocked Steam achievements, by global unlock rate",
   schema,
-  defaults: { limit: 6, scanGames: 40, layout: "list" },
+  defaults: { limit: 6, scanGames: 40, layout: "list", showHidden: false, rareBorder: true },
   requiresEnv: ["STEAM_API_KEY", "STEAM_ID"],
 } satisfies WidgetMeta;

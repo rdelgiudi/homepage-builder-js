@@ -252,6 +252,8 @@ interface SchemaAchievement {
   displayName?: string;
   description?: string;
   icon?: string;
+  /** 1 = a spoiler: Steam hides it until unlocked (GetSchemaForGame omits its description). */
+  hidden?: number;
 }
 
 export interface RareAchievement {
@@ -262,6 +264,7 @@ export interface RareAchievement {
   icon: string | null;
   percent: number;
   unlockedAt: string | null;
+  hidden: boolean;
 }
 
 /** Joins one game's unlocked achievements with their global unlock rate and display names. */
@@ -281,9 +284,39 @@ export function rareAchievements(appid: number, game: string, player: PlayerAchi
         icon: httpUrl(s?.icon ?? null),
         percent: pct,
         unlockedAt: a.unlocktime ? new Date(a.unlocktime * 1000).toISOString() : null,
+        hidden: s?.hidden === 1,
       },
     ];
   });
+}
+
+export interface GameAchievement {
+  internal_name: string;
+  localized_name?: string;
+  localized_desc?: string;
+  icon?: string;
+  hidden?: boolean;
+  player_percent_unlocked?: string | number;
+}
+
+/**
+ * `IPlayerService/GetGameAchievements` (no key) → the global rates and display data
+ * `rareAchievements` takes. Unlike `GetSchemaForGame`, it includes the descriptions of
+ * hidden achievements. Icons are file names under the community CDN.
+ */
+export function fromGameAchievements(appid: number, list: GameAchievement[]): { globals: { name: string; percent: number | string }[]; schema: SchemaAchievement[] } {
+  const iconBase = `https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/${appid}/`;
+  const file = /^[\w.-]+\.(jpg|png)$/;
+  return {
+    globals: list.filter((a) => a.player_percent_unlocked !== undefined).map((a) => ({ name: a.internal_name, percent: a.player_percent_unlocked! })),
+    schema: list.map((a) => ({
+      name: a.internal_name,
+      displayName: a.localized_name,
+      description: a.localized_desc,
+      icon: a.icon && file.test(a.icon) ? iconBase + a.icon : undefined,
+      hidden: a.hidden ? 1 : 0,
+    })),
+  };
 }
 
 async function gameRarities(key: string, steamId: string, game: OwnedGame): Promise<RareAchievement[]> {
@@ -294,6 +327,19 @@ async function gameRarities(key: string, steamId: string, game: OwnedGame): Prom
     ).catch(() => null);
     const unlocked = player?.playerstats?.achievements?.filter((a) => a.achieved === 1) ?? [];
     if (!unlocked.length) return [];
+    const name = game.name || `App ${game.appid}`;
+
+    // One call with everything, hidden descriptions included…
+    const all = await getJson<{ response?: { achievements?: GameAchievement[] } }>(
+      `https://api.steampowered.com/IPlayerService/GetGameAchievements/v1/?appid=${game.appid}&language=english`
+    ).catch(() => null);
+    const list = all?.response?.achievements;
+    if (list?.length) {
+      const { globals, schema } = fromGameAchievements(game.appid, list);
+      return rareAchievements(game.appid, name, unlocked, globals, schema);
+    }
+
+    // …or the documented pair, where hidden achievements have no description.
     const [globals, schema] = await Promise.all([
       getJson<{ achievementpercentages?: { achievements?: { name: string; percent: number | string }[] } }>(`${api}/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${game.appid}`),
       getJson<{ game?: { gameName?: string; availableGameStats?: { achievements?: SchemaAchievement[] } } }>(
@@ -302,7 +348,7 @@ async function gameRarities(key: string, steamId: string, game: OwnedGame): Prom
     ]);
     return rareAchievements(
       game.appid,
-      game.name || schema?.game?.gameName || `App ${game.appid}`,
+      game.name || schema?.game?.gameName || name,
       unlocked,
       globals.achievementpercentages?.achievements ?? [],
       schema?.game?.availableGameStats?.achievements ?? []

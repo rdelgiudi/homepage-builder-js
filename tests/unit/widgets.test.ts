@@ -8,7 +8,7 @@ import { initialStatus } from "@/lib/comments";
 import { backgroundLayer } from "@/lib/background";
 import { BackgroundBaseSchema } from "@/lib/schema/config";
 import { infoRequest, parseA2SReply, parseServerAddress } from "@/lib/a2s";
-import { minecraftStatus, rareAchievements, speedrunRun, tetrioLevel, tetrioProfile } from "@/lib/gaming-sources";
+import { fromGameAchievements, minecraftStatus, rareAchievements, speedrunRun, tetrioLevel, tetrioProfile } from "@/lib/gaming-sources";
 import { summarizePlay } from "@/lib/play-history";
 import { playStatus } from "@/widgets/play-with-me/status";
 import { searchTerm, storeResults } from "@/lib/game-suggestions";
@@ -345,9 +345,28 @@ describe("gaming sources", () => {
         { name: "A", percent: "3.4" },
         { name: "B", percent: 1 },
       ],
-      [{ name: "A", displayName: "Alpha", description: "Do it", icon: "https://cdn.example/a.jpg" }]
+      [
+        { name: "A", displayName: "Alpha", description: "Do it", icon: "https://cdn.example/a.jpg" },
+        { name: "C", displayName: "Secret", hidden: 1 },
+      ]
     );
-    assert.deepEqual(list, [{ appid: 10, game: "Game", name: "Alpha", description: "Do it", icon: "https://cdn.example/a.jpg", percent: 3.4, unlockedAt: "2023-11-14T22:13:20.000Z" }]);
+    assert.deepEqual(list, [{ appid: 10, game: "Game", name: "Alpha", description: "Do it", icon: "https://cdn.example/a.jpg", percent: 3.4, unlockedAt: "2023-11-14T22:13:20.000Z", hidden: false }]);
+    const hidden = rareAchievements(10, "Game", [{ apiname: "C", achieved: 1, unlocktime: 0 }], [{ name: "C", percent: "0.5" }], [{ name: "C", displayName: "Secret", hidden: 1 }]);
+    assert.equal(hidden[0].hidden, true);
+    assert.equal(hidden[0].description, null);
+  });
+
+  it("reads hidden descriptions, icons and rates from GetGameAchievements", () => {
+    const { globals, schema } = fromGameAchievements(435150, [
+      { internal_name: "Q10", localized_name: "Cat's Out of the Bag!", localized_desc: "Escort the Black Cat out of Fort Joy", icon: "b47b.jpg", hidden: true, player_percent_unlocked: "33.7" },
+      { internal_name: "Q11", localized_name: "Odd", icon: "../evil.jpg", hidden: false },
+    ]);
+    const [a] = rareAchievements(435150, "Divinity", [{ apiname: "Q10", achieved: 1, unlocktime: 0 }], globals, schema);
+    assert.equal(a.description, "Escort the Black Cat out of Fort Joy");
+    assert.equal(a.hidden, true);
+    assert.equal(a.percent, 33.7);
+    assert.equal(a.icon, "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/435150/b47b.jpg");
+    assert.equal(schema[1].icon, undefined, "only plain file names become icon URLs");
   });
 });
 
