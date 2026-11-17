@@ -1,6 +1,6 @@
 # Project Overview
 
-Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2 status, and GitHub project cards. Tab-based UI with real-time WebSocket updates.
+Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch status, and GitHub project cards. Tab-based UI with real-time WebSocket updates.
 
 ## Architecture
 
@@ -54,7 +54,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── DiscordServer.tsx        # Discord server widget (client-side cache)
 │   │   ├── DiscordUser.tsx          # Discord user presence (WebSocket subscriber, mobile indicator)
 │   │   ├── SteamStatus.tsx          # Steam profile & games with achievement progress
-│   │   ├── OverwatchStatus.tsx      # Overwatch 2 stats
+│   │   ├── OverwatchStatus.tsx      # Overwatch stats
 │   │   ├── MemeWidget.tsx           # Random meme display
 │   │   ├── MarkdownWidget.tsx       # Renders pre-rendered HTML from /api/markdown
 │   │   ├── VisitorCounter.tsx       # Live viewer + total visitor counters (see "Visitor counters")
@@ -198,7 +198,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - **discord-server** — Discord server widget (uses DISCORD_SERVER_ID)
 - **discord-user** — Discord user presence (WebSocket subscriber, shows phone icon on mobile)
 - **steam** — Steam profile & games (includes achievement progress for recent and top games)
-- **overwatch** — Overwatch 2 competitive stats
+- **overwatch** — Overwatch competitive stats
 - **markdown** — Renders `content/<file>.md` via `/api/markdown?file=<file>`
 - **meme** — Random meme from external API (supports `popular` flag; NSFW/spoiler always filtered server-side)
 - **github** — GitHub project cards (repos: [{ owner, repo, label?, note? }])

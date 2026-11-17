@@ -11,10 +11,10 @@ export type OverwatchSection = z.infer<typeof schema>;
 
 export const meta = {
   type: "overwatch",
-  label: "Overwatch 2",
+  label: "Overwatch",
   icon: "🎯",
   category: "gaming",
-  description: "Overwatch 2 competitive stats",
+  description: "Overwatch competitive stats",
   schema,
   defaults: {},
   requiresEnv: ["OVERWATCH_BATTLE_TAG"],
