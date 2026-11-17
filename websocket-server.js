@@ -839,7 +839,7 @@ let overwatchRefreshPromise = null;
 async function fetchOverwatchData() {
   const { battleTag } = overwatchConfig;
   if (!battleTag || battleTag === 'YourTag-12345') {
-    return { available: false, error: 'Configure your BattleTag via the OVERWATCH_BATTLE_TAG env var or src/config/overwatch.json' };
+    return { available: false, error: 'Configure your BattleTag via the OVERWATCH_BATTLE_TAG env var' };
   }
 
   try {

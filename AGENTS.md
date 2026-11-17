@@ -68,7 +68,6 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   ├── FaviconAnimation.tsx     # Canvas-based animated favicon (hidden canvas → PNG data URL, self-healing)
 │   │   ├── ThemeSwitcher.tsx        # Fixed light/dark toggle (bottom right)
 │   │   ├── useTheme.ts              # Theme state: `dark`/`light` class on <html>, persisted in localStorage
-│   │   ├── ThemeProvider.tsx        # Context version of useTheme — currently unused
 │   │   ├── VisitorCounter.tsx       # Live viewer + total visitor counters (see "Visitor counters")
 │   │   ├── DiscordServer.tsx        # Discord server widget (60s client-side cache)
 │   │   ├── DiscordUser.tsx          # Discord user presence (WebSocket subscriber, mobile indicator)
