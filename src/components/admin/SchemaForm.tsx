@@ -164,7 +164,7 @@ function Control({ node, optional, value, onChange, label }: Omit<FieldProps, "n
     return (
       <div className="adm-inline">
         {bounded && <input type="range" aria-label={label} min={node.minimum} max={node.maximum} step={step} value={(value as number) ?? node.minimum} onChange={(e) => set(e.target.value)} />}
-        <input type="number" className="adm-input adm-input-num" aria-label={label} min={node.minimum} max={node.maximum} step={step} value={(value as number) ?? ""} onChange={(e) => set(e.target.value)} />
+        <input type="number" className="adm-input adm-input-num" aria-label={label} min={node.minimum} max={node.maximum} step={bounded ? step : "any"} value={(value as number) ?? ""} onChange={(e) => set(e.target.value)} />
       </div>
     );
   }
@@ -182,6 +182,8 @@ function Control({ node, optional, value, onChange, label }: Omit<FieldProps, "n
   const set = (v: string) => onChange(v === "" && optional ? undefined : v);
 
   if (node.ui === "color") return <ColorInput value={text} onChange={set} label={label} />;
+  if (node.ui === "datetime") return <input type="datetime-local" className="adm-input" aria-label={label} value={text} onChange={(e) => set(e.target.value)} />;
+  if (node.ui === "timezone") return <TimezoneInput value={text} onChange={set} label={label} />;
   if (node.ui === "image" || node.ui === "video") return <MediaInput kind={node.ui} value={text} onChange={set} label={label} />;
   if (node.ui === "textarea") return <textarea className="adm-input" aria-label={label} rows={4} value={text} onChange={(e) => set(e.target.value)} />;
   if (node.ui === "content-file") return <ContentFileSelect value={text} onChange={set} label={label} />;
@@ -209,6 +211,31 @@ function Segmented({ options, value, onChange, label }: { options: { value: stri
         </button>
       ))}
     </div>
+  );
+}
+
+let timezones: string[] | null = null;
+
+/** Free text with suggestions for every time zone the browser knows (e.g. "Europe/Rome"). */
+function TimezoneInput({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+  const [zones, setZones] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      timezones ??= ["UTC", ...Intl.supportedValuesOf("timeZone")];
+    } catch {
+      timezones = ["UTC"];
+    }
+    setZones(timezones);
+  }, []);
+  return (
+    <>
+      <input className="adm-input" aria-label={label} list="adm-timezones" value={value} placeholder="Europe/Rome" onChange={(e) => onChange(e.target.value)} />
+      <datalist id="adm-timezones">
+        {zones.map((z) => (
+          <option key={z} value={z} />
+        ))}
+      </datalist>
+    </>
   );
 }
 

@@ -26,6 +26,8 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │   ├── presence/route.ts    # Snapshot of current Discord presence (force-dynamic; reads in-memory server state)
 │   │   │   ├── steam/route.ts       # Snapshot of current Steam data (force-dynamic; reads in-memory server state)
 │   │   │   └── overwatch/route.ts   # Snapshot of current Overwatch data (force-dynamic; reads in-memory server state)
+│   │   │   ├── widgets/[type]/route.ts  # Data for widgets that show another site's data (dispatches to lib/widget-sources.ts)
+│   │   │   ├── poll/route.ts        # Poll results (GET) and voting (POST); SQLite poll_votes
 │   │   │   ├── uploads/[name]/route.ts  # Public: serves an uploaded background image/video (immutable cache, byte ranges)
 │   │   │   └── admin/               # Admin API — every handler wrapped in withAdmin()
 │   │   │       ├── login/ logout/   # Session create / destroy
@@ -103,6 +105,8 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │   └── publish.ts           # publishConfig() (atomic write + revision), getDraftConfig(), isWritable()
 │   │   ├── comments.ts              # comments table + moderation columns, moderation settings, initialStatus()
 │   │   ├── background.ts            # backgroundLayer(): background.base → CSS variables/classes (pure); safeUrl()
+│   │   ├── widget-data.ts           # cached(), getJson/getText, findSection(), htmlToText(), httpUrl(), WidgetError
+│   │   ├── widget-sources.ts        # weather, chess, bluesky, github-activity, rss, mastodon fetchers
 │   │   ├── uploads.ts               # DATA_DIR/uploads: storeImage (sharp → WebP), storeVideo, resolveUpload, listUploads
 │   │   ├── content.ts               # CONTENT_DIR + resolveContentFile() (plain *.md names only)
 │   │   ├── config.ts                # mtime-cached homepage.json loader (uses parseConfig)
@@ -117,6 +121,9 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── registry.tsx             # Client index: renderSection(section, ctx)
 │   │   ├── fields.ts                # Shared zod fields (base id/type, titleFields, frameField)
 │   │   ├── shared.tsx               # Icon, SectionTitle, WidgetFrame, alignClass
+│   │   ├── common.tsx               # For data widgets: Card, Notice, Skeleton, useWidgetData, DataCard, timeAgo
+│   │   ├── posts.tsx                # PostList shared by mastodon + bluesky
+│   │   ├── time.ts                  # Time-zone maths for clock + countdown (Intl only)
 │   │   └── types.ts                 # WidgetMeta, WidgetView, WidgetContext
 │   └── types/
 │       ├── gray-matter.d.ts
@@ -197,6 +204,21 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - **github** — GitHub project cards (repos: [{ owner, repo, label?, note? }])
 - **comments** — Guestbook widget (repos: none; optional `limit` for max comments fetched, default 50). Posts via `/api/comments`, lists newest-first.
 - **reactions** — Anonymous emoji reactions (repos: none; optional `emojis` array overriding `DEFAULT_EMOJIS`). Toggle per emoji keyed by `visitor_hash`; a new reaction broadcasts `{type:"reaction", emoji}` to all clients for the background flyer (`effects.reactionFlyer`).
+- **image** — Image or gallery (`images: [{ src, alt?, caption?, link? }]`, `columns` 1–4, `shape`). `src` accepts uploads (`/api/uploads/…`) or http(s) URLs.
+- **embed** — YouTube / Vimeo / Spotify / SoundCloud player from a normal link (`url`).
+- **clock** — Live clock for a `timezone`; optional `place`, `hour12`, `showDate`, `showDifference`.
+- **countdown** — Time left until `target` (`YYYY-MM-DDTHH:mm`, wall time in `timezone`); `label`, `doneText`.
+- **weather** — Open-Meteo current weather + 3-day forecast (`latitude`, `longitude`, `place` label, `units`, `showForecast`).
+- **rss** — Latest items of an RSS/Atom feed (`url`, `limit`, `showDates`).
+- **github-activity** — Contribution heatmap (`username`).
+- **mastodon** — Latest posts (`instance`, `account`, `limit`).
+- **bluesky** — Latest posts (`handle`, `limit`).
+- **chess** — Ratings (`site`: `lichess` | `chesscom`, `username`).
+- **skills** — Badges (`items: [{ label, icon?, level? }]`).
+- **timeline** — Ordered events (`items: [{ title, date?, text? }]`).
+- **quote** — `quotes: [{ text, author? }]`; several = a random one per visit (first one on the server render).
+- **divider** — `style` (`line` | `dots` | `space`), `size`. No title, no frame.
+- **poll** — `question`, `options` (strings), `results` (`after` | `always`). Votes in SQLite via `/api/poll`.
 
 ## Critical Gotchas
 
@@ -275,6 +297,20 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - Limits: 240–760px per panel, and the preview always keeps at least 320px. Double-click or `Home` resets; arrow keys resize (Shift = larger steps).
 - The divider uses pointer capture so a drag keeps working while the pointer is over the preview iframe (an iframe otherwise swallows the move events).
 - Below 1000px the panels stack and the dividers are hidden.
+
+### Data widgets (weather, rss, github-activity, mastodon, bluesky, chess)
+- Flow: the widget (client) calls `/api/widgets/<type>` → `widgetSources[type]` in `src/lib/widget-sources.ts` → the outside service → a trimmed result (only the fields the widget shows). Everything goes through `cached()` (in-memory, per key): success TTLs are 15 min weather, 30 min rss/chess, 10 min mastodon/bluesky, 3 h github-activity; failures are cached 5 minutes; concurrent requests share one fetch.
+- **Nothing polls.** Data is fetched only when a visitor's widget asks, so "no viewers → no outbound queries" holds without touching the idle-pause logic in `websocket-server.js`.
+- **Never fetch a URL taken from the request.** Sources with a fixed host (weather, chess, bluesky, github-activity) take strictly validated values from the query string. Sources whose host the site owner typed (rss, mastodon) take a **section id** and read the address from the config via `findSection()` — otherwise the endpoint would be an open proxy. `findSection` looks in the published config first, then the admin draft, so the panel's preview works before publishing. Those widgets still add the address to their request URL as an ignored param (`u=` / `k=`) only so the URL changes — and the widget refetches — when the setting changes.
+- Errors meant for the widget are `WidgetError` (message shown as-is, in the interface's voice: say what to fix). Anything else is logged with `[Widgets]` and shown as a generic line.
+- `github-activity` has no key-less API; it parses the public calendar fragment GitHub's own profile page loads (`/users/<name>/contributions`): `data-date` / `data-level` on the cells, counts from the matching `<tool-tip for="…">`. If GitHub changes that markup the widget shows "could not be read" — the parser in `widget-sources.ts` is the one place to fix.
+- `rss` uses a small regex parser (RSS `<item>` and Atom `<entry>`), not an XML library. Titles are plain text (`htmlToText`); links pass `httpUrl()` so only http(s) reaches the browser.
+- Text from other sites (posts, feed titles) is always rendered as React text, never `dangerouslySetInnerHTML`. Mastodon's HTML is flattened with `htmlToText`; a post with a content warning shows only the warning.
+- `embed`: `toPlayer()` maps a link to that site's own player URL for four known hosts and nothing else; the iframe is sandboxed. YouTube uses `youtube-nocookie.com`.
+- `clock` / `countdown` render the time only after mount (server and client HTML must match); the countdown's `target` is wall time in the widget's `timezone`, converted with `zonedTimeToMs`.
+- `poll`: votes in `poll_votes` (primary key `poll_id` + `visitor_hash`, so one vote per visitor, replaced on re-vote), keyed by **option text** — renaming an option starts it from zero, removed options' votes are ignored. The poll must exist in the config (`findSection`) for votes to be accepted.
+- Client-side building blocks are in `src/widgets/common.tsx`: `useWidgetData(url | null)` + `DataCard` handle "not set up yet" / loading / error so each widget only writes its success state. `Card` uses `bg-white dark:bg-[#2b2d31]`, which is already in the card-opacity selector list.
+- The admin palette groups widgets by `meta.category` (`PALETTE_GROUPS` in `Builder.tsx`); a new category needs an entry there. New form hints: `datetime`, `timezone`.
 
 ### Widget registry (`src/widgets/`)
 - Adding a widget = `src/widgets/<type>/meta.ts` + `render.tsx`, then one line each in `widgets/meta.ts` (`SectionSchema` + `widgetMetas`) and `widgets/registry.tsx` (`views`). The `views` map is typed against `SectionType`, so a missing renderer is a compile error.

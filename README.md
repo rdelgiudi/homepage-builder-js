@@ -181,6 +181,23 @@ All effects default to `true` if omitted (except `widgetFrame`/`widgetFrameWidth
 | `github` | GitHub project cards from public repos | yes |
 | `comments` | Guestbook widget: visitors post a name + comment, listed newest-first (open posting) | yes |
 | `reactions` | Anonymous emoji reactions (toggle per emoji, rate-limited, background flyer on react) | yes |
+| `image` | One image or a gallery: `images` (`src`, `alt`, `caption`, `link`), `columns` (1–4, at most 2 on phones), `shape` (`original` / `square` / `wide`) | yes |
+| `embed` | A YouTube or Vimeo video, or a Spotify or SoundCloud player, from its normal link (`url`) | yes |
+| `clock` | Current time in a `timezone` (e.g. `Europe/Rome`), with optional date and the difference to the visitor's own time | yes |
+| `countdown` | Days, hours, minutes and seconds until `target` (`YYYY-MM-DDTHH:mm` in `timezone`) | yes |
+| `weather` | Current weather and three-day forecast for `latitude` / `longitude` (Open-Meteo; `units`: `celsius` / `fahrenheit`) | yes |
+| `rss` | Latest posts from an RSS or Atom feed (`url`, `limit`) | yes |
+| `github-activity` | A year of GitHub contributions as a heatmap (`username`) | yes |
+| `mastodon` | Latest posts from a Mastodon account (`instance`, `account`, `limit`) | yes |
+| `bluesky` | Latest posts from a Bluesky account (`handle`, `limit`) | yes |
+| `chess` | Ratings from Lichess or Chess.com (`site`: `lichess` / `chesscom`, `username`) | yes |
+| `skills` | Badges with an optional icon and level 1–5 (`items`) | yes |
+| `timeline` | Events in order (`items`: `title`, `date`, `text`) | yes |
+| `quote` | A quote; with several in `quotes`, each visitor sees a random one | yes |
+| `divider` | A line, dots or empty space (`style`, `size`) | no |
+| `poll` | A question visitors vote on (`question`, `options`; one vote per visitor, changeable; `results`: `after` / `always`) | yes |
+
+None of the widgets added in this table's second half needs an API key. Those that show data from another site fetch it through this server only when a visitor's page asks for it, and cache it (weather 15 min, feeds and chess 30 min, Mastodon and Bluesky 10 min, GitHub activity 3 h).
 
 ## Components Reference
 

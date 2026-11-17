@@ -17,6 +17,21 @@ import * as meme from "./meme/meta";
 import * as github from "./github/meta";
 import * as comments from "./comments/meta";
 import * as reactions from "./reactions/meta";
+import * as image from "./image/meta";
+import * as embed from "./embed/meta";
+import * as clock from "./clock/meta";
+import * as countdown from "./countdown/meta";
+import * as weather from "./weather/meta";
+import * as rss from "./rss/meta";
+import * as githubActivity from "./github-activity/meta";
+import * as mastodon from "./mastodon/meta";
+import * as bluesky from "./bluesky/meta";
+import * as chess from "./chess/meta";
+import * as skills from "./skills/meta";
+import * as timeline from "./timeline/meta";
+import * as quote from "./quote/meta";
+import * as divider from "./divider/meta";
+import * as poll from "./poll/meta";
 
 export const SectionSchema = z.discriminatedUnion("type", [
   header.schema,
@@ -31,24 +46,60 @@ export const SectionSchema = z.discriminatedUnion("type", [
   github.schema,
   comments.schema,
   reactions.schema,
+  image.schema,
+  embed.schema,
+  clock.schema,
+  countdown.schema,
+  weather.schema,
+  rss.schema,
+  githubActivity.schema,
+  mastodon.schema,
+  bluesky.schema,
+  chess.schema,
+  skills.schema,
+  timeline.schema,
+  quote.schema,
+  divider.schema,
+  poll.schema,
 ]);
 export type Section = z.infer<typeof SectionSchema>;
 export type SectionType = Section["type"];
 
-/** Palette order. */
+/** Palette order (the admin panel groups these by category, keeping this order within each). */
 export const widgetMetas: WidgetMeta[] = [
+  // content
   header.meta,
   text.meta,
   markdown.meta,
+  quote.meta,
+  skills.meta,
+  timeline.meta,
+  divider.meta,
+  // media
+  image.meta,
+  embed.meta,
+  meme.meta,
+  // info
+  clock.meta,
+  countdown.meta,
+  weather.meta,
+  rss.meta,
+  // social
   links.meta,
   github.meta,
+  githubActivity.meta,
+  mastodon.meta,
+  bluesky.meta,
   discordUser.meta,
   discordServer.meta,
+  // gaming
   steam.meta,
   overwatch.meta,
-  meme.meta,
+  chess.meta,
+  // community
   comments.meta,
   reactions.meta,
+  poll.meta,
 ];
 
 export const widgetMetaByType: Record<string, WidgetMeta> = Object.fromEntries(widgetMetas.map((m) => [m.type, m]));

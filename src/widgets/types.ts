@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { z } from "zod";
 
-export type WidgetCategory = "content" | "social" | "gaming" | "media" | "community";
+export type WidgetCategory = "content" | "media" | "info" | "social" | "gaming" | "community";
 
 /**
  * Server-safe description of a widget: what it is and which options it takes.

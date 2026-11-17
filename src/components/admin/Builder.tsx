@@ -35,6 +35,15 @@ const SEC = "sec:";
 const NEW = "new:";
 const LIST = "section-list";
 
+const PALETTE_GROUPS: [category: string, title: string][] = [
+  ["content", "Text and structure"],
+  ["media", "Media"],
+  ["info", "Live info"],
+  ["social", "Social and profiles"],
+  ["gaming", "Gaming"],
+  ["community", "Visitors"],
+];
+
 function uniqueId(config: HomepageConfig, wanted: string): string {
   const used = new Set(config.tabs.flatMap((t) => [t.id, ...t.sections.map((s) => s.id)]));
   let id = wanted;
@@ -313,11 +322,18 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
             <h2>Add a widget</h2>
           </div>
           <p className="adm-hint adm-pad">Click to add at the end, or drag into the list or onto another tab.</p>
-          <div className="adm-palette">
-            {widgetMetas.map((m) => (
-              <PaletteItem key={m.type} type={m.type} needsSetup={missingEnv(m.type).length > 0} onAdd={() => addSection(m.type, tab.id)} />
-            ))}
-          </div>
+          {PALETTE_GROUPS.map(([category, title]) => (
+            <div key={category}>
+              <h3 className="adm-palette-title">{title}</h3>
+              <div className="adm-palette">
+                {widgetMetas
+                  .filter((m) => m.category === category)
+                  .map((m) => (
+                    <PaletteItem key={m.type} type={m.type} needsSetup={missingEnv(m.type).length > 0} onAdd={() => addSection(m.type, tab.id)} />
+                  ))}
+              </div>
+            </div>
+          ))}
         </>
       )}
 

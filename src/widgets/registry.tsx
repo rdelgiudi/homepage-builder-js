@@ -18,6 +18,21 @@ import { view as meme } from "./meme/render";
 import { view as github } from "./github/render";
 import { view as comments } from "./comments/render";
 import { view as reactions } from "./reactions/render";
+import { view as image } from "./image/render";
+import { view as embed } from "./embed/render";
+import { view as clock } from "./clock/render";
+import { view as countdown } from "./countdown/render";
+import { view as weather } from "./weather/render";
+import { view as rss } from "./rss/render";
+import { view as githubActivity } from "./github-activity/render";
+import { view as mastodon } from "./mastodon/render";
+import { view as bluesky } from "./bluesky/render";
+import { view as chess } from "./chess/render";
+import { view as skills } from "./skills/render";
+import { view as timeline } from "./timeline/render";
+import { view as quote } from "./quote/render";
+import { view as divider } from "./divider/render";
+import { view as poll } from "./poll/render";
 
 const views: { [K in SectionType]: WidgetView<Extract<Section, { type: K }>> } = {
   header,
@@ -32,6 +47,21 @@ const views: { [K in SectionType]: WidgetView<Extract<Section, { type: K }>> } =
   github,
   comments,
   reactions,
+  image,
+  embed,
+  clock,
+  countdown,
+  weather,
+  rss,
+  "github-activity": githubActivity,
+  mastodon,
+  bluesky,
+  chess,
+  skills,
+  timeline,
+  quote,
+  divider,
+  poll,
 };
 
 /** Renders one section: optional title row, optional gradient frame, then the widget body. */

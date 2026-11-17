@@ -824,11 +824,18 @@ textarea.adm-input {
   color: #2b1d00;
   font-weight: 650;
 }
+.adm-palette-title {
+  margin: 0;
+  padding: 4px 14px 6px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--a-muted);
+}
 .adm-palette {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
-  padding: 0 8px 16px;
+  padding: 0 8px 12px;
 }
 .adm-palette-item {
   position: relative;
