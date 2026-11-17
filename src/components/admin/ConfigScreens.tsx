@@ -5,6 +5,7 @@ import type { HomepageConfig } from "@/lib/schema/config";
 import SchemaForm from "./SchemaForm";
 import { formSchemas, type JsonSchema } from "./schemas";
 import { useAdmin } from "./store";
+import { LayoutPicker } from "./LayoutControls";
 
 type Obj = Record<string, unknown>;
 
@@ -41,7 +42,7 @@ export function SiteScreen() {
         <RootForm schema={formSchemas.gradients} />
       </Block>
       <Block title="Layout">
-        <KeyForm name="layout" schema={formSchemas.layout} />
+        <LayoutPicker />
       </Block>
       <Block title="Counters">
         <KeyForm name="counters" schema={formSchemas.counters} />

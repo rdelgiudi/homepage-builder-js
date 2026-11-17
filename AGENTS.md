@@ -58,7 +58,10 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │   ├── ReactionsWidget.tsx      # Anonymous emoji reactions (toggle, visitor-hash keyed, rate-limited, GUI lock)
 │   │   │   ├── ReactionFlyer.tsx        # Background layer that flies an emoji up the screen when anyone reacts (WebSocket subscriber, coalesce:false)
 │   │   ├── GitHubProjects.tsx       # GitHub repo cards (public API, no key needed)
-│   │   ├── Tabs.tsx                 # Tab navigation (bar, mobile drawer, transitions); renders sections via widgets/registry
+│   │   ├── SiteHeader.tsx           # Site name + tagline (`top` / `side` variants)
+│   │   ├── Tabs.tsx                 # Tab navigation (top bar or side column, mobile drawer, transitions)
+│   │   ├── OnePage.tsx              # "onepage" layout: all tabs as sections, sticky jump bar with scroll-spy
+│   │   ├── TabSections.tsx          # One tab's widgets as a stack or 12-column grid; renders via widgets/registry
 │   │   ├── ParticleBackground.tsx   # Canvas floating particles
 │   │   ├── MouseTrail.tsx           # Canvas comet-style mouse trail (gradient line, no draw while stationary)
 │   │   ├── SitePage.tsx             # The whole site rendered from a config; used by / and /admin/preview. Mounts ThemeSwitcher, FaviconAnimation, ConfigSync
@@ -71,6 +74,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │   ├── Builder.tsx          # useBuilder(): dnd-kit outline (tabs, widgets, palette) + inspector
 │   │   │   ├── PreviewPane.tsx      # iframe of /admin/preview, refreshed by postMessage
 │   │   │   ├── ConfigScreens.tsx    # Site / Background / Effects
+│   │   │   ├── LayoutControls.tsx   # LayoutPicker (site layout thumbnails) + SpanControl (widget width in a grid)
 │   │   │   ├── ContentScreen.tsx  CommentsScreen.tsx  OtherScreens.tsx (Integrations, History)  LoginForm.tsx
 │   │   │   └── api.ts               # fetch helper for /api/admin/*
 │   │   ├── EffectsController.tsx    # Conditionally renders effects based on config
@@ -151,11 +155,11 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 | `favicon` | URL for favicon (optional, empty/omit = auto-generated animated gradient ring using `titleGradient` colors) |
 | `titleGradient` | Array of CSS color stops for title gradient text; omit or empty = solid color |
 | `taglineGradient` | Array of CSS color stops for tagline gradient; empty array or omit = inherits `titleGradient` |
-| `layout` | `{ site }` — site shell. Only `"tabs"` exists so far. |
+| `layout` | `{ site }` — site shell: `"tabs"` (default), `"sidebar"`, `"onepage"`, `"bento"`, `"linkinbio"`. See "Site layouts and the grid". |
 | `background` | `{ base: { type: "solid", light, dark }, effect: { type: "none" \| "stars" \| "comet" } }` — page background color (defaults `#f3f4f6` / `#111827`) and the canvas particle layer (default `"stars"`) |
 | `counters` | `{ viewers, visitors }` — toggles for the bottom-left counters (both default `true`) |
 | `effects` | Object toggling visual effects — see Effects section below |
-| `tabs` | Array of tab objects: `{ id, label, icon?, invertDark?, layout: "stack", sections: [...] }`. Every tab and section has an `id` (unique across the file; auto-derived on load when missing). |
+| `tabs` | Array of tab objects: `{ id, label, icon?, invertDark?, layout: "stack" \| "grid", sections: [...] }`. Every section also accepts `span` (1–12, grid width). Every tab and section has an `id` (unique across the file; auto-derived on load when missing). |
 
 ### Effects Config:
 
@@ -242,6 +246,29 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - Blocking is by `visitor_hash` (`blocked_visitors`): a blocked visitor's `POST` gets 403. It is a cookie-based id, so it stops casual repeat offenders, not a determined one. Comments older than the moderation columns have no hash and can't be blocked.
 - Every moderation action is written to `audit_log` (`comment.*`); the Comments screen shows the latest 30.
 - The pending badge in the admin nav is polled every 30s (not pushed), because the admin and public sites may be different processes.
+
+### Site layouts and the grid
+- `layout.site` picks the shell, all assembled in `SitePage.tsx`; `PAGE_WIDTH` there maps each layout to its page column width (full Tailwind class names — don't build them dynamically, Tailwind can't see computed names).
+
+  | Layout | Width | How it is built |
+  |---|---|---|
+  | `tabs` | 870px | `SiteHeader` + `Tabs` (top bar) |
+  | `sidebar` | 1180px | `Tabs nav="side"`: from `md` up a sticky 230px left column with `SiteHeader variant="side"` + vertical nav; the top header and tab bar are `md:hidden`. Below `md` it is identical to `tabs` (compact bar + drawer). |
+  | `onepage` | 870px | `OnePage`: every tab rendered as a `<section>` (all widgets mounted at once), sticky horizontally scrollable jump bar, `IntersectionObserver` scroll-spy. `?tab=<slug>` scrolls to that section. |
+  | `bento` | 1280px | `Tabs` with `grid={{ force: true, defaultSpan: 6 }}` — every tab is a grid, two widgets per row unless a widget has its own `span`. |
+  | `linkinbio` | 480px | `Tabs` with `hideNavIfSingle` — no navigation when there is one tab. |
+- **Tab layout** (`tab.layout`): `stack` (one widget per row) or `grid`. `TabSections` renders both for every site layout. The grid is CSS `.section-grid` in `globals.css`: one column below `md`, 12 columns from `md`, each cell `grid-column: span var(--span, 12)`. The span is passed as a CSS variable because inline styles can't be responsive. Rows are auto-height and items keep DOM order (no `grid-auto-flow: dense`) — widgets have intrinsic, animated heights, so there is deliberately no x/y/height placement.
+- `span` (1–12) lives in `base()` (`widgets/fields.ts`), so every section type has it. It is ignored in a stack. Unset = the layout's default (12 in a grid tab, 6 in bento).
+- The `Tabs` transition logic (three-phase fade, `transitioning` guard, mobile drawer) is unchanged and shared by `tabs`/`sidebar`/`bento`/`linkinbio`; only the navigation chrome differs via props. `OnePage` has no tab state at all.
+- One-page scroll-spy details: a clicked section stays highlighted for the duration of the smooth scroll (`jumpUntil`), and reaching the end of the page highlights the last section, because a short last section can never reach the observer band.
+- **Tailwind scans `src/widgets/` too** (`tailwind.config.ts`). Any new folder that contains class names must be added to `content`, or its classes are silently purged — the HTML still looks right in a diff, only the CSS is missing.
+- Admin: the Site screen's `LayoutPicker` replaces the generated control for `layout.site`. `span` is in `SchemaForm`'s hidden keys and edited with `SpanControl` (a 12-cell bar to click/drag, presets, "use the default") in the builder's inspector, shown only where a grid applies (`tab.layout === "grid"` or the bento layout); outline rows then show a `n/12` badge.
+
+### Admin panel: resizable side panels
+- The builder's left panel and inspector (and the single left panel on Site/Background/Effects) are resized with `Resizer` dividers in `AdminApp.tsx`; widths are applied as an inline `grid-template-columns` on `.adm-work` and remembered in `localStorage` (`admin.panelWidths`, read after mount to avoid a hydration mismatch).
+- Limits: 240–760px per panel, and the preview always keeps at least 320px. Double-click or `Home` resets; arrow keys resize (Shift = larger steps).
+- The divider uses pointer capture so a drag keeps working while the pointer is over the preview iframe (an iframe otherwise swallows the move events).
+- Below 1000px the panels stack and the dividers are hidden.
 
 ### Widget registry (`src/widgets/`)
 - Adding a widget = `src/widgets/<type>/meta.ts` + `render.tsx`, then one line each in `widgets/meta.ts` (`SectionSchema` + `widgetMetas`) and `widgets/registry.tsx` (`views`). The `views` map is typed against `SectionType`, so a missing renderer is a compile error.

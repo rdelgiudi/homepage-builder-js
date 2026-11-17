@@ -46,6 +46,22 @@ main, header, footer, section, article, aside, div {
   transition: background-color 500ms ease, border-color 500ms ease, color 500ms ease;
 }
 
+/* Grid tab layout: 12 columns from md up, one column below. Each cell's width is its
+   section's `span`, passed as --span (inline styles can't be responsive, a variable can). */
+.section-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+@media (min-width: 768px) {
+  .section-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+  .section-grid > * {
+    grid-column: span var(--span, 12);
+  }
+}
+
 @keyframes fade-in-up {
   from {
     opacity: 0;

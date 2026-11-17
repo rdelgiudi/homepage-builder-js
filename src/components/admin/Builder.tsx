@@ -24,6 +24,7 @@ import SchemaForm from "./SchemaForm";
 import { formSchemas } from "./schemas";
 import { api } from "./api";
 import { useAdmin } from "./store";
+import { SpanControl } from "./LayoutControls";
 
 type Selection = { kind: "tab" | "section"; id: string } | null;
 type Obj = Record<string, unknown>;
@@ -140,6 +141,11 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
 
   const tab = config.tabs.find((t) => t.id === tabId) ?? config.tabs[0] ?? null;
   const selectedSection = selection?.kind === "section" ? tab?.sections.find((s) => s.id === selection.id) ?? null : null;
+  // Widths matter where widgets can sit side by side: grid tabs, and every tab in the bento layout.
+  const bento = config.layout.site === "bento";
+  const gridActive = bento || tab?.layout === "grid";
+  const defaultSpan = bento ? 6 : 12;
+
   const selectedTab = selection?.kind === "tab" ? config.tabs.find((t) => t.id === selection.id) ?? null : null;
 
   const sensors = useSensors(
@@ -292,6 +298,11 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
                       <span className="adm-row-title">{meta.label}</span>
                       {summary && <span className="adm-row-sub">{summary}</span>}
                     </span>
+                    {gridActive && (
+                      <span className="adm-count" title="Width in grid columns">
+                        {s.span ?? defaultSpan}/12
+                      </span>
+                    )}
                   </SortableRow>
                 );
               })}
@@ -388,6 +399,24 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
             value={selectedSection as unknown as Obj}
             onChange={(v) => update((c) => mapTab(c, tab.id, (t) => ({ ...t, sections: t.sections.map((s) => (s.id === selectedSection.id ? (v as unknown as Section) : s)) })))}
           />
+          {gridActive && (
+            <SpanControl
+              value={selectedSection.span}
+              defaultSpan={defaultSpan}
+              onChange={(span) =>
+                update((c) =>
+                  mapTab(c, tab.id, (t) => ({
+                    ...t,
+                    sections: t.sections.map((s) => {
+                      if (s.id !== selectedSection.id) return s;
+                      const { span: _old, ...rest } = s;
+                      return (span === undefined ? rest : { ...rest, span }) as Section;
+                    }),
+                  }))
+                )
+              }
+            />
+          )}
           {config.tabs.length > 1 && (
             <label className="adm-field">
               <span className="adm-label">Move to tab</span>

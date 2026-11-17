@@ -9,6 +9,9 @@ export const CONFIG_VERSION = 2;
 
 const GradientSchema = z.array(z.string());
 
+export const SITE_LAYOUTS = ["tabs", "sidebar", "onepage", "bento", "linkinbio"] as const;
+export type SiteLayout = (typeof SITE_LAYOUTS)[number];
+
 export const EffectsSchema = z.object({
   gradientBorders: z.boolean().default(true).meta({ title: "Gradient borders on hover" }),
   tabTransitions: z.boolean().default(true).meta({ title: "Tab transitions" }),
@@ -41,8 +44,12 @@ export const BackgroundSchema = z.object({
 });
 
 export const LayoutSchema = z.object({
-  /** Site shell. Only `tabs` exists so far; more layouts are additive. */
-  site: z.enum(["tabs"]).default("tabs").meta({ title: "Site layout" }),
+  /**
+   * Site shell (see src/components/SitePage.tsx):
+   * `tabs` top tab bar · `sidebar` name + navigation in a left column · `onepage` every tab
+   * stacked on one scrolling page · `bento` wide page, widgets in a grid · `linkinbio` narrow column.
+   */
+  site: z.enum(SITE_LAYOUTS).default("tabs").meta({ title: "Site layout" }),
 });
 
 export const CountersSchema = z.object({
@@ -55,8 +62,8 @@ export const TabSchema = z.object({
   label: z.string().min(1).meta({ title: "Label" }),
   icon: z.string().optional().meta({ title: "Icon", ui: "icon", description: "Emoji or image URL" }),
   invertDark: z.boolean().optional().meta({ title: "Invert icon in dark mode" }),
-  /** How sections are arranged. Only `stack` exists so far. */
-  layout: z.enum(["stack"]).default("stack").meta({ title: "Tab layout" }),
+  /** `stack` — one widget per row. `grid` — 12 columns; each widget's `span` sets its width. */
+  layout: z.enum(["stack", "grid"]).default("stack").meta({ title: "Arrange widgets", description: "Grid lets widgets sit side by side; set each widget's width in its settings" }),
   sections: z.array(SectionSchema).default([]),
 });
 

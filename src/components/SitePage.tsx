@@ -5,7 +5,9 @@ import { Suspense } from "react";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import FaviconAnimation from "@/components/FaviconAnimation";
 import ConfigSync from "@/components/ConfigSync";
-import type { HomepageConfig } from "@/lib/schema/config";
+import type { HomepageConfig, SiteLayout } from "@/lib/schema/config";
+import SiteHeader from "@/components/SiteHeader";
+import OnePage from "@/components/OnePage";
 import type { WidgetContext } from "@/widgets/types";
 
 function TabsFallback() {
@@ -19,6 +21,15 @@ function TabsFallback() {
   );
 }
 
+/** Page column width per site layout. Full class names, so Tailwind can see them. */
+const PAGE_WIDTH: Record<SiteLayout, string> = {
+  tabs: "max-w-[870px]",
+  sidebar: "max-w-[1180px]",
+  onepage: "max-w-[870px]",
+  bento: "max-w-[1280px]",
+  linkinbio: "max-w-[480px]",
+};
+
 /**
  * The whole site, rendered from `config`. Used by `/` (the published config) and by
  * `/admin/preview` (the admin panel's draft, `preview` = true).
@@ -26,6 +37,12 @@ function TabsFallback() {
 export default function SitePage({ config, preview }: { config: HomepageConfig; preview: boolean }) {
   const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, background, effects, counters, tabs } = config;
   const taglineGradient = rawTaglineGradient.length ? rawTaglineGradient : titleGradient;
+  const header = { name, tagline, titleGradient, taglineGradient };
+
+  const site = config.layout.site;
+  const width = PAGE_WIDTH[site];
+  // Bento lays every tab out as a grid, two widgets per row unless a widget says otherwise.
+  const grid = site === "bento" ? { force: true, defaultSpan: 6 } : undefined;
 
   const bgVars = { '--bg-light': background.base.light, '--bg-dark': background.base.dark } as React.CSSProperties;
 
@@ -42,22 +59,29 @@ export default function SitePage({ config, preview }: { config: HomepageConfig; 
   return (
     <main className="min-h-screen bg-page relative z-10 overflow-x-clip" style={bgVars}>
       <EffectsController particleEffect={background.effect.type} customScrollbar={effects.customScrollbar} mouseTrail={effects.mouseTrail} mouseTrailColors={effects.mouseTrailColors} reactionFlyer={effects.reactionFlyer} />
-      <div className="bg-page pt-6 md:pt-8 pb-3 md:pb-4">
-        <div className="w-full max-w-[870px] mx-auto text-center space-y-3 md:space-y-4">
-          <h1
-            className={`text-3xl md:text-5xl font-bold pb-2${titleGradient.length ? ' animate-gradient-text' : ' text-gray-900 dark:text-white'}`}
-            style={titleGradient.length ? { backgroundImage: `linear-gradient(135deg, ${titleGradient.join(', ')})` } : undefined}
-          >{name}</h1>
-          <p
-            className={`text-base md:text-xl ${taglineGradient.length ? 'animate-gradient-text' : 'text-gray-600 dark:text-gray-300'}`}
-            style={taglineGradient.length ? { backgroundImage: `linear-gradient(135deg, ${taglineGradient.join(', ')})` } : undefined}
-          >{tagline}</p>
+      {/* The sidebar layout shows the name in its left column from md up, so the top header is mobile-only there. */}
+      <div className={`bg-page pt-6 md:pt-8 pb-3 md:pb-4${site === "sidebar" ? " md:hidden" : ""}`}>
+        <div className={`w-full ${width} mx-auto px-4 md:px-8`}>
+          <SiteHeader {...header} />
         </div>
       </div>
 
-      <div className="w-full max-w-[870px] mx-auto px-4 md:px-8 pb-8">
+      <div className={`w-full ${width} mx-auto px-4 md:px-8 pb-8`}>
         <Suspense fallback={<TabsFallback />}>
-          <Tabs tabs={tabs} enableTransitions={effects.tabTransitions} widgetContext={widgetContext} />
+          {site === "onepage" ? (
+            <OnePage tabs={tabs} widgetContext={widgetContext} widthClass={width} grid={grid} />
+          ) : (
+            <Tabs
+              tabs={tabs}
+              enableTransitions={effects.tabTransitions}
+              widgetContext={widgetContext}
+              widthClass={width}
+              nav={site === "sidebar" ? "side" : "top"}
+              sideHeader={site === "sidebar" ? <SiteHeader {...header} variant="side" /> : undefined}
+              hideNavIfSingle={site === "linkinbio"}
+              grid={grid}
+            />
+          )}
         </Suspense>
       </div>
 

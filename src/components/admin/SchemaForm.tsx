@@ -8,7 +8,8 @@ type Obj = Record<string, unknown>;
 
 // Identity fields are managed by the builder, never edited by hand. (A section's `type`
 // is a constant in its schema, and constants are skipped anyway.)
-const HIDDEN_KEYS = new Set(["id", "version"]);
+// `span` (grid width) has its own control in the builder, shown only where a grid applies.
+const HIDDEN_KEYS = new Set(["id", "version", "span"]);
 
 function humanize(key: string): string {
   const spaced = key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[-_]/g, " ").toLowerCase();

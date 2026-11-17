@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const GRID_COLUMNS = 12;
+
 export const AlignSchema = z.enum(["left", "center", "right"]);
 export type Align = z.infer<typeof AlignSchema>;
 
@@ -8,6 +10,11 @@ export function base<T extends string>(type: T) {
   return {
     id: z.string().min(1),
     type: z.literal(type),
+    /**
+     * Width in a grid layout, in columns out of 12. Unset = the layout's default
+     * (full width in a grid tab, half in the bento layout). Ignored in stack layouts.
+     */
+    span: z.number().int().min(1).max(GRID_COLUMNS).optional(),
   };
 }
 

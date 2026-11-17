@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/widgets/shared";
-import { renderSection } from "@/widgets/registry";
+import TabSections, { type GridOptions } from "@/components/TabSections";
 import type { WidgetContext } from "@/widgets/types";
 import type { Tab } from "@/lib/schema/config";
 
@@ -30,13 +30,24 @@ interface TabsProps {
   enableTransitions?: boolean;
   /** Site-wide values handed to every widget. */
   widgetContext: WidgetContext;
+  /** Max-width class of the page column; the full-bleed tab bar aligns its content to it. */
+  widthClass: string;
+  /**
+   * `top` — horizontal tab bar. `side` — from `md` up the tabs are a sticky left column
+   * (below `sideHeader`); below `md` it falls back to the same compact bar + drawer.
+   */
+  nav?: "top" | "side";
+  sideHeader?: ReactNode;
+  /** Hide the navigation entirely when there is only one tab. */
+  hideNavIfSingle?: boolean;
+  grid?: GridOptions;
 }
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
-export default function Tabs({ tabs, enableTransitions, widgetContext }: TabsProps) {
+export default function Tabs({ tabs, enableTransitions, widgetContext, widthClass, nav = "top", sideHeader, hideNavIfSingle, grid }: TabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState(0);
@@ -105,10 +116,40 @@ export default function Tabs({ tabs, enableTransitions, widgetContext }: TabsPro
   const activeIndex = Math.min(activeTab, tabs.length - 1);
   const mountedIndex = Math.min(mountedTab, tabs.length - 1);
 
+  const side = nav === "side";
+  const showNav = !(hideNavIfSingle && tabs.length === 1);
+
   return (
-    <div className="w-full">
-      <div ref={barRef} className="sticky top-0 z-50 w-screen ml-[calc(50%-50vw)] bg-tab-bar border-b border-gray-300 dark:border-gray-700 h-12 md:h-auto">
-        <div className="max-w-[870px] mx-auto px-4 md:px-8 flex items-center gap-3 pt-2 pb-2 h-full">
+    <div className={side ? "w-full md:grid md:grid-cols-[230px_minmax(0,1fr)] md:gap-10" : "w-full"}>
+      {side && (
+        <aside className="hidden md:flex flex-col gap-8 sticky top-0 self-start max-h-screen overflow-y-auto py-10">
+          {sideHeader}
+          {showNav && (
+            <nav className="flex flex-col gap-1" aria-label="Tabs">
+              {tabs.map((tab, index) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleTabClick(index)}
+                  aria-current={activeIndex === index ? "page" : undefined}
+                  className={`flex items-center gap-3 px-3 py-2 text-left border-l-2 transition-colors duration-200 ${
+                    activeIndex === index
+                      ? "text-blue-600 dark:text-white border-blue-600 dark:border-blue-400"
+                      : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white border-transparent"
+                  }`}
+                >
+                  {tab.icon && <Icon icon={tab.icon} invertDark={tab.invertDark} width={20} height={20} />}
+                  <span className="truncate">{tab.label}</span>
+                </button>
+              ))}
+            </nav>
+          )}
+        </aside>
+      )}
+      <div className="min-w-0">
+      {showNav && (
+      <div ref={barRef} className={`sticky top-0 z-50 w-screen ml-[calc(50%-50vw)] bg-tab-bar border-b border-gray-300 dark:border-gray-700 h-12 md:h-auto${side ? " md:hidden" : ""}`}>
+        <div className={`${widthClass} mx-auto px-4 md:px-8 flex items-center gap-3 pt-2 pb-2 h-full`}>
           {/* Desktop tab bar */}
           <div className="hidden md:flex gap-4 justify-center flex-1">
             {tabs.map((tab, index) => (
@@ -138,6 +179,7 @@ export default function Tabs({ tabs, enableTransitions, widgetContext }: TabsPro
           </div>
         </div>
       </div>
+      )}
 
       {/* Mobile side drawer — starts at the tab bar's level (drawerTop) so the title above stays visible; the bar (z-50) sits on top so its morphing close button remains in view */}
       <div className={`fixed inset-x-0 bottom-0 z-40 md:hidden transition-opacity duration-300 ${menuOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} style={{ top: drawerTop }}>
@@ -167,19 +209,12 @@ export default function Tabs({ tabs, enableTransitions, widgetContext }: TabsPro
       </div>
 
       <div
-        className={`space-y-6 md:space-y-8 pt-4${enableTransitions ? ' transition-all duration-100 ease-out' : ''} ${
+        className={`${side ? "pt-4 md:pt-10" : "pt-4"}${enableTransitions ? ' transition-all duration-100 ease-out' : ''} ${
           visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
         }`}
       >
-        {tabs[mountedIndex].sections.map((section, index) => (
-          <div
-            key={section.id}
-            className={enableTransitions && visible ? "animate-fade-in-up" : ""}
-            style={enableTransitions && visible ? { animationDelay: `${index * 0.07}s` } : undefined}
-          >
-            {renderSection(section, widgetContext)}
-          </div>
-        ))}
+        <TabSections tab={tabs[mountedIndex]} widgetContext={widgetContext} animate={enableTransitions && visible} grid={grid} />
+      </div>
       </div>
     </div>
   );

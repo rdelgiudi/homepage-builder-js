@@ -52,7 +52,7 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
   "favicon": "",  // empty/omit = auto-generated animated gradient ring
   "titleGradient": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
   "taglineGradient": [],
-  "layout": { "site": "tabs" },
+  "layout": { "site": "tabs" },  // "tabs" | "sidebar" | "onepage" | "bento" | "linkinbio"
   "background": {
     "base": { "type": "solid", "light": "#f3f4f6", "dark": "#111827" },
     "effect": { "type": "comet" }  // "none" | "stars" | "comet"
@@ -92,6 +92,19 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
   ]
 }
 ```
+
+**Layouts:**
+- `layout.site` — the overall shell:
+
+  | Value | Result |
+  |---|---|
+  | `tabs` (default) | Tab bar across the top, one tab at a time |
+  | `sidebar` | Name, tagline and the tab list in a left column (falls back to the tab bar on phones) |
+  | `onepage` | Every tab on one scrolling page with a sticky jump bar |
+  | `bento` | Wide page; every tab is a grid, two widgets per row by default |
+  | `linkinbio` | One narrow column, sized for phones; no navigation if there is a single tab |
+- `tabs[].layout` — `"stack"` (default, one widget per row) or `"grid"` (12 columns).
+- `sections[].span` — a widget's width in a grid, 1–12 columns (e.g. `6` = half). Unset = full width in a grid tab, half in the bento layout. On phones every widget is full width.
 
 **Config versions:** this is config **v2**. A v1 file (no `version` field, with `backgroundColor` and `effects.particleBackground` / `effects.particleEffect`) still works unchanged — it is upgraded in memory on load. `id`s are optional when writing by hand (they are derived from the tab label / section type); they must be unique across the whole file if you set them.
 
@@ -506,6 +519,8 @@ The hash (salted scrypt) means the password itself is not stored anywhere — so
 | **Comments** | Approve, reject, edit, delete; block a visitor; choose whether new comments publish right away or wait for approval; hold comments containing certain words. |
 | **Integrations** | Which environment variables are set (never their values) and whether config, content and data are writable. |
 | **History** | The last 50 published versions. Loading one puts it into the draft. |
+
+**Resizable panels.** Drag the dividers on either side of the preview to resize the side panels (240–760px; the preview keeps at least 320px). Double-click a divider to reset it; widths are remembered in your browser.
 
 **Draft and publish.** Edits are saved automatically as a *draft* (in the database) and shown in the live preview next to the forms. Nothing changes on the site until you press **Publish**, which writes `homepage.json` and tells open browser tabs to refresh. Markdown files and comment moderation are the exception: they take effect immediately.
 
