@@ -130,20 +130,28 @@ export async function githubActivity(p: Params) {
   return cached(`github-activity:${user.toLowerCase()}`, 180 * MIN, async () => {
     // GitHub has no key-less API for this; the calendar fragment its own profile page loads is public HTML.
     const html = await getText(`https://github.com/users/${user}/contributions`, "text/html");
-    const counts = new Map<string, number>();
-    for (const m of html.matchAll(/<tool-tip[^>]*\bfor="([^"]+)"[^>]*>\s*(No|\d+) contribution/g)) counts.set(m[1], m[2] === "No" ? 0 : Number(m[2]));
-    const days: { date: string; level: number; count: number }[] = [];
-    for (const m of html.matchAll(/<td[^>]*\bdata-date="[^"]*"[^>]*>/g)) {
-      const tag = m[0];
-      const date = /data-date="(\d{4}-\d{2}-\d{2})"/.exec(tag)?.[1];
-      const level = Number(/data-level="(\d)"/.exec(tag)?.[1] ?? 0);
-      const id = /\bid="([^"]+)"/.exec(tag)?.[1] ?? "";
-      if (date) days.push({ date, level, count: counts.get(id) ?? 0 });
-    }
+    const days = parseContributions(html);
     if (!days.length) throw new WidgetError("GitHub's activity calendar could not be read.");
-    days.sort((a, b) => a.date.localeCompare(b.date));
     return { user, url: `https://github.com/${user}`, total: days.reduce((n, d) => n + d.count, 0), days };
   });
+}
+
+/**
+ * Reads GitHub's contributions calendar HTML: one `<td data-date data-level id>` per day,
+ * and the day's count in the `<tool-tip for="<td id>">` that follows. Sorted by date.
+ */
+export function parseContributions(html: string): { date: string; level: number; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const m of html.matchAll(/<tool-tip[^>]*\bfor="([^"]+)"[^>]*>\s*(No|\d+) contribution/g)) counts.set(m[1], m[2] === "No" ? 0 : Number(m[2]));
+  const days: { date: string; level: number; count: number }[] = [];
+  for (const m of html.matchAll(/<td[^>]*\bdata-date="[^"]*"[^>]*>/g)) {
+    const tag = m[0];
+    const date = /data-date="(\d{4}-\d{2}-\d{2})"/.exec(tag)?.[1];
+    const level = Number(/data-level="(\d)"/.exec(tag)?.[1] ?? 0);
+    const id = /\bid="([^"]+)"/.exec(tag)?.[1] ?? "";
+    if (date) days.push({ date, level, count: counts.get(id) ?? 0 });
+  }
+  return days.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 // --- RSS / Atom ---
@@ -160,23 +168,32 @@ export async function rss(p: Params) {
   const feedUrl = httpUrl(section.url);
   if (!feedUrl) throw new WidgetError("Set the feed's address in this widget's settings.", 400);
   return cached(`rss:${feedUrl}`, 30 * MIN, async () => {
-    const xml = await getText(feedUrl, "application/rss+xml, application/atom+xml, application/xml, text/xml");
-    const atom = !/<item[\s>]/i.test(xml) && /<entry[\s>]/i.test(xml);
-    const blocks = xml.match(atom ? /<entry[\s>][\s\S]*?<\/entry>/gi : /<item[\s>][\s\S]*?<\/item>/gi) ?? [];
-    if (!blocks.length) throw new WidgetError("That address is not an RSS or Atom feed, or the feed is empty.");
-    const items = blocks.slice(0, 15).flatMap((block) => {
-      const link = atom
-        ? (/<link[^>]*rel=["']alternate["'][^>]*href=["']([^"']+)["']/i.exec(block) ?? /<link[^>]*href=["']([^"']+)["']/i.exec(block))?.[1]
-        : tagText(block, "link");
-      const url = httpUrl(link ? decodeEntities(link) : null);
-      const title = tagText(block, "title");
-      const date = new Date(tagText(block, atom ? "updated" : "pubDate") || tagText(block, "published") || tagText(block, "dc:date"));
-      return url && title ? [{ title, url, date: Number.isNaN(date.getTime()) ? null : date.toISOString() }] : [];
-    });
-    // The feed's own title is the first <title> outside any item.
-    const head = xml.slice(0, xml.search(atom ? /<entry[\s>]/i : /<item[\s>]/i));
-    return { title: tagText(head, "title"), items };
+    const feed = parseFeed(await getText(feedUrl, "application/rss+xml, application/atom+xml, application/xml, text/xml"));
+    if (!feed) throw new WidgetError("That address is not an RSS or Atom feed, or the feed is empty.");
+    return feed;
   });
+}
+
+/**
+ * RSS 2.0 (`<item>`) or Atom (`<entry>`) → the feed title and up to 15 items with a
+ * title and an http(s) link. `null` when the text has no items at all.
+ */
+export function parseFeed(xml: string): { title: string; items: { title: string; url: string; date: string | null }[] } | null {
+  const atom = !/<item[\s>]/i.test(xml) && /<entry[\s>]/i.test(xml);
+  const blocks = xml.match(atom ? /<entry[\s>][\s\S]*?<\/entry>/gi : /<item[\s>][\s\S]*?<\/item>/gi) ?? [];
+  if (!blocks.length) return null;
+  const items = blocks.slice(0, 15).flatMap((block) => {
+    const link = atom
+      ? (/<link[^>]*rel=["']alternate["'][^>]*href=["']([^"']+)["']/i.exec(block) ?? /<link[^>]*href=["']([^"']+)["']/i.exec(block))?.[1]
+      : tagText(block, "link");
+    const url = httpUrl(link ? decodeEntities(link) : null);
+    const title = tagText(block, "title");
+    const date = new Date(tagText(block, atom ? "updated" : "pubDate") || tagText(block, "published") || tagText(block, "dc:date"));
+    return url && title ? [{ title, url, date: Number.isNaN(date.getTime()) ? null : date.toISOString() }] : [];
+  });
+  // The feed's own title is the first <title> outside any item.
+  const head = xml.slice(0, xml.search(atom ? /<entry[\s>]/i : /<item[\s>]/i));
+  return { title: tagText(head, "title"), items };
 }
 
 // --- Mastodon ---

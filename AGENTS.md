@@ -57,7 +57,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── OverwatchStatus.tsx      # Overwatch 2 stats
 │   │   ├── MemeWidget.tsx           # Random meme display
 │   │   ├── MarkdownWidget.tsx       # Renders pre-rendered HTML from /api/markdown
-│   │   ├── VisitorCounter.tsx       # Visitor count display
+│   │   ├── VisitorCounter.tsx       # Live viewer + total visitor counters (see "Visitor counters")
 │   │   ├── CommentsWidget.tsx       # Guestbook: post + list visitor comments (SQLite)
 │   │   │   ├── ReactionsWidget.tsx      # Anonymous emoji reactions (toggle, visitor-hash keyed, rate-limited, GUI lock)
 │   │   │   ├── ReactionFlyer.tsx        # Background layer that flies an emoji up the screen when anyone reacts (WebSocket subscriber, coalesce:false)
@@ -463,7 +463,13 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
   | 5 (Stream) | 📺 | 0 |
 
 ### npm overrides
-- `package.json` overrides pin patched transitive deps: `undici@^6.29.1` (discord.js), `glob@^14.0.4` / `rimraf@^6.1.4` (eslint tooling), and `postcss: "$postcss"` (forces Next's nested `postcss@8.4.31` up to the patched direct dependency `^8.5.32`).
+- `package.json` overrides pin patched transitive deps: `undici@^6.29.1` (discord.js) and `postcss: "$postcss"` (forces Next's nested `postcss@8.4.31` up to the patched direct dependency `^8.5.32`). The former `glob` / `rimraf` overrides were removed with the move to ESLint 9, which no longer pulls either package in.
+
+### Visitor counters (`counters.*`, `VisitorCounter.tsx`)
+- The two counters are fetched independently (`POST /api/visitors`, `GET /api/viewers`); either can be switched off without affecting the other. Never collect them into one array and destructure by position — that was a bug: with visitors off, the viewers response was read as the visitor count.
+- The effect re-runs when a counter is switched on or off by a live config refresh. Re-posting `/api/visitors` is harmless (one row per visitor).
+- **The live viewer count must be subscribed to from mount**, not after the first fetch. The page shares one WebSocket (`useWebSocket`), and `ConfigSync` opens it immediately; the server sends `{ type: "viewers" }` only when a connection opens, closes or identifies. A subscriber that joins later misses that message and keeps the fetch's value, which was taken before this page's own connection existed (shows "0 people viewing" on a first visit). `gotLiveViewers` stops the initial fetch from overwriting a newer pushed count.
+- Viewers are counted per visitor hash (`viewerHashes` in `websocket-server.js`); connections without a `visitor_id` cookie all share one `undefined` key, so several brand-new visitors count as one until they identify.
 
 ### Docker build requires native modules
 - `better-sqlite3` and `sharp` need `build-base` + `python3` (already in Dockerfile).
@@ -612,9 +618,31 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 | Command | Description |
 |---|---|
 | `npm run dev` | Next.js dev with WebSocket server (presence bot in-process if env set) |
-| `npm run build` | Next.js production build |
+| `npm run build` | Next.js production build (also lints `src/` and type-checks everything, tests included) |
 | `npm run start` | Production start (websocket-server.js) |
 | `npm run admin:hash` | Ask for a password and print the `ADMIN_PASSWORD_HASH=...` line for `.env` |
+| `npm run lint` | ESLint over the whole repo (`eslint.config.mjs`) |
+| `npm test` | Unit tests (`tests/unit`, ~1s, no network, no database) |
+| `npm run test:integration` | Production build, then HTTP tests against the built server (`tests/integration`, ~20s). Rebuilds `.next`, so don't run it while `npm run dev` is up. |
+
+## Linting
+- ESLint 9 flat config in `eslint.config.mjs`: `next/core-web-vitals` + `next/typescript` through `FlatCompat`, plus a CommonJS block for the plain Node files (`websocket-server.js`, `discord-presence.js`, `scripts/**`, `src/lib/admin/password.js`) where `require` is allowed. `next lint` is not used (deprecated, removed in Next 16).
+- `eslint-config-next` is pinned to the same version as `next`. Don't move it to 16 without moving Next.
+- Unused names: a leading `_` marks a deliberately unused argument or variable, and `const { a, ...rest }` may drop `a`.
+- **`next build` runs ESLint over `src/` only and fails on errors there** (warnings only print); the Docker image build runs `next build`, so such an error breaks the image. Lint errors in `websocket-server.js`, `discord-presence.js`, `scripts/` or `tests/` do **not** fail the build (checked) — only `npm run lint` reports them, so run it before committing.
+- Three `react-hooks/exhaustive-deps` warnings are left on purpose (MemeWidget, ReactionsWidget ×2): each effect is meant to run once, and adding the dependency would change when it runs. Don't "fix" them mechanically.
+- An `<img>` instead of `next/image` needs a disable comment with the reason (external hosts that aren't in `next.config.ts`, tiny icons).
+
+## Testing
+- Needs the same Node major as the Dockerfile (26): the setup relies on Node stripping TypeScript types by default and on `module.registerHooks`, and older versions fail with unhelpful errors.
+- Node's built-in runner (`node --test`), no test framework. Node 26 strips TypeScript types itself; `tests/register.mjs` adds what Next.js normally provides: the `@/` alias and extensionless imports (`./meta` → `./meta.ts`), inside `src/` and `tests/`.
+- **What tests can import:** `.ts` and `.js` only — Node can't run JSX, so nothing reachable from a test may import a `.tsx` file. Logic worth testing that lives in a component goes into a `.ts` file next to it (e.g. `widgets/embed/player.ts`, `parseFeed` / `parseContributions` in `lib/widget-sources.ts`). No TypeScript-only runtime syntax either (enums, parameter properties, namespaces).
+- **No SQLite in unit tests:** `db.ts` loads better-sqlite3 with `require()`, which doesn't exist in the ES-module scope Node uses for `.ts` files. Code that touches the database is covered by the integration tests instead (or takes its inputs as parameters, like `initialStatus(name, body, settings)`).
+- The `MODULE_TYPELESS_PACKAGE_JSON` warning is silenced in the scripts. Don't add `"type": "module"` to `package.json` to get rid of it — that would turn `websocket-server.js` and the other CommonJS files into ES modules and break them.
+- `tests/fixtures/homepage.v1.json` is the original v1 example (from before config v2). Keep it as is: it is what proves old configs still load.
+- **Integration tests** (`tests/integration/server.ts`) start the built `websocket-server.js` in production mode in a temp folder with symlinks to `.next`, `node_modules` etc., their own `homepage.json`, content and `DATA_DIR`, on a free port. Every integration env var is set to an empty string so the real `.env` (dotenv never overrides a set variable) can't log the Discord bot in. Node's `fetch` keeps no cookies and sends no `Origin`; the `Client` helper does both. Limits to keep in mind when adding tests: 8 failed sign-ins per server start, one comment per visitor per 5s, one poll vote per visitor per second.
+- Tests are type-checked by `tsc` and by `next build` (tsconfig includes `**/*.ts`), so **a type error in a test fails the production and Docker build**. Use `@/` imports, not `.ts` extensions.
+- `tests/unit/tailwind.test.ts` fails when a folder with `.tsx` files is missing from Tailwind's `content` list (the Phase 0 regression where widget styles were silently dropped).
 
 ## Docker
 

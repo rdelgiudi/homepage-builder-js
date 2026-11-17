@@ -1068,7 +1068,6 @@ app.prepare().then(() => {
     console.log(`[${new Date().toISOString()}] > Ready on http://${hostname}:${port}`);
   });
 
-  let presenceUnsubscribe = null;
   const presenceModule = require('./discord-presence');
 
   let enrichmentInFlight = false;
@@ -1108,7 +1107,7 @@ app.prepare().then(() => {
   }
 
   if (presenceModule && typeof presenceModule.onPresenceUpdate === 'function') {
-    presenceUnsubscribe = presenceModule.onPresenceUpdate(processRawPresence);
+    presenceModule.onPresenceUpdate(processRawPresence);
   }
 
   if (presenceModule && typeof presenceModule.start === 'function') {

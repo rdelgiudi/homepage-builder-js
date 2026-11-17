@@ -48,21 +48,6 @@ function formatPlaytime(minutes: number): string {
   return `${(hours / 1000).toFixed(1)}k hrs`;
 }
 
-const dotColors: Record<string, string> = {
-  offline: "bg-gray-500",
-  online: "bg-blue-500",
-  inGame: "bg-green-500",
-  away: "bg-yellow-500",
-};
-
-const glowColors: Record<string, string> = {
-  "bg-blue-500": "rgba(59, 130, 246, 0.5)",
-  "bg-green-500": "rgba(34, 197, 94, 0.5)",
-  "bg-yellow-500": "rgba(234, 179, 8, 0.5)",
-  "bg-red-500": "rgba(239, 68, 68, 0.5)",
-  "bg-gray-500": "rgba(107, 114, 128, 0.5)",
-};
-
 function getStatus(player: SteamPlayer): { dotColor: string; textColor: string; text: string } {
   const isAway = player.personastate === 3;
   const isBusy = player.personastate === 2;
@@ -242,6 +227,7 @@ function GameCard({ game, achievement }: { game: SteamGame; achievement?: Achiev
                         <p className="text-[10px] text-gray-500 mb-1">Recent:</p>
                         {achievement.recent.slice(0, 3).map((a, i) => (
                           <div key={i} className="flex items-center gap-1.5 mb-0.5">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- 16px Steam CDN icon; next/image would add a resize request for nothing */}
                             <img src={a.icon} alt="" className="w-4 h-4 rounded-sm" />
                             <p className="text-[10px] text-gray-300 truncate">{a.name}</p>
                           </div>

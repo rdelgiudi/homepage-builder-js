@@ -5,5 +5,5 @@ import type { OverwatchSection } from "./meta";
 export const view: WidgetView<OverwatchSection> = {
   titled: true,
   frame: "wrap",
-  render: (_section, ctx) => <OverwatchStatus />,
+  render: () => <OverwatchStatus />,
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useWebSocket, sendWebSocket } from "@/hooks/useWebSocket";
 
 interface VisitorCounterProps {
@@ -15,39 +15,47 @@ export default function VisitorCounter({
   const [viewers, setViewers] = useState<number | null>(null);
   const [count, setCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Set once the server has pushed a live viewer count; the initial fetch must not overwrite it. */
+  const gotLiveViewers = useRef(false);
 
   useEffect(() => {
-    async function trackAndGetCount() {
-      try {
-        const requests: Promise<Response>[] = [];
-        if (showVisitors) requests.push(fetch("/api/visitors", { method: "POST" }));
-        if (showViewers) requests.push(fetch("/api/viewers"));
-        const [visitorsRes, viewersRes] = await Promise.all(requests);
-        if (visitorsRes) {
-          const visitorsData = await visitorsRes.json();
-          if (visitorsData.count !== undefined) setCount(visitorsData.count);
-          if (visitorsData.visitorId) identifyVisitor(visitorsData.visitorId);
-        }
-        if (viewersRes) {
-          const viewersData = await viewersRes.json();
-          if (viewersData.count !== undefined) setViewers(viewersData.count);
-        }
-      } catch {
+    let cancelled = false;
+    // Each counter is fetched on its own, so turning one off can't shift the other's response.
+    const visitorsRequest = showVisitors ? fetch("/api/visitors", { method: "POST" }).then((r) => r.json()) : null;
+    const viewersRequest = showViewers ? fetch("/api/viewers").then((r) => r.json()) : null;
+    Promise.all([visitorsRequest, viewersRequest])
+      .then(([visitorsData, viewersData]) => {
+        if (cancelled) return;
+        if (visitorsData?.count !== undefined) setCount(visitorsData.count);
+        if (visitorsData?.visitorId) identifyVisitor(visitorsData.visitorId);
+        if (viewersData?.count !== undefined && !gotLiveViewers.current) setViewers(viewersData.count);
+      })
+      .catch(() => {
+        if (cancelled) return;
         setCount(null);
         setViewers(null);
-      } finally {
-        setLoading(false);
-      }
-    }
-    trackAndGetCount();
-  }, []);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Re-runs when a counter is switched on or off (live config refresh). Registering the
+    // visitor again is harmless: the server counts each visitor once.
+  }, [showViewers, showVisitors]);
 
+  // Listen from the start: the page's shared socket (also used by ConfigSync) can connect
+  // before the fetch above finishes, and the server announces the count only on changes.
   useWebSocket({
-    enabled: !loading && showViewers,
+    enabled: showViewers,
     onMessage: (data) => {
       if (data && typeof data === "object" && (data as { type?: string }).type === "viewers") {
         const msg = data as { count?: number };
-        if (typeof msg.count === "number") setViewers(msg.count);
+        if (typeof msg.count === "number") {
+          gotLiveViewers.current = true;
+          setViewers(msg.count);
+        }
       }
     },
   });

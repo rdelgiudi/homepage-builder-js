@@ -1,5 +1,17 @@
 import { NextResponse } from "next/server";
 
+/** The fields of a meme-api.com entry this route reads. */
+interface RawMeme {
+  title?: string;
+  url?: string;
+  postLink?: string;
+  subreddit?: string;
+  author?: string;
+  ups?: number;
+  nsfw?: boolean;
+  spoiler?: boolean;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const popular = searchParams.get("popular") === "true";
@@ -13,9 +25,9 @@ export async function GET(request: Request) {
     }
     const data = await res.json();
 
-    const safe = (data.memes || [])
-      .filter((m: Record<string, any>) => !m.nsfw && !m.spoiler)
-      .map((m: Record<string, any>) => ({
+    const safe = ((data.memes || []) as RawMeme[])
+      .filter((m) => !m.nsfw && !m.spoiler)
+      .map((m) => ({
         title: m.title || "Random Meme",
         url: m.url,
         postLink: m.postLink,
@@ -33,7 +45,7 @@ export async function GET(request: Request) {
     }
 
     if (popular) {
-      safe.sort((a: Record<string, any>, b: Record<string, any>) => (b.ups || 0) - (a.ups || 0));
+      safe.sort((a, b) => (b.ups || 0) - (a.ups || 0));
       return NextResponse.json({ memes: safe.slice(0, 30) });
     }
 

@@ -1,0 +1,183 @@
+{
+  "name": "Display Name",
+  "tagline": "Your tagline or bio goes here",
+  "favicon": "",
+  "titleGradient": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
+  "taglineGradient": [],
+  "backgroundColor": {
+    "light": "#f3f4f6",
+    "dark": "#111827"
+  },
+  "effects": {
+    "particleBackground": true,
+    "particleEffect": "comet",
+    "gradientBorders": true,
+    "tabTransitions": true,
+    "customScrollbar": true,
+    "progressGradient": true,
+    "progressGradientColors": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
+    "widgetFrame": false,
+    "widgetFrameWidth": 3,
+    "mouseTrail": false,
+    "mouseTrailColors": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
+    "faviconAnimation": true,
+    "reactionFlyer": true
+  },
+  "counters": {
+    "viewers": true,
+    "visitors": true
+  },
+  "tabs": [
+    {
+      "label": "Welcome",
+      "icon": "👋",
+      "sections": [
+        {
+          "type": "header",
+          "title": "Hello! Welcome to my site!",
+          "icon": "👋"
+        },
+        {
+          "type": "text",
+          "content": "A simple paragraph of text with an optional icon.",
+          "icon": "💬"
+        },
+        {
+          "type": "text",
+          "content": "This one is left-aligned.",
+          "align": "left"
+        },
+        {
+          "type": "text",
+          "content": "This one is right-aligned.",
+          "align": "right"
+        },
+        {
+          "type": "markdown",
+          "file": "about.md"
+        },
+        {
+          "type": "meme",
+          "icon": "",
+          "text": "A random meme, refreshed each visit",
+          "popular": false
+        }
+      ]
+    },
+    {
+      "label": "Social",
+      "icon": "🔗",
+      "sections": [
+        {
+          "type": "links",
+          "text": "Follow me on social media",
+          "align": "right",
+          "items": [
+            { "label": "GitHub",  "url": "https://github.com/yourusername",  "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/github.svg", "invertDark": true },
+            { "label": "Twitter", "url": "https://twitter.com/yourusername", "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/twitter.svg", "invertDark": true },
+            { "label": "YouTube", "url": "https://youtube.com/@yourchannel", "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/youtube.svg", "invertDark": true },
+            { "label": "Email",   "url": "mailto:you@example.com",          "icon": "📧" }
+          ]
+        },
+        {
+          "type": "links",
+          "align": "left",
+          "items": [
+            { "label": "GitHub",  "url": "https://github.com/yourusername",  "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/github.svg", "invertDark": true },
+            { "label": "Twitter", "url": "https://twitter.com/yourusername", "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/twitter.svg", "invertDark": true },
+            { "label": "YouTube", "url": "https://youtube.com/@yourchannel", "icon": "https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/youtube.svg", "invertDark": true },
+            { "label": "Email",   "url": "mailto:you@example.com",          "icon": "📧" }
+          ]
+        },
+        {
+          "type": "links",
+          "items": [
+            { "label": "Download Resume", "url": "https://yoursite.com/resume.pdf", "icon": "📄", "style": "primary" },
+            { "label": "View Portfolio",  "url": "https://yoursite.com",            "icon": "🎨", "style": "secondary" }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Gaming",
+      "icon": "🎮",
+      "sections": [
+        {
+          "type": "discord-user",
+          "icon": "",
+          "text": "My Discord Status",
+          "widgetFrame": true
+        },
+        {
+          "type": "steam",
+          "icon": "",
+          "text": "My Steam Profile",
+          "widgetFrame": true
+        },
+        {
+          "type": "overwatch",
+          "icon": "",
+          "text": "My Overwatch Stats",
+          "widgetFrame": true
+        }
+      ]
+    },
+    {
+      "label": "Projects",
+      "icon": "📂",
+      "sections": [
+        {
+          "type": "github",
+          "repos": [
+            { "owner": "vercel", "repo": "next.js", "label": "Next.js", "note": "The React Framework" },
+            { "owner": "facebook", "repo": "react", "label": "React", "note": "A JavaScript library" },
+            { "owner": "tailwindlabs", "repo": "tailwindcss", "label": "Tailwind CSS", "note": "Utility-first CSS" },
+            { "owner": "nodejs", "repo": "node", "label": "Node.js", "note": "JavaScript runtime" }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Widgets",
+      "icon": "🧩",
+      "sections": [
+        {
+          "type": "discord-server",
+          "icon": "💬",
+          "text": "Discord Server Widget",
+          "widgetFrame": true
+        },
+        {
+          "type": "github",
+          "icon": "",
+          "text": "GitHub Projects",
+          "widgetFrame": false,
+          "repos": [
+            { "owner": "vercel", "repo": "next.js" },
+            { "owner": "facebook", "repo": "react" }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Guestbook",
+      "icon": "📝",
+      "sections": [
+        {
+          "type": "comments",
+          "icon": "💬",
+          "text": "Leave a comment",
+          "limit": 50,
+          "widgetFrame": false
+        },
+        {
+          "type": "reactions",
+          "icon": "✨",
+          "text": "Or just drop a reaction",
+          "emojis": ["👍", "❤️", "😂", "🔥", "🎉", "👀"],
+          "widgetFrame": false
+        }
+      ]
+    }
+  ]
+}

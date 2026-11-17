@@ -327,15 +327,6 @@ function formatLastSeen(isoString: string): string {
   return `${months}mo ago`;
 }
 
-function adjustColor(hex: string, percent: number): string {
-  const num = parseInt(hex.replace('#', ''), 16);
-  const amt = Math.round(2.55 * percent);
-  const R = Math.max((num >> 16) - amt, 0);
-  const G = Math.max(((num >> 8) & 0x00ff) - amt, 0);
-  const B = Math.max((num & 0x0000ff) - amt, 0);
-  return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
-}
-
 function desaturate(hex: string, satPercent: number, lightPercent: number): string {
   const num = parseInt(hex.replace('#', ''), 16);
   const r = (num >> 16) & 0xff;
@@ -658,7 +649,6 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
 
   const avatarUrl = data?.id && data?.avatar ? getAvatarUrl(data.id, data.avatar) : lastAvatarUrlRef.current;
   const bannerUrl = data?.id && data?.banner ? getBannerUrl(data.id, data.banner) : null;
-  const statusColor = statusColors[data?.status || lastStatusRef.current] || statusColors.offline;
 
   const globalName = data?.globalName?.trim();
   const usernameOnly = data?.username?.includes('#') ? data.username.split('#')[0] : data?.username;
@@ -678,8 +668,6 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
   const allActivities = (data?.activities?.filter((a: DiscordActivity) =>
     a.type === 0 || a.type === 2 || a.type === 1 || a.type === 3 || a.type === 4 || a.type === 5
   ) || []).reverse();
-  const currentActivity = allActivities[0];
-  const otherActivities = allActivities.slice(1);
 
   const leavingKeySet = new Set(leavingActivities.keys());
   const activeCards = allActivities.filter((a) => !collapsedKeys.has(getActivityKey(a))).length;

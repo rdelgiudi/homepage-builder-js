@@ -40,6 +40,16 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 
+### Checks
+
+```bash
+npm run lint              # ESLint
+npm test                  # unit tests, about a second
+npm run test:integration  # builds, then tests the admin panel and APIs over HTTP (~20s)
+```
+
+The tests need Node 26, the version the Dockerfile uses. The integration tests start the built server in a temporary folder with its own config and database and with every integration (Discord, Steam, Overwatch) switched off, so the test server never reads your real `.env`, config or data. (The build step before it reads `.env` as any `npm run build` does.) It rebuilds `.next`, so stop `npm run dev` first.
+
 ## Configuration
 
 ### Homepage Settings (`src/config/homepage.json`)
@@ -105,6 +115,8 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
   | `linkinbio` | One narrow column, sized for phones; no navigation if there is a single tab |
 - `tabs[].layout` — `"stack"` (default, one widget per row) or `"grid"` (12 columns).
 - `sections[].span` — a widget's width in a grid, 1–12 columns (e.g. `6` = half). Unset = full width in a grid tab, half in the bento layout. On phones every widget is full width.
+
+**Counters:** `"counters": { "viewers": true, "visitors": true }` — the live "people viewing now" count and the total unique visitors, shown bottom left. Each can be switched off on its own (both default to on).
 
 **Config versions:** this is config **v2**. A v1 file (no `version` field, with `backgroundColor` and `effects.particleBackground` / `effects.particleEffect`) still works unchanged — it is upgraded in memory on load. `id`s are optional when writing by hand (they are derived from the tab label / section type); they must be unique across the whole file if you set them.
 
@@ -513,7 +525,7 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 │   │   ├── OverwatchStatus.tsx      # Overwatch stats
 │   │   ├── MemeWidget.tsx           # Random meme
 │   │   ├── MarkdownWidget.tsx       # Renders pre-rendered HTML
-│   │   ├── VisitorCounter.tsx       # Visitor count
+│   │   ├── VisitorCounter.tsx       # Live viewer and total visitor counters
 │   │   ├── CommentsWidget.tsx       # Guestbook: post + list visitor comments (SQLite)
 │   │   ├── ReactionsWidget.tsx   # Anonymous emoji reactions (toggle, visitor-hash keyed, rate-limited, GUI lock)
 │   │   │   ├── ReactionFlyer.tsx     # Background layer that flies an emoji up the screen when anyone reacts
