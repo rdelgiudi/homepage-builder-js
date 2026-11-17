@@ -106,7 +106,25 @@ function project(w: number, h: number, px: number, py: number, z: number) {
   return { sx: w / 2 + px * scale, sy: h / 2 + py * scale, scale };
 }
 
-export default function ParticleBackground({ mode = "stars" }: { mode?: ParticleMode }) {
+interface ParticleBackgroundProps {
+  mode?: ParticleMode;
+  /** Multiplies the particle count (1 = normal). */
+  density?: number;
+  /** Multiplies movement speed (1 = normal). */
+  speed?: number;
+  /** Overrides the theme's particle colour (any hex colour). */
+  color?: string;
+}
+
+/** "#rrggbb" / "#rgb" → "r, g, b", or null if it isn't a hex colour. */
+function hexToRgb(hex: string | undefined): string | null {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex ?? "");
+  if (!m) return null;
+  const h = m[1].length === 3 ? m[1].replace(/./g, "$&$&") : m[1];
+  return `${parseInt(h.slice(0, 2), 16)}, ${parseInt(h.slice(2, 4), 16)}, ${parseInt(h.slice(4, 6), 16)}`;
+}
+
+export default function ParticleBackground({ mode = "stars", density = 1, speed = 1, color }: ParticleBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -121,8 +139,11 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
     function getCount() {
       const isMobile = window.innerWidth < 640;
       const multiplier = isMobile ? 0.025 : 0.04;
-      return Math.min(Math.floor(window.innerWidth * multiplier), isMobile ? 30 : 60);
+      return Math.max(1, Math.round(Math.min(Math.floor(window.innerWidth * multiplier), isMobile ? 30 : 60) * density));
     }
+
+    const custom = hexToRgb(color);
+    const themeColor = (isDark: boolean) => custom ?? (isDark ? "148, 163, 184" : "75, 85, 99");
 
     function initStars() {
       const c = getCount();
@@ -132,11 +153,11 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
       particles = Array.from({ length: c }, () => ({
         x: Math.random() * w,
         y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
+        vx: (Math.random() - 0.5) * 0.3 * speed,
+        vy: (Math.random() - 0.5) * 0.3 * speed,
         size: Math.random() * 2.5 + 1,
         baseOpacity: isDark ? Math.random() * 0.5 + 0.3 : Math.random() * 0.5 + 0.4,
-        color: isDark ? "148, 163, 184" : "75, 85, 99",
+        color: themeColor(isDark),
         twinkleSpeed: Math.random() * 0.004 + 0.002,
         twinklePhase: Math.random() * Math.PI * 2,
       })) satisfies StarsParticle[];
@@ -145,13 +166,13 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
     function initComets() {
       const c = getCount();
       const isDark = document.documentElement.classList.contains("dark");
-      const color = isDark ? "148, 163, 184" : "75, 85, 99";
+      const color = themeColor(isDark);
       const [r, g, b] = color.split(", ").map(s => parseInt(s));
       particles = Array.from({ length: c }, () => ({
         x: (Math.random() - 0.5) * 1.6,
         y: (Math.random() - 0.5) * 1.6,
         z: Math.random() * (FAR_Z - 0.3) + 0.3,
-        speed: Math.random() * 0.012 + 0.003,
+        speed: (Math.random() * 0.012 + 0.003) * speed,
         baseSize: Math.random() * 0.025 + 0.005,
         brightness: isDark ? Math.random() * 0.7 + 0.3 : Math.random() * 0.6 + 0.4,
         color,
@@ -217,7 +238,7 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
           cp.z = Math.random() * (FAR_Z - 0.5) + 0.5;
           cp.x = (Math.random() - 0.5) * 1.6;
           cp.y = (Math.random() - 0.5) * 1.6;
-          cp.speed = Math.random() * 0.012 + 0.003;
+          cp.speed = (Math.random() * 0.012 + 0.003) * speed;
           cp.baseSize = Math.random() * 0.025 + 0.005;
           cp.hasPrev = false;
           continue;
@@ -240,7 +261,7 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
       }
 
       if (hasTrails) {
-        ctx!.strokeStyle = `rgba(148, 163, 184, 0.3)`;
+        ctx!.strokeStyle = `rgba(${custom ?? "148, 163, 184"}, 0.3)`;
         ctx!.lineWidth = 1;
         ctx!.stroke();
       }
@@ -283,7 +304,7 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
 
     const observer = new MutationObserver(() => {
       const isDark = document.documentElement.classList.contains("dark");
-      const newColor = isDark ? "148, 163, 184" : "75, 85, 99";
+      const newColor = themeColor(isDark);
       const [nr, ng, nb] = newColor.split(", ").map(s => parseInt(s));
       for (const p of particles) {
         if (mode === "comet") {
@@ -307,7 +328,7 @@ export default function ParticleBackground({ mode = "stars" }: { mode?: Particle
       document.removeEventListener("visibilitychange", visibilityHandler);
       observer.disconnect();
     };
-  }, [mode]);
+  }, [mode, density, speed, color]);
 
   return (
     <canvas

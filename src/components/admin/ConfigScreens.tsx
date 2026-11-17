@@ -1,10 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { HomepageConfig } from "@/lib/schema/config";
 import SchemaForm from "./SchemaForm";
 import { formSchemas, type JsonSchema } from "./schemas";
 import { useAdmin } from "./store";
+import { api } from "./api";
 import { LayoutPicker } from "./LayoutControls";
 
 type Obj = Record<string, unknown>;
@@ -51,11 +52,66 @@ export function SiteScreen() {
   );
 }
 
+interface Upload {
+  name: string;
+  url: string;
+  kind: "image" | "video";
+  bytes: number;
+  inUse: boolean;
+}
+
+/** Files uploaded for backgrounds, so unused ones can be removed. */
+function Uploads() {
+  const { savedTick } = useAdmin();
+  const [uploads, setUploads] = useState<Upload[]>([]);
+  const load = useCallback(() => {
+    api<{ uploads: Upload[] }>("upload")
+      .then((d) => setUploads(d.uploads))
+      .catch(() => {});
+  }, []);
+  // Refresh whenever the draft was saved: that is when "in use" can change.
+  useEffect(load, [load, savedTick]);
+
+  if (!uploads.length) return <p className="adm-hint">Nothing uploaded yet. Choose Image or Video above and use Upload.</p>;
+  return (
+    <ul className="adm-uploads">
+      {uploads.map((u) => (
+        <li key={u.name}>
+          {u.kind === "image" ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={u.url} alt="" />
+          ) : (
+            <video src={u.url} muted preload="metadata" />
+          )}
+          <span className="adm-hint">
+            {u.kind === "image" ? "Image" : "Video"}, {u.bytes > 1048576 ? `${(u.bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(u.bytes / 1024))} KB`}
+            {u.inUse ? ", in use" : ""}
+          </span>
+          <button
+            type="button"
+            className="adm-btn is-small is-danger"
+            disabled={u.inUse}
+            title={u.inUse ? "Used by the live site or your draft" : undefined}
+            onClick={() => api(`upload?name=${u.name}`, { method: "DELETE" }).then(load)}
+          >
+            Delete
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function BackgroundScreen() {
   return (
-    <Block title="Background">
-      <KeyForm name="background" schema={formSchemas.background} />
-    </Block>
+    <>
+      <Block title="Background">
+        <KeyForm name="background" schema={formSchemas.background} />
+      </Block>
+      <Block title="Uploaded files">
+        <Uploads />
+      </Block>
+    </>
   );
 }
 

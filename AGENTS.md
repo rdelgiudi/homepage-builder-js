@@ -26,11 +26,13 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │   ├── presence/route.ts    # Snapshot of current Discord presence (force-dynamic; reads in-memory server state)
 │   │   │   ├── steam/route.ts       # Snapshot of current Steam data (force-dynamic; reads in-memory server state)
 │   │   │   └── overwatch/route.ts   # Snapshot of current Overwatch data (force-dynamic; reads in-memory server state)
+│   │   │   ├── uploads/[name]/route.ts  # Public: serves an uploaded background image/video (immutable cache, byte ranges)
 │   │   │   └── admin/               # Admin API — every handler wrapped in withAdmin()
 │   │   │       ├── login/ logout/   # Session create / destroy
 │   │   │       ├── config/route.ts  # GET published+draft, PUT save draft (strict), DELETE discard draft
 │   │   │       ├── config/publish/  # POST: draft → homepage.json (revision kept)
 │   │   │       ├── revisions/       # GET list, POST load one into the draft
+│   │   │       ├── upload/          # Background media: GET list, POST multipart upload, DELETE
 │   │   │       ├── content/         # Markdown files: list/read, PUT, DELETE, POST = render preview
 │   │   │       ├── comments/        # GET list by status, POST bulk; [id] PATCH/DELETE; settings PUT
 │   │   │       └── integrations/    # Which env vars are set, what is writable
@@ -62,7 +64,9 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   ├── Tabs.tsx                 # Tab navigation (top bar or side column, mobile drawer, transitions)
 │   │   ├── OnePage.tsx              # "onepage" layout: all tabs as sections, sticky jump bar with scroll-spy
 │   │   ├── TabSections.tsx          # One tab's widgets as a stack or 12-column grid; renders via widgets/registry
-│   │   ├── ParticleBackground.tsx   # Canvas floating particles
+│   │   ├── BackgroundLayer.tsx      # Gradient / image / video / pattern layer + overlay; per-tab crossfade
+│   │   ├── AmbientEffects.tsx       # Canvas effects: snow, fireflies, constellation, aurora
+│   │   ├── ParticleBackground.tsx   # Canvas effects: stars, comet
 │   │   ├── MouseTrail.tsx           # Canvas comet-style mouse trail (gradient line, no draw while stationary)
 │   │   ├── SitePage.tsx             # The whole site rendered from a config; used by / and /admin/preview. Mounts ThemeSwitcher, FaviconAnimation, ConfigSync
 │   │   ├── ConfigSync.tsx           # router.refresh() on WS {type:"config"} (live) or on postMessage from the admin panel (preview)
@@ -98,6 +102,8 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 │   │   │   ├── store.ts             # SQLite: admin_sessions, admin_state (draft, settings), config_revisions, blocked_visitors, audit_log
 │   │   │   └── publish.ts           # publishConfig() (atomic write + revision), getDraftConfig(), isWritable()
 │   │   ├── comments.ts              # comments table + moderation columns, moderation settings, initialStatus()
+│   │   ├── background.ts            # backgroundLayer(): background.base → CSS variables/classes (pure); safeUrl()
+│   │   ├── uploads.ts               # DATA_DIR/uploads: storeImage (sharp → WebP), storeVideo, resolveUpload, listUploads
 │   │   ├── content.ts               # CONTENT_DIR + resolveContentFile() (plain *.md names only)
 │   │   ├── config.ts                # mtime-cached homepage.json loader (uses parseConfig)
 │   │   ├── db.ts                    # Shared better-sqlite3 connection (DATA_DIR/visitors.db, WAL); exports DATA_DIR
@@ -156,7 +162,7 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 | `titleGradient` | Array of CSS color stops for title gradient text; omit or empty = solid color |
 | `taglineGradient` | Array of CSS color stops for tagline gradient; empty array or omit = inherits `titleGradient` |
 | `layout` | `{ site }` — site shell: `"tabs"` (default), `"sidebar"`, `"onepage"`, `"bento"`, `"linkinbio"`. See "Site layouts and the grid". |
-| `background` | `{ base: { type: "solid", light, dark }, effect: { type: "none" \| "stars" \| "comet" } }` — page background color (defaults `#f3f4f6` / `#111827`) and the canvas particle layer (default `"stars"`) |
+| `background` | `{ base, overlay, effect, surface }` — what fills the page (solid / gradient / image / video / pattern), a readability overlay, the particle effect, and how see-through the header, tab bar and cards are. See "Background" below. |
 | `counters` | `{ viewers, visitors }` — toggles for the bottom-left counters (both default `true`) |
 | `effects` | Object toggling visual effects — see Effects section below |
 | `tabs` | Array of tab objects: `{ id, label, icon?, invertDark?, layout: "stack" \| "grid", sections: [...] }`. Every section also accepts `span` (1–12, grid width). Every tab and section has an `id` (unique across the file; auto-derived on load when missing). |
@@ -302,8 +308,24 @@ Next.js 15 + TypeScript + Tailwind CSS homepage with Discord, Steam, Overwatch 2
 - `export const dynamic = "force-dynamic"` prevents static prerendering.
 - Allows editing without rebuild; can be volume-mounted in Docker.
 
-### Background uses solid colors, not gradients
-- `main` and tab bar use `bg-gray-100 dark:bg-gray-900` instead of gradients.
+### Background (`background.*`)
+- **Layer order**, all inside `<main>`'s stacking context: main's own `bg-page` colour (`base.light`/`base.dark`) → `BackgroundLayer` (`-z-20`) → particle canvas (`-z-10`) → content. The page colour is therefore always underneath (and is what shows while an image or video loads).
+- **`base` is one flat object for every type** (`solid`, `gradient`, `image`, `video`, `pattern`); fields that don't belong to the chosen `type` are ignored. Flat on purpose: switching type in the admin panel keeps the other types' values, and the form generator needs no union support — each field carries `.meta({ showIf: { type: [...] } })` and `SchemaForm` hides it otherwise.
+- `src/lib/background.ts` `backgroundLayer(base)` is pure and returns CSS **variables** (`--bg-image-light` / `--bg-image-dark`, size, repeat, position) consumed by `.bg-layer` in `globals.css`; `html.dark .bg-layer` switches the image, so the theme toggle needs no JS. Gradients can't be transitioned, which is why a tab's own background (`tab.background`, same schema as `base`) is **crossfaded with two layers** in `BackgroundLayer` (old one kept 700ms under the new one's fade-in). The open tab is read from `?tab=`; the one-page layout passes no overrides.
+- Only `/api/uploads/...` and plain `http(s)` URLs are ever put inside `url(...)` (`safeUrl`). Don't interpolate a config string into CSS any other way.
+- `overlay.dim` is a `bg-page`-coloured sheet over the layer (darkens in dark mode, lightens in light mode); `overlay.blur` is a plain `filter: blur()` on the layer itself (plus a slight scale to hide soft edges) — not a backdrop filter.
+- A video is muted/looped/`playsInline`; with `prefers-reduced-motion` it is paused so the poster shows.
+- **Effects** (`effect.type`): `stars`/`comet` are `ParticleBackground`; `snow`/`fireflies`/`constellation`/`aurora` are `AmbientEffects`. Both take `density`, `speed` and an optional `color`, keep the canvas transparent (`clearRect`, never a painted backdrop — that would hide the layer beneath), cut the particle count on phones, pause while the tab is hidden and recolour on theme change. Aurora renders at 20% resolution and is stretched (cheap, and soft for free); its colours default to the title gradient. `AmbientEffects` draws one still frame under `prefers-reduced-motion`.
+- **Surfaces** (`surface`): `header` (0–100) drives `--surface-header`, read by `.bg-header` (the name/tagline band) and `.bg-tab-bar` (always 90% of it, as before); `blur` is the tab bar's backdrop blur. `main` and the mobile drawer keep the opaque `.bg-page`. `cards` (20–100) sets `data-card-opacity` on `<main>`, and one rule in `globals.css` overrides Tailwind's `--tw-bg-opacity` for the neutral surface classes (grey scale, white, and the Discord-style card colours listed there). Brand colours, fully round elements and hover states stay solid. **A new neutral card colour must be added to that selector list** to follow the setting.
+
+### Background uploads
+- `POST /api/admin/upload` (multipart, field `file`). Images are decoded and re-encoded to WebP with sharp (max 2560px, metadata dropped) — never stored as sent, so the stored file is guaranteed to be an image; SVG is refused. Videos (MP4/WebM, checked by signature) are stored as sent. Limits: 20 MB / 60 MB.
+- Files go to `DATA_DIR/uploads/<first 20 hex of sha256>.<ext>`; same content → same name. They are served by the **public** route `/api/uploads/[name]` (name must match the hash pattern; `immutable` caching; byte ranges, which Safari needs for video). In the two-container setup the admin container writes them and the public one serves them from the shared data volume.
+- The Background screen lists uploads and only lets unused ones be deleted ("in use" = the URL appears in the live config or the draft).
+- A reverse proxy in front of the admin container may cap request bodies below these limits; the panel reports a 413 as such.
+
+### Page colour is solid; gradients are a separate layer
+- `main` uses the solid `.bg-page` colour; a gradient background is a separate layer above it (see "Background").
 - CSS `transition: background-color 500ms ease` animates solid colors smoothly.
 - Gradients (`background-image`) cannot be transitioned in CSS — they would pop instantly.
 - The animated gradient effect is applied only to text via `background-clip: text`.

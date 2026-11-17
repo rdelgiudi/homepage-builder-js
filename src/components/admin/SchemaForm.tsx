@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { JsonSchema } from "./schemas";
-import { api } from "./api";
+import { api, uploadFile } from "./api";
 
 type Obj = Record<string, unknown>;
 
@@ -38,6 +38,9 @@ export default function SchemaForm({ schema, value, onChange }: FormProps) {
     <div className="adm-form">
       {Object.entries(props).map(([key, node]) => {
         if (HIDDEN_KEYS.has(key) || node.const !== undefined) return null;
+        // `showIf`: only relevant for certain values of a sibling (falling back to its default).
+        const hidden = Object.entries(node.showIf ?? {}).some(([sibling, allowed]) => !allowed.includes(value?.[sibling] ?? props[sibling]?.default));
+        if (hidden) return null;
         return (
           <Field
             key={key}
@@ -70,6 +73,21 @@ function Field({ name, node, optional, value, onChange }: FieldProps) {
   if (node.type === "object") {
     const visible = Object.entries(node.properties ?? {}).filter(([k, n]) => !HIDDEN_KEYS.has(k) && n.const === undefined);
     if (!visible.length) return null;
+    // An optional object is switched on and off as a whole; off removes it from the config.
+    if (optional) {
+      return (
+        <fieldset className="adm-group">
+          <label className="adm-switch-row">
+            <span>
+              <span className="adm-label">{label}</span>
+              {node.description && <span className="adm-hint">{node.description}</span>}
+            </span>
+            <input type="checkbox" className="adm-switch" checked={value !== undefined} onChange={(e) => onChange(e.target.checked ? {} : undefined)} />
+          </label>
+          {value !== undefined && <SchemaForm schema={node} value={value as Obj} onChange={onChange} />}
+        </fieldset>
+      );
+    }
     return (
       <fieldset className="adm-group">
         <legend>{label}</legend>
@@ -118,7 +136,7 @@ function Control({ node, optional, value, onChange, label }: Omit<FieldProps, "n
 
   if (node.enum) {
     const options = node.enum.map((v) => ({ value: v, label: humanize(v) }));
-    if (options.length <= 4) {
+    if (options.length <= 5) {
       return <Segmented label={label} options={options} value={(value as string) ?? ""} onChange={(v) => onChange(v === value && optional ? undefined : v)} />;
     }
     return (
@@ -134,7 +152,10 @@ function Control({ node, optional, value, onChange, label }: Omit<FieldProps, "n
   }
 
   if (node.type === "number" || node.type === "integer") {
-    const bounded = node.minimum !== undefined && node.maximum !== undefined && node.maximum - node.minimum <= 100;
+    const span = node.minimum !== undefined && node.maximum !== undefined ? node.maximum - node.minimum : Infinity;
+    const bounded = span <= 100 || node.ui === "range";
+    // Small ranges (e.g. 0.25–3) need finer steps than whole numbers.
+    const step = node.type === "integer" ? 1 : span <= 5 ? 0.05 : span <= 30 ? 0.5 : 1;
     const set = (raw: string) => {
       if (raw === "") return onChange(optional ? undefined : node.default ?? node.minimum ?? 0);
       const n = node.type === "integer" ? parseInt(raw, 10) : parseFloat(raw);
@@ -142,8 +163,8 @@ function Control({ node, optional, value, onChange, label }: Omit<FieldProps, "n
     };
     return (
       <div className="adm-inline">
-        {bounded && <input type="range" aria-label={label} min={node.minimum} max={node.maximum} step={node.type === "integer" ? 1 : 0.5} value={(value as number) ?? node.minimum} onChange={(e) => set(e.target.value)} />}
-        <input type="number" className="adm-input adm-input-num" aria-label={label} min={node.minimum} max={node.maximum} value={(value as number) ?? ""} onChange={(e) => set(e.target.value)} />
+        {bounded && <input type="range" aria-label={label} min={node.minimum} max={node.maximum} step={step} value={(value as number) ?? node.minimum} onChange={(e) => set(e.target.value)} />}
+        <input type="number" className="adm-input adm-input-num" aria-label={label} min={node.minimum} max={node.maximum} step={step} value={(value as number) ?? ""} onChange={(e) => set(e.target.value)} />
       </div>
     );
   }
@@ -161,6 +182,7 @@ function Control({ node, optional, value, onChange, label }: Omit<FieldProps, "n
   const set = (v: string) => onChange(v === "" && optional ? undefined : v);
 
   if (node.ui === "color") return <ColorInput value={text} onChange={set} label={label} />;
+  if (node.ui === "image" || node.ui === "video") return <MediaInput kind={node.ui} value={text} onChange={set} label={label} />;
   if (node.ui === "textarea") return <textarea className="adm-input" aria-label={label} rows={4} value={text} onChange={(e) => set(e.target.value)} />;
   if (node.ui === "content-file") return <ContentFileSelect value={text} onChange={set} label={label} />;
   if (node.ui === "icon") {
@@ -186,6 +208,59 @@ function Segmented({ options, value, onChange, label }: { options: { value: stri
           {o.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** An image or video: paste a URL or upload a file. Shows what is currently set. */
+function MediaInput({ kind, value, onChange, label }: { kind: "image" | "video"; value: string; onChange: (v: string) => void; label: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      onChange(await uploadFile(file));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="adm-media">
+      {value &&
+        (kind === "image" ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="adm-media-preview" src={value} alt="" />
+        ) : (
+          <video className="adm-media-preview" src={value} muted loop autoPlay playsInline />
+        ))}
+      <div className="adm-inline">
+        <input className="adm-input" aria-label={label} value={value} placeholder="https://… or upload" onChange={(e) => onChange(e.target.value)} />
+        <label className={`adm-btn is-small${busy ? " is-busy" : ""}`}>
+          {busy ? "Uploading…" : "Upload"}
+          <input
+            type="file"
+            hidden
+            disabled={busy}
+            accept={kind === "image" ? "image/jpeg,image/png,image/webp,image/avif,image/gif" : "video/mp4,video/webm"}
+            onChange={(e) => {
+              upload(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {value && (
+          <button type="button" className="adm-icon-btn" aria-label={`Remove ${label.toLowerCase()}`} onClick={() => onChange("")}>
+            ×
+          </button>
+        )}
+      </div>
+      {error && <span className="adm-bad">{error}</span>}
     </div>
   );
 }

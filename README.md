@@ -113,8 +113,34 @@ Open [http://localhost:3000](http://localhost:3000) to view your homepage.
 **Gradient & background customization:**
 - `titleGradient` — Array of color stops for the animated title text gradient. Omit or empty = solid color.
 - `taglineGradient` — Color stops for the tagline gradient. Leave empty or omit to inherit `titleGradient` colors.
-- `background.base` — `{ "type": "solid", "light": "#f3f4f6", "dark": "#111827" }` for the page background. Omit individual values to keep defaults.
-- `background.effect.type` — Canvas particle layer: `"stars"` (default; flickering drifting circles), `"comet"` (3D comet starfield with motion trails) or `"none"`.
+- `background` — see [Background](#background) below.
+
+### Background
+
+```json
+"background": {
+  "base":    { "type": "image", "image": "/api/uploads/….webp", "fit": "cover", "light": "#f3f4f6", "dark": "#111827" },
+  "overlay": { "dim": 40, "blur": 4 },
+  "effect":  { "type": "aurora", "density": 1, "speed": 1 },
+  "surface": { "header": 0, "cards": 70, "blur": 8 }
+}
+```
+
+| Part | Options |
+|---|---|
+| `base.type` | `solid` (default), `gradient`, `image`, `video`, `pattern` |
+| `base.light` / `base.dark` | Page colour per mode. Always used underneath, and while an image or video loads. |
+| gradient | `gradientLight`, `gradientDark` (colour stops; dark falls back to light), `angle` (0–360), `animated` (slow drift) |
+| image | `image`, `imageDark` (optional), `fit` (`cover` / `contain` / `tile`), `position` (`center` / `top` / `bottom` / `left` / `right`), `fixed` (stay in place while scrolling) |
+| video | `video` (MP4 or WebM, plays muted in a loop), `poster` (still image; shown instead of the video for visitors who prefer reduced motion) |
+| pattern | `pattern` (`dots` / `grid` / `diagonal` / `noise`), `patternSize` (8–80px), `patternColor` (optional) |
+| `overlay` | `dim` (0–95%, fades the background toward the page colour to keep text readable), `blur` (0–24px) |
+| `effect` | `type`: `none`, `stars` (default), `comet`, `snow`, `fireflies`, `constellation`, `aurora`; `density` and `speed` (0.25–3, 1 = normal); `color` (optional) |
+| `surface` | `header` (0–100% opacity of the name band and tab bar), `cards` (20–100% opacity of widget cards), `blur` (0–24px blur behind the tab bar) |
+
+A tab can have its own background: give it a `background` object with the same fields as `base`. It replaces the site's background while that tab is open, with a crossfade (not in the one-page layout).
+
+Images and videos can be any `https://` URL, or uploaded in the admin panel (Background → Image/Video → Upload). Uploaded images are converted to WebP, scaled to at most 2560px and stripped of metadata; limits are 20 MB per image and 60 MB per video.
 
 ### Effects (`effects`)
 

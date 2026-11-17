@@ -12,6 +12,8 @@ export interface JsonSchema {
   description?: string;
   /** Rendering hint set in the zod schema via `.meta({ ui })`. */
   ui?: string;
+  /** Show this field only while a sibling field has one of the listed values. */
+  showIf?: Record<string, unknown[]>;
   default?: unknown;
   const?: unknown;
   enum?: string[];

@@ -26,19 +26,67 @@ export const EffectsSchema = z.object({
   reactionFlyer: z.boolean().default(true).meta({ title: "Flying emoji on reactions" }),
 });
 
+export const BACKGROUND_TYPES = ["solid", "gradient", "image", "video", "pattern"] as const;
+export const PARTICLE_EFFECTS = ["none", "stars", "comet", "snow", "fireflies", "constellation", "aurora"] as const;
+export type ParticleEffect = (typeof PARTICLE_EFFECTS)[number];
+
+/** `showIf` (read by the admin form generator): show the field only for these background types. */
+const only = (...types: (typeof BACKGROUND_TYPES)[number][]) => ({ showIf: { type: types } });
+
+/**
+ * What fills the page. One flat object for every type, so switching type in the admin
+ * panel keeps the other types' values. Fields that don't belong to the chosen `type`
+ * are ignored. `light` / `dark` are always the page colour underneath (and what shows
+ * while an image or video loads).
+ */
+export const BackgroundBaseSchema = z.object({
+  type: z.enum(BACKGROUND_TYPES).default("solid").meta({ title: "Background" }),
+  light: z.string().default("#f3f4f6").meta({ title: "Light mode color", ui: "color" }),
+  dark: z.string().default("#111827").meta({ title: "Dark mode color", ui: "color" }),
+
+  gradientLight: z.array(z.string()).optional().meta({ title: "Light mode gradient", ui: "gradient", ...only("gradient") }),
+  gradientDark: z.array(z.string()).optional().meta({ title: "Dark mode gradient", ui: "gradient", description: "Empty = same as light mode", ...only("gradient") }),
+  angle: z.number().min(0).max(360).default(135).meta({ title: "Gradient angle (°)", ui: "range", ...only("gradient") }),
+  animated: z.boolean().default(false).meta({ title: "Drift slowly", ...only("gradient") }),
+
+  image: z.string().optional().meta({ title: "Image", ui: "image", ...only("image") }),
+  imageDark: z.string().optional().meta({ title: "Dark mode image", ui: "image", description: "Empty = same image in both modes", ...only("image") }),
+  fit: z.enum(["cover", "contain", "tile"]).default("cover").meta({ title: "Image size", ...only("image") }),
+  position: z.enum(["center", "top", "bottom", "left", "right"]).default("center").meta({ title: "Image position", ...only("image") }),
+  fixed: z.boolean().default(true).meta({ title: "Stay in place while scrolling", description: "Off = the image is stretched over the whole page and scrolls with it", ...only("image", "pattern") }),
+
+  video: z.string().optional().meta({ title: "Video", ui: "video", description: "Plays muted in a loop", ...only("video") }),
+  poster: z.string().optional().meta({ title: "Still image", ui: "image", description: "Shown while the video loads, and instead of it for visitors who prefer reduced motion", ...only("video") }),
+
+  pattern: z.enum(["dots", "grid", "diagonal", "noise"]).default("dots").meta({ title: "Pattern", ...only("pattern") }),
+  patternSize: z.number().min(8).max(80).default(24).meta({ title: "Pattern size (px)", ...only("pattern") }),
+  patternColor: z.string().optional().meta({ title: "Pattern color", ui: "color", description: "Empty = a faint tone that suits each mode", ...only("pattern") }),
+});
+
 export const BackgroundSchema = z.object({
-  /** What fills the page. Only `solid` exists so far; more base types are additive. */
-  base: z
+  base: BackgroundBaseSchema.prefault({}),
+  /** Applied on top of a gradient, image, video or pattern to keep text readable. */
+  overlay: z
     .object({
-      type: z.literal("solid").default("solid"),
-      light: z.string().default("#f3f4f6").meta({ title: "Light mode color", ui: "color" }),
-      dark: z.string().default("#111827").meta({ title: "Dark mode color", ui: "color" }),
+      dim: z.number().min(0).max(95).default(0).meta({ title: "Fade toward the page color (%)", description: "Darkens the background in dark mode and lightens it in light mode" }),
+      blur: z.number().min(0).max(24).default(0).meta({ title: "Blur (px)" }),
     })
     .prefault({}),
   /** Animated layer drawn over the base. */
   effect: z
     .object({
-      type: z.enum(["none", "stars", "comet"]).default("stars").meta({ title: "Particle effect" }),
+      type: z.enum(PARTICLE_EFFECTS).default("stars").meta({ title: "Particle effect" }),
+      density: z.number().min(0.25).max(3).default(1).meta({ title: "Amount", description: "1 = normal" }),
+      speed: z.number().min(0.25).max(3).default(1).meta({ title: "Speed", description: "1 = normal" }),
+      color: z.string().optional().meta({ title: "Color", ui: "color", description: "Empty = each effect's own colors" }),
+    })
+    .prefault({}),
+  /** How see-through the page's own surfaces are, so a background can show through. */
+  surface: z
+    .object({
+      header: z.number().min(0).max(100).default(100).meta({ title: "Header and tab bar opacity (%)" }),
+      cards: z.number().min(20).max(100).default(100).meta({ title: "Widget card opacity (%)" }),
+      blur: z.number().min(0).max(24).default(0).meta({ title: "Blur behind the tab bar (px)" }),
     })
     .prefault({}),
 });
@@ -64,6 +112,8 @@ export const TabSchema = z.object({
   invertDark: z.boolean().optional().meta({ title: "Invert icon in dark mode" }),
   /** `stack` — one widget per row. `grid` — 12 columns; each widget's `span` sets its width. */
   layout: z.enum(["stack", "grid"]).default("stack").meta({ title: "Arrange widgets", description: "Grid lets widgets sit side by side; set each widget's width in its settings" }),
+  /** Replaces `background.base` while this tab is open (not in the one-page layout). */
+  background: BackgroundBaseSchema.optional().meta({ title: "Own background for this tab" }),
   sections: z.array(SectionSchema).default([]),
 });
 
@@ -84,6 +134,7 @@ export const ConfigSchema = z.object({
 export type HomepageConfig = z.infer<typeof ConfigSchema>;
 export type EffectsConfig = z.infer<typeof EffectsSchema>;
 export type BackgroundConfig = z.infer<typeof BackgroundSchema>;
+export type BackgroundBase = z.infer<typeof BackgroundBaseSchema>;
 export type LayoutConfig = z.infer<typeof LayoutSchema>;
 export type CountersConfig = z.infer<typeof CountersSchema>;
 export type Tab = z.infer<typeof TabSchema>;

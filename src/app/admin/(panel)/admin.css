@@ -612,6 +612,46 @@ textarea.adm-input {
   white-space: nowrap;
 }
 
+/* ---------- media fields + uploads ---------- */
+
+.adm-media {
+  display: grid;
+  gap: 6px;
+}
+.adm-media-preview {
+  width: 100%;
+  max-height: 140px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--a-line);
+  background: var(--a-bg);
+}
+.adm-btn.is-busy {
+  opacity: 0.6;
+  cursor: progress;
+}
+.adm-uploads {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.adm-uploads li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+.adm-uploads img,
+.adm-uploads video {
+  width: 64px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--a-line);
+}
+
 /* ---------- layout picker + grid width ---------- */
 
 .adm-layouts {

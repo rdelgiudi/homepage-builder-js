@@ -7,6 +7,8 @@ import FaviconAnimation from "@/components/FaviconAnimation";
 import ConfigSync from "@/components/ConfigSync";
 import type { HomepageConfig, SiteLayout } from "@/lib/schema/config";
 import SiteHeader from "@/components/SiteHeader";
+import BackgroundLayer from "@/components/BackgroundLayer";
+import { slugify } from "@/lib/schema/migrate";
 import OnePage from "@/components/OnePage";
 import type { WidgetContext } from "@/widgets/types";
 
@@ -44,7 +46,14 @@ export default function SitePage({ config, preview }: { config: HomepageConfig; 
   // Bento lays every tab out as a grid, two widgets per row unless a widget says otherwise.
   const grid = site === "bento" ? { force: true, defaultSpan: 6 } : undefined;
 
-  const bgVars = { '--bg-light': background.base.light, '--bg-dark': background.base.dark } as React.CSSProperties;
+  const { surface } = background;
+  const pageVars = {
+    '--bg-light': background.base.light,
+    '--bg-dark': background.base.dark,
+    '--surface-header': surface.header / 100,
+    '--surface-cards': surface.cards / 100,
+    '--surface-blur': `${surface.blur}px`,
+  } as React.CSSProperties;
 
   const widgetContext: WidgetContext = {
     gradientBorders: effects.gradientBorders,
@@ -57,10 +66,19 @@ export default function SitePage({ config, preview }: { config: HomepageConfig; 
   };
 
   return (
-    <main className="min-h-screen bg-page relative z-10 overflow-x-clip" style={bgVars}>
-      <EffectsController particleEffect={background.effect.type} customScrollbar={effects.customScrollbar} mouseTrail={effects.mouseTrail} mouseTrailColors={effects.mouseTrailColors} reactionFlyer={effects.reactionFlyer} />
+    <main className="min-h-screen bg-page relative z-10 overflow-x-clip" style={pageVars} data-card-opacity={surface.cards < 100 ? "" : undefined}>
+      <Suspense fallback={null}>
+        <BackgroundLayer
+          base={background.base}
+          overlay={background.overlay}
+          // The one-page layout shows every tab at once, so there is no "open tab" to follow.
+          tabOverrides={site === "onepage" ? [] : tabs.flatMap((t) => (t.background ? [{ slug: slugify(t.label), base: t.background }] : []))}
+          firstTabSlug={tabs[0] ? slugify(tabs[0].label) : ""}
+        />
+      </Suspense>
+      <EffectsController particles={background.effect} palette={titleGradient} customScrollbar={effects.customScrollbar} mouseTrail={effects.mouseTrail} mouseTrailColors={effects.mouseTrailColors} reactionFlyer={effects.reactionFlyer} />
       {/* The sidebar layout shows the name in its left column from md up, so the top header is mobile-only there. */}
-      <div className={`bg-page pt-6 md:pt-8 pb-3 md:pb-4${site === "sidebar" ? " md:hidden" : ""}`}>
+      <div className={`bg-header pt-6 md:pt-8 pb-3 md:pb-4${site === "sidebar" ? " md:hidden" : ""}`}>
         <div className={`w-full ${width} mx-auto px-4 md:px-8`}>
           <SiteHeader {...header} />
         </div>

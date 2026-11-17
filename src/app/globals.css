@@ -34,12 +34,88 @@ html.dark .bg-page {
   background-color: var(--bg-dark);
 }
 
+/* Page surfaces. --surface-header (0–1) comes from background.surface.header, so a
+   background image can show through the header band and the tab bar. The tab bar is
+   always a little more see-through than the header (90% of it), as it always was. */
+html {
+  --surface-header: 1;
+  --surface-blur: 0px;
+}
+
+.bg-header {
+  background-color: color-mix(in srgb, var(--bg-light) calc(var(--surface-header) * 100%), transparent);
+}
+
+html.dark .bg-header {
+  background-color: color-mix(in srgb, var(--bg-dark) calc(var(--surface-header) * 100%), transparent);
+}
+
 .bg-tab-bar {
-  background-color: color-mix(in srgb, var(--bg-light) 90%, transparent);
+  background-color: color-mix(in srgb, var(--bg-light) calc(var(--surface-header) * 90%), transparent);
+  -webkit-backdrop-filter: blur(var(--surface-blur));
+  backdrop-filter: blur(var(--surface-blur));
 }
 
 html.dark .bg-tab-bar {
-  background-color: color-mix(in srgb, var(--bg-dark) 90%, transparent);
+  background-color: color-mix(in srgb, var(--bg-dark) calc(var(--surface-header) * 90%), transparent);
+}
+
+/* background.surface.cards: every neutral Tailwind surface inside the page (widget
+   cards, inputs, buttons) gets this opacity. Tailwind's bg-* utilities read
+   --tw-bg-opacity, so one override covers them all: the grey scale, white, and the
+   Discord-style card colours the widgets use. Brand colours (blurple, Steam blue, the
+   progress bar) are not listed and stay solid; so do fully round elements (status
+   dots, avatars, switch thumbs) and hover states. A new neutral card colour must be
+   added here to follow the setting. */
+main[data-card-opacity] :is(
+  [class*="bg-gray-"],
+  [class*="bg-white"],
+  [class*="bg-[#2b2d31]"],
+  [class*="bg-[#1e1f22]"],
+  [class*="bg-[#313338]"],
+  [class*="bg-[#f2f3f5]"],
+  [class*="bg-[#ebedef]"]
+):not([class*="rounded-full"]) {
+  --tw-bg-opacity: var(--surface-cards);
+}
+
+/* Background layer (src/components/BackgroundLayer.tsx). The image is a variable per
+   colour mode so the theme switch needs no JavaScript. */
+.bg-layer {
+  background-image: var(--bg-image-light);
+  background-size: var(--bg-size, cover);
+  background-repeat: var(--bg-repeat, no-repeat);
+  background-position: var(--bg-position, center);
+}
+
+html.dark .bg-layer {
+  background-image: var(--bg-image-dark);
+}
+
+.bg-layer-drift {
+  background-size: 300% 300%;
+  animation: bg-drift 40s ease-in-out infinite;
+}
+
+.bg-layer-in {
+  animation: bg-layer-in 600ms ease-out both;
+}
+
+@keyframes bg-drift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes bg-layer-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-layer-drift,
+  .bg-layer-in {
+    animation: none;
+  }
 }
 
 main, header, footer, section, article, aside, div {

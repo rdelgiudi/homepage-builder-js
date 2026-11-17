@@ -41,3 +41,20 @@ export function timeAgo(ms: number): string {
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
   return new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
+
+/** Uploads an image or video for use as a background; resolves to its URL. */
+export async function uploadFile(file: File): Promise<string> {
+  const body = new FormData();
+  body.append("file", file);
+  const res = await fetch("/api/admin/upload", { method: "POST", body });
+  let data: Record<string, unknown> = {};
+  try {
+    data = await res.json();
+  } catch {}
+  if (res.status === 401) window.location.href = "/admin/login";
+  if (!res.ok || typeof data.url !== "string") {
+    // A proxy in front of the panel may refuse large bodies before the app sees them.
+    throw new ApiError(typeof data.error === "string" ? data.error : res.status === 413 ? "The file is larger than your server or proxy accepts." : `Upload failed (${res.status})`, res.status);
+  }
+  return data.url;
+}
