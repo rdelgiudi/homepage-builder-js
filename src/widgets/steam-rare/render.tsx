@@ -20,9 +20,11 @@ interface RareData {
   achievements: Achievement[];
 }
 
+// Full class names so Tailwind generates them.
+const COLUMNS: Record<number, string> = { 2: "sm:grid-cols-2", 3: "sm:grid-cols-3", 4: "sm:grid-cols-4", 5: "sm:grid-cols-5", 6: "sm:grid-cols-6" };
+
 /** Steam calls an achievement rare below 10%. */
 const RARE_BELOW = 10;
-const DEFAULT_GRADIENT = ["#60a5fa", "#a78bfa", "#f472b6"];
 
 /** Steam's own rarity tiers, by global unlock rate. */
 function tier(percent: number): { label: string; className: string } {
@@ -62,24 +64,15 @@ function AchievementIcon({ a, covered, rareBorder, size }: { a: Achievement; cov
   return <div className={`shrink-0 ${rareBorder && a.percent < RARE_BELOW ? "rare-ring" : "rounded-md"}`}>{inner}</div>;
 }
 
-/** Thin bar for the share of players who have it, coloured like the Steam widget's progress bars. */
-function RarityBar({ percent, colors }: { percent: number; colors: string[] }) {
+function Uncover({ onClick, short = false }: { onClick: () => void; short?: boolean }) {
   return (
-    <div className="h-1 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
-      <div className="h-full rounded-full" style={{ width: `${Math.max(2, Math.min(100, percent))}%`, background: `linear-gradient(90deg, ${colors.join(", ")})` }} />
-    </div>
-  );
-}
-
-function Uncover({ onClick }: { onClick: () => void }) {
-  return (
-    <button type="button" onClick={onClick} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
-      Show hidden achievement
+    <button type="button" onClick={onClick} className="text-xs text-blue-600 dark:text-blue-400 hover:underline" aria-label="Show hidden achievement">
+      {short ? "Reveal" : "Show hidden achievement"}
     </button>
   );
 }
 
-function SteamRare({ section, colors, gradientBorders }: { section: SteamRareSection; colors: string[]; gradientBorders: boolean }) {
+function SteamRare({ section, gradientBorders }: { section: SteamRareSection; gradientBorders: boolean }) {
   // `n` only changes the URL when the scan size changes, so the widget refetches.
   const state = useWidgetData<RareData>(`/api/widgets/steam-rare?id=${encodeURIComponent(section.id)}&n=${section.scanGames}`);
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
@@ -138,24 +131,32 @@ function SteamRare({ section, colors, gradientBorders }: { section: SteamRareSec
         {list.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">No unlocked achievements found in these games.</p>
         ) : section.layout === "grid" ? (
-          <ul className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <ul className={`grid grid-cols-2 ${COLUMNS[section.columns] ?? COLUMNS[3]} gap-4`}>
             {list.map((a, i) => {
               const covered = isCovered(a, i);
               const t = tier(a.percent);
               return (
-                <li key={i} className="flex flex-col items-center text-center min-w-0" title={covered ? undefined : (a.description ?? undefined)}>
+                <li key={i} className="flex flex-col items-center text-center min-w-0">
                   <AchievementIcon a={a} covered={covered} rareBorder={section.rareBorder} size="w-16 h-16" />
                   <p className="mt-2 w-full truncate text-sm font-medium text-gray-900 dark:text-white">{covered ? "Hidden achievement" : a.name}</p>
                   <a href={`https://store.steampowered.com/app/${a.appid}`} target="_blank" rel="noopener noreferrer" className="w-full truncate text-xs text-gray-600 dark:text-gray-400 hover:underline">
                     {a.game}
                   </a>
-                  <div className="mt-1.5 w-full">
-                    <RarityBar percent={a.percent} colors={colors} />
-                    <p className={`mt-0.5 text-[11px] font-semibold ${t.className}`}>
-                      {pct(a.percent)}% · {t.label}
-                    </p>
-                  </div>
-                  {covered && <Uncover onClick={() => reveal(i)} />}
+                  {covered ? (
+                    <div className="mt-1">
+                      <Uncover short onClick={() => reveal(i)} />
+                    </div>
+                  ) : (
+                    a.description && (
+                      <p className="mt-1 w-full text-[11px] leading-snug text-gray-500 dark:text-gray-400 line-clamp-2" title={a.description}>
+                        {a.description}
+                      </p>
+                    )
+                  )}
+                  {/* mt-auto: the rarity lines up along the bottom of each row, however long the descriptions are. */}
+                  <p className={`mt-auto pt-1 text-[11px] font-semibold ${t.className}`}>
+                    {pct(a.percent)}% · {t.label}
+                  </p>
                 </li>
               );
             })}
@@ -179,9 +180,6 @@ function SteamRare({ section, colors, gradientBorders }: { section: SteamRareSec
                       </a>
                       <p className="shrink-0 text-[11px] text-gray-500 dark:text-gray-400">{t.label}</p>
                     </div>
-                    <div className="mt-1">
-                      <RarityBar percent={a.percent} colors={colors} />
-                    </div>
                     {covered ? (
                       <Uncover onClick={() => reveal(i)} />
                     ) : (
@@ -204,11 +202,5 @@ function SteamRare({ section, colors, gradientBorders }: { section: SteamRareSec
 export const view: WidgetView<SteamRareSection> = {
   titled: true,
   frame: "wrap",
-  render: (section, ctx) => (
-    <SteamRare
-      section={section}
-      gradientBorders={ctx.gradientBorders}
-      colors={ctx.progressGradientColors?.length ? ctx.progressGradientColors : ctx.titleGradient.length ? ctx.titleGradient : DEFAULT_GRADIENT}
-    />
-  ),
+  render: (section, ctx) => <SteamRare section={section} gradientBorders={ctx.gradientBorders} />,
 };

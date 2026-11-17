@@ -15,6 +15,13 @@ export const schema = z.object({
     .default(40)
     .meta({ title: "Games to look through", description: "Your most-played games. More = a slower first load (refreshed every 6 hours)" }),
   layout: z.enum(["list", "grid"]).default("list").meta({ title: "Layout" }),
+  columns: z
+    .number()
+    .int()
+    .min(2)
+    .max(6)
+    .default(3)
+    .meta({ title: "Columns", description: "Grid layout, on wide screens (two on phones)", showIf: { layout: ["grid"] } }),
   showHidden: z
     .boolean()
     .default(false)
@@ -31,6 +38,6 @@ export const meta = {
   category: "gaming",
   description: "Your rarest unlocked Steam achievements, by global unlock rate",
   schema,
-  defaults: { limit: 6, scanGames: 40, layout: "list", showHidden: false, rareBorder: true },
+  defaults: { limit: 6, scanGames: 40, layout: "list", columns: 3, showHidden: false, rareBorder: true },
   requiresEnv: ["STEAM_API_KEY", "STEAM_ID"],
 } satisfies WidgetMeta;
