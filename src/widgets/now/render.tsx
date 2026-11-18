@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { httpUrl } from "@/lib/url";
 import { Card, Notice } from "../common";
 import { Icon } from "../shared";
@@ -30,14 +30,15 @@ function Now({ section }: { section: NowSection }) {
   if (!items.length) return <Notice>Add a line in this widget&apos;s settings.</Notice>;
   return (
     <Card className="text-left">
-      <dl className="space-y-2.5">
+      {/* Label column = the longest label (all rows line up), capped at 60% so the text always keeps room; the text wraps. */}
+      <dl className="grid grid-cols-[fit-content(60%)_minmax(0,1fr)] items-baseline gap-x-4 gap-y-2.5">
         {items.map((item, i) => {
           const url = httpUrl(item.url);
           return (
-            <div key={i} className="flex items-baseline gap-3">
-              <dt className="flex shrink-0 items-center gap-2 w-32 text-sm text-gray-500 dark:text-gray-400">
-                {item.icon && <Icon icon={item.icon} width={18} height={18} />}
-                <span className="truncate">{item.label}</span>
+            <Fragment key={i}>
+              <dt className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                {item.icon && <Icon icon={item.icon} width={18} height={18} className="shrink-0" />}
+                <span className="min-w-0 break-words">{item.label}</span>
               </dt>
               <dd className="min-w-0 break-words text-gray-900 dark:text-white">
                 {url ? (
@@ -48,7 +49,7 @@ function Now({ section }: { section: NowSection }) {
                   item.text || <span className="text-gray-400">—</span>
                 )}
               </dd>
-            </div>
+            </Fragment>
           );
         })}
       </dl>
