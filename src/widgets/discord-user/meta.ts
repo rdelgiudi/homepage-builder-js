@@ -1,16 +1,12 @@
 import { z } from "zod";
-import { base, titleFields, frameField } from "../fields";
+import { base, titleFields, frameField, progressColorsField } from "../fields";
 import type { WidgetMeta } from "../types";
 
 export const schema = z.object({
   ...base("discord-user"),
   ...titleFields,
   ...frameField,
-  progressColors: z.array(z.string()).optional().meta({
-    title: "Progress bar colors",
-    ui: "gradient",
-    description: "Color stops for the music progress bar and its sparkles. Empty = the site's progress bar colors (Effects), else the title gradient",
-  }),
+  ...progressColorsField,
   progressAnimation: z.boolean().default(true).meta({
     title: "Animate progress bar gradient",
     description: "Off = the colors stay still. Has no effect when the progress gradient is turned off in Effects",

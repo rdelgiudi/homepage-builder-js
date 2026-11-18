@@ -233,7 +233,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - **links** — Row of link cards (items: label, url, icon, style: primary/secondary, invertDark; optional: text, icon, invertDark for section title)
 - **discord-server** — Discord server widget (uses DISCORD_SERVER_ID)
 - **discord-user** — Discord user presence (WebSocket subscriber, shows phone icon on mobile); optional `progressColors` (gradient stops for the music progress bar + sparkles) overrides `effects.progressGradientColors` → `titleGradient`; `progressAnimation` (default `true`) = `false` keeps the gradient still
-- **steam** — Steam profile & games (includes achievement progress for recent and top games); `showRecent` / `showTop` toggle the two game rows
+- **steam** — Steam profile & games (includes achievement progress for recent and top games); `showRecent` / `showTop` toggle the two game rows; optional `progressColors` for the achievement bars (same fallback as `discord-user`)
 - **overwatch** — Overwatch competitive stats
 - **markdown** — Renders `content/<file>.md` via `/api/markdown?file=<file>`
 - **meme** — Random meme from external API (supports `popular` flag; NSFW/spoiler always filtered server-side)
@@ -547,7 +547,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 ### Progress bar gradient + sparkles
 - Music activities (type 2 or "youtube music") with timestamps get an animated gradient progress bar.
 - `animate-gradient-bar` class: horizontal gradient shifted via `gradient-shift` 3s animation. Omitted when the section's `progressAnimation` is `false` (the gradient is then drawn at `100%` size, not moving).
-- Colors come from the section's `progressColors` → `effects.progressGradientColors` → `titleGradient` → default blue→purple→pink (an empty array counts as unset).
+- Colors come from the section's `progressColors` → `effects.progressGradientColors` → `titleGradient` → default blue→purple→pink (an empty array counts as unset), resolved by `progressColors()` in `src/widgets/progress.ts` (client-safe, shared with Steam; `progressColorsField` in `fields.ts` is the shared schema field).
 - When `progressGradient` is `false`, falls back to solid `bg-[#5865F2]` (Discord blurple) with no sparkles.
 - Continuous random spark particles via the `ProgressSparkles` component (defined in `DiscordUser.tsx`): spawns at random intervals (60–200ms via recursive `setTimeout`) with random angle in the right-side half-circle range (-10° to -90° from horizontal), random distance (18–46px), random size (2–4.5px), random color from the gradient palette. Trajectory driven by CSS custom properties `--spark-x` / `--spark-y` on a single `spark-particle` keyframe. Each spark self-removes after 1s.
 - Progress percentage extracted as `progressPct` local variable to keep fill width and sparkle position aligned.
@@ -635,7 +635,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - `SteamStatus.tsx` displays a thin gradient progress bar + "X/Y unlocked" below each game card.
 - Hover popup uses `createPortal` to `document.body` (escapes parent `overflow-hidden` clipping) with `position: fixed`. A `useEffect` listens to `scroll` (capture phase) and `resize` events to recalculate `popupRect` via `getBoundingClientRect`, keeping the popup pinned to the game card during scrolling.
 - Popup has `min-w-[220px]` and shows "Playtime" and "Achievements" subsection titles, a larger progress bar with percentage, and up to 3 recent achievements (icon + name).
-- Progress bar uses the same gradient colors as the music progress bar (`progressGradientColors` → `titleGradient` → default blue→purple→pink).
+- Both achievement bars (card + popup) use the same color chain as the Discord music bar: the section's `progressColors` → `effects.progressGradientColors` → `titleGradient` → default (`progressColors()` in `widgets/progress.ts`, resolved in each widget's `render.tsx`). The bars are static (no animation, no sparkles), and `effects.progressGradient` doesn't affect them.
 
 ### Server-side logging
 - All server-side logging uses raw `console.log`/`console.error`/`console.warn` with timestamp prefix: `[${new Date().toISOString()}] [Tag]`.

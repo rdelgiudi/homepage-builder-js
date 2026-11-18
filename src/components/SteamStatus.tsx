@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { gradientImage } from "@/widgets/progress";
 import Image from "next/image";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
@@ -77,7 +78,7 @@ function getStatus(player: SteamPlayer): { dotColor: string; textColor: string; 
 const GAME_CARD_WIDTH = 96;
 const GAME_GAP = 12;
 
-function GameCard({ game, achievement }: { game: SteamGame; achievement?: AchievementData }) {
+function GameCard({ game, achievement, barImage }: { game: SteamGame; achievement?: AchievementData; barImage: string }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [rotateX, setRotateX] = useState(0);
   const [rotateY, setRotateY] = useState(0);
@@ -170,7 +171,7 @@ function GameCard({ game, achievement }: { game: SteamGame; achievement?: Achiev
                 className="h-full rounded-full transition-all duration-500"
                 style={{
                   width: `${(achievement.unlocked / achievement.total) * 100}%`,
-                  background: 'linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6)',
+                  backgroundImage: barImage,
                 }}
               />
             </div>
@@ -216,7 +217,7 @@ function GameCard({ game, achievement }: { game: SteamGame; achievement?: Achiev
                           className="h-full rounded-full"
                           style={{
                             width: `${(achievement.unlocked / achievement.total) * 100}%`,
-                            background: 'linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6)',
+                            backgroundImage: barImage,
                           }}
                         />
                       </div>
@@ -246,7 +247,7 @@ function GameCard({ game, achievement }: { game: SteamGame; achievement?: Achiev
   );
 }
 
-function GameSection({ title, games, achievements }: { title: string; games: SteamGame[]; achievements?: Record<number, AchievementData> }) {
+function GameSection({ title, games, achievements, barImage }: { title: string; games: SteamGame[]; achievements?: Record<number, AchievementData>; barImage: string }) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const [maxGames, setMaxGames] = useState(6);
 
@@ -268,7 +269,7 @@ function GameSection({ title, games, achievements }: { title: string; games: Ste
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{title}</p>
       <div className="flex gap-3 pb-2">
         {games.slice(0, maxGames).map((game) => (
-          <GameCard key={game.appid} game={game} achievement={achievements?.[game.appid]} />
+          <GameCard key={game.appid} game={game} achievement={achievements?.[game.appid]} barImage={barImage} />
         ))}
       </div>
     </div>
@@ -279,11 +280,15 @@ export default function SteamStatus({
   enableGradientBorders,
   showRecent = true,
   showTop = true,
+  progressColors = [],
 }: {
   enableGradientBorders?: boolean;
   showRecent?: boolean;
   showTop?: boolean;
+  /** Achievement bar color stops, already resolved by the widget (`widgets/progress.ts`). */
+  progressColors?: string[];
 }) {
+  const barImage = gradientImage(progressColors);
   const [data, setData] = useState<SteamData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -389,11 +394,11 @@ export default function SteamStatus({
       </div>
 
       {showRecent && recentGames.length > 0 && (
-        <GameSection title="Recently Played" games={recentGames} achievements={achievements} />
+        <GameSection title="Recently Played" games={recentGames} achievements={achievements} barImage={barImage} />
       )}
 
       {showTop && ownedGames.length > 0 && (
-        <GameSection title="Top Games" games={ownedGames} achievements={achievements} />
+        <GameSection title="Top Games" games={ownedGames} achievements={achievements} barImage={barImage} />
       )}
     </div>
   );

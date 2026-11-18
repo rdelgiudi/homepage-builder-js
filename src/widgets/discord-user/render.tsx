@@ -1,5 +1,6 @@
 import DiscordUser from "@/components/DiscordUser";
 import type { WidgetView } from "../types";
+import { progressColors } from "../progress";
 import type { DiscordUserSection } from "./meta";
 
 export const view: WidgetView<DiscordUserSection> = {
@@ -9,8 +10,7 @@ export const view: WidgetView<DiscordUserSection> = {
     <DiscordUser
       enableGradient={ctx.progressGradient}
       animateGradient={section.progressAnimation}
-      gradientColors={section.progressColors?.length ? section.progressColors : ctx.progressGradientColors}
-      titleGradientColors={ctx.titleGradient}
+      gradientColors={progressColors(section.progressColors, ctx)}
       framed={ctx.framed}
     />
   ),

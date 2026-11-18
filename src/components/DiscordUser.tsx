@@ -4,8 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import quantize from "quantize";
 import { useWebSocket } from "@/hooks/useWebSocket";
-
-const DEFAULT_GRADIENT_COLORS = ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"];
+import { DEFAULT_PROGRESS_COLORS as DEFAULT_GRADIENT_COLORS, gradientImage } from "@/widgets/progress";
 
 function ProgressSparkles({ progressPct, gradientColors, crossfadeData }: { progressPct: number; gradientColors: string[] | undefined; crossfadeData: object | undefined }) {
   const [sparks, setSparks] = useState<Array<{id: number; x: number; y: number; size: number; color: string; delay: number}>>([]);
@@ -448,12 +447,11 @@ interface DiscordUserProps {
   enableGradient?: boolean;
   animateGradient?: boolean;
   gradientColors?: string[];
-  titleGradientColors?: string[];
   framed?: boolean;
 }
 
-export default function DiscordUser({ enableGradient = true, animateGradient = true, gradientColors, titleGradientColors, framed }: DiscordUserProps) {
-  const resolvedGradient = gradientColors?.length ? gradientColors : titleGradientColors;
+export default function DiscordUser({ enableGradient = true, animateGradient = true, gradientColors, framed }: DiscordUserProps) {
+  const resolvedGradient = gradientColors; // already resolved by widgets/progress.ts
   const [data, setData] = useState<DiscordUserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [imgError, setImgError] = useState(false);
@@ -844,7 +842,7 @@ export default function DiscordUser({ enableGradient = true, animateGradient = t
                         // Animated: the class shifts a 200%-wide gradient. Still: the gradient spans the bar as is.
                         // backgroundImage, not the `background` shorthand: React re-sets only changed keys, and
                         // re-setting the shorthand (new colors) resets background-size to auto, which freezes the animation.
-                        backgroundImage: `linear-gradient(90deg, ${(resolvedGradient?.length ? resolvedGradient : DEFAULT_GRADIENT_COLORS).join(', ')})`,
+                        backgroundImage: gradientImage(resolvedGradient?.length ? resolvedGradient : DEFAULT_GRADIENT_COLORS),
                         backgroundSize: animateGradient ? '200% 100%' : '100% 100%'
                       } : {
                         width: `${progressPct}%`,

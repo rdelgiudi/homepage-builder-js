@@ -40,3 +40,12 @@ export const frameField = {
     .optional()
     .meta({ title: "Gradient frame", ui: "tristate", description: "Follows the site-wide setting unless set here" }),
 };
+
+/** Per-section progress bar colors (discord-user, steam); unset = `effects.progressGradientColors`, then the title gradient. */
+export const progressColorsField = {
+  progressColors: z.array(z.string()).optional().meta({
+    title: "Progress bar colors",
+    ui: "gradient",
+    description: "Empty = the site's progress bar colors (Effects), else the title gradient",
+  }),
+};
