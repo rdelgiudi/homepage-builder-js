@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import Image from "next/image";
 import type { Align } from "./fields";
+import { WidgetIcon } from "./BrandIcon";
 
 const alignClasses: Record<Align, string> = {
   left: "text-left justify-start",
@@ -24,12 +25,15 @@ export function Icon({ icon, className, width = 24, height = 24, invertDark }: {
   return <span className={className}>{icon}</span>;
 }
 
-/** The icon + text row shown above titled widgets. Renders nothing when both are empty. */
-export function SectionTitle({ icon, text, align, invertDark }: { icon?: string; text?: string; align?: Align; invertDark?: boolean }) {
+/**
+ * The icon + text row shown above titled widgets. Renders nothing when both are empty.
+ * A titled widget without its own icon gets its service's logo (`brands.ts`), if it has one.
+ */
+export function SectionTitle({ icon, text, align, invertDark, type }: { icon?: string; text?: string; align?: Align; invertDark?: boolean; type?: string }) {
   if (!icon && !text) return null;
   return (
     <p className={`text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2 ${alignClass(align)}`}>
-      {icon && <Icon icon={icon} className="text-xl" width={24} height={24} invertDark={invertDark} />}
+      {icon ? <Icon icon={icon} className="text-xl" width={24} height={24} invertDark={invertDark} /> : type && <WidgetIcon type={type} size={20} />}
       {text && <span>{text}</span>}
     </p>
   );

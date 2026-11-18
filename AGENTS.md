@@ -419,6 +419,11 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - A link must be http(s) or an e-mail address (`socialHref`, which turns `me@x.y` into `mailto:`); anything else is dropped. `platform: "auto"` matches the host (and its subdomains) against each platform's `hosts`; an unknown host with a `/@name` path is taken as Mastodon, a `/rss`/`/feed`-style path as RSS, everything else as "website" (globe icon).
 - Icon colour on a brand background is white unless the colour is very light (`contrastOn`, luminance > 0.5). Links get `rel="me"` for Mastodon verification.
 
+### Widget brand logos (`src/widgets/brands.ts`)
+- `WIDGET_BRANDS` maps a widget type that shows exactly one service to that service's Simple Icons logo (Steam, Discord, Twitch, YouTube, Mastodon, Bluesky, GitHub, Reddit for `meme`, RSS). `<WidgetIcon type fallback>` (`widgets/BrandIcon.tsx`) draws it, or the emoji fallback for anything not in the map.
+- Used in the admin palette, outline rows, drag overlay, inspector header and Integrations table, and on the site by `SectionTitle`: a titled widget with **no icon of its own** (unset or `""`) shows its logo; a set icon always wins. `twitch` draws its own title row, so it passes `type` to `SectionTitle` too.
+- Logos keep their brand colour; near-black ones (Steam, GitHub, luminance < 0.03) use `currentColor` so they stay visible in dark mode. Don't recolour or alter them otherwise (brand guidelines). Multi-service widgets (chess, music, media, game-server, embed, support) and services with no Simple Icons logo (Overwatch, Speedrun.com, TETR.IO, Minecraft, Open-Meteo, ListenBrainz) keep their emoji on purpose — don't draw look-alike logos.
+
 ### Media log (`media` + `src/lib/media-sources.ts`)
 - Fixed hosts and no keys, so the request carries a validated username (like chess): AniList GraphQL (`postJson()` in `widget-data.ts`), Letterboxd `/<user>/rss/` (diary only; list entries without `letterboxd:filmTitle` are skipped), Open Library `/people/<user>/books/<shelf>.json` (covers from `covers.openlibrary.org`). Cached 30 min per service/user/list.
 - AniList answers "no such user" and "private" with 404 and some unknown names with 500; Open Library answers a private log with 403 — each is turned into a message that says what to fix. Goodreads was dropped: its RSS answers 404 for every account.

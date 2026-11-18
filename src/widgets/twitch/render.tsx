@@ -21,7 +21,7 @@ function Twitch({ section, ctx }: { section: TwitchSection; ctx: WidgetRenderCon
   if (section.hideOffline && state.data && !state.data.live) return null;
   return (
     <div>
-      <SectionTitle icon={section.icon} text={section.text} align={section.align} invertDark={section.invertDark} />
+      <SectionTitle icon={section.icon} text={section.text} align={section.align} invertDark={section.invertDark} type={section.type} />
       <WidgetFrame enabled={ctx.framed} colors={ctx.titleGradient} width={ctx.widgetFrameWidth}>
     <DataCard state={state} setup={!user && "Set your Twitch username in this widget's settings."} lines={2}>
       {(c) =>

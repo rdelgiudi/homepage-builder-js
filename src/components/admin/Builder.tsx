@@ -25,6 +25,7 @@ import { formSchemas } from "./schemas";
 import { api } from "./api";
 import { useAdmin } from "./store";
 import { SpanControl } from "./LayoutControls";
+import { WidgetIcon } from "@/widgets/BrandIcon";
 
 type Selection = { kind: "tab" | "section"; id: string } | null;
 type Obj = Record<string, unknown>;
@@ -108,7 +109,9 @@ function PaletteItem({ type, onAdd, needsSetup }: { type: string; onAdd: () => v
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: NEW + type });
   return (
     <button ref={setNodeRef} type="button" className={`adm-palette-item${isDragging ? " is-dragging" : ""}`} title={meta.description} onClick={onAdd} {...attributes} {...listeners}>
-      <span aria-hidden>{meta.icon}</span>
+      <span aria-hidden>
+        <WidgetIcon type={type} fallback={meta.icon} />
+      </span>
       <span>{meta.label}</span>
       {needsSetup && <span className="adm-dot" title="Needs environment variables that are not set" />}
     </button>
@@ -243,10 +246,11 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
 
   const overlayLabel = (() => {
     if (!dragging) return null;
-    if (dragging.startsWith(NEW)) return widgetMetaByType[dragging.slice(NEW.length)];
+    const widget = (type: string) => ({ icon: <WidgetIcon type={type} fallback={widgetMetaByType[type].icon} />, label: widgetMetaByType[type].label });
+    if (dragging.startsWith(NEW)) return widget(dragging.slice(NEW.length));
     if (dragging.startsWith(SEC)) {
       const s = tab?.sections.find((x) => SEC + x.id === dragging);
-      return s ? widgetMetaByType[s.type] : null;
+      return s ? widget(s.type) : null;
     }
     const t = config.tabs.find((x) => TAB + x.id === dragging);
     return t ? { icon: t.icon ?? "", label: t.label } : null;
@@ -301,7 +305,7 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
                 return (
                   <SortableRow key={s.id} id={SEC + s.id} label={`${meta.label} widget`} selected={selection?.kind === "section" && selection.id === s.id} onSelect={() => setSelection({ kind: "section", id: s.id })}>
                     <span className="adm-row-icon" aria-hidden>
-                      {meta.icon}
+                      <WidgetIcon type={s.type} fallback={meta.icon} />
                     </span>
                     <span className="adm-row-text">
                       <span className="adm-row-title">{meta.label}</span>
@@ -400,7 +404,10 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
       <>
         <div className="adm-panel-head">
           <h2>
-            <span aria-hidden>{meta.icon}</span> {meta.label}
+            <span aria-hidden>
+              <WidgetIcon type={selectedSection.type} fallback={meta.icon} size={20} />
+            </span>{" "}
+            {meta.label}
           </h2>
         </div>
         <div className="adm-pad">

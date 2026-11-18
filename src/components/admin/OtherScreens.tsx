@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { HomepageConfig } from "@/lib/schema/config";
 import { api, timeAgo } from "./api";
 import { useAdmin } from "./store";
+import { WidgetIcon } from "@/widgets/BrandIcon";
 
 interface Integrations {
   widgets: { type: string; label: string; icon: string; env: { name: string; set: boolean }[] }[];
@@ -36,7 +37,13 @@ export function IntegrationsScreen() {
             {data.widgets.flatMap((w) =>
               w.env.map((e, i) => (
                 <tr key={`${w.type}-${e.name}`}>
-                  <td>{i === 0 ? `${w.icon} ${w.label}` : ""}</td>
+                  <td>
+                    {i === 0 && (
+                      <>
+                        <WidgetIcon type={w.type} fallback={w.icon} size={16} /> {w.label}
+                      </>
+                    )}
+                  </td>
                   <td>
                     <code>{e.name}</code>
                   </td>

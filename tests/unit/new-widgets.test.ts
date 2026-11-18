@@ -6,6 +6,8 @@ import { formatCount, parseCount } from "@/widgets/stats/count";
 import { fromAniList, fromOpenLibrary, parseLetterboxd } from "@/lib/media-sources";
 import { excerpt, postDate, toPost } from "@/lib/posts";
 import { zonedTimeToMs } from "@/widgets/time";
+import { WIDGET_BRANDS, widgetBrand } from "@/widgets/brands";
+import { widgetMetas } from "@/widgets/meta";
 
 describe("social links", () => {
   it("accepts http(s) and e-mail addresses only", () => {
@@ -187,5 +189,23 @@ describe("blog posts", () => {
     assert.equal(excerpt("# Title\n\nSome **bold** [link](https://x.y) e-mail text.\n\n- item\n\n```js\ncode()\n```"), "Some bold link e-mail text. item");
     const long = excerpt("word ".repeat(100), 30);
     assert.ok(long.endsWith("…") && long.length <= 31, long);
+  });
+});
+
+describe("widget brand logos", () => {
+  it("maps only real widget types, each to a logo", () => {
+    const types = new Set(widgetMetas.map((m) => m.type));
+    for (const type of Object.keys(WIDGET_BRANDS)) {
+      assert.ok(types.has(type), type);
+      assert.ok(widgetBrand(type)?.path, type);
+    }
+  });
+
+  it("keeps brand colours, but near-black logos follow the text colour", () => {
+    assert.equal(widgetBrand("twitch")?.color, "#9146FF");
+    assert.equal(widgetBrand("steam")?.color, "currentColor");
+    assert.equal(widgetBrand("github")?.color, "currentColor");
+    // Several services or no logo: the emoji stays.
+    for (const type of ["chess", "music", "media", "overwatch", "speedrun", "weather", "embed"]) assert.equal(widgetBrand(type), null, type);
   });
 });

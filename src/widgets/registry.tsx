@@ -126,7 +126,7 @@ export function renderSection(section: Section, ctx: WidgetContext): ReactNode {
 
   return (
     <div>
-      {view.titled && "text" in section && <SectionTitle icon={section.icon} text={section.text} align={section.align} invertDark={section.invertDark} />}
+      {view.titled && "text" in section && <SectionTitle icon={section.icon} text={section.text} align={section.align} invertDark={section.invertDark} type={section.type} />}
       {view.frame === "wrap" ? (
         <WidgetFrame enabled={framed} colors={ctx.titleGradient} width={ctx.widgetFrameWidth}>
           {body}
