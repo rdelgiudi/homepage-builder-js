@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { JsonSchema } from "./schemas";
 import { api, uploadFile } from "./api";
+import { resolveSocials, type SocialPlatformKey } from "@/widgets/socials/platforms";
 
 type Obj = Record<string, unknown>;
 
@@ -406,6 +407,10 @@ function ObjectList({ node, items, onChange, label }: { node: JsonSchema; items:
     setOpen(items.length);
   };
   const titleOf = (item: Obj) => {
+    if (node.ui === "social-link") {
+      const [social] = resolveSocials([item as { url: string; platform?: SocialPlatformKey | "auto"; label?: string }]);
+      if (social) return social.label === social.platform.name ? social.label : `${social.label} · ${social.platform.name}`;
+    }
     const first = ["label", "name", "title", "repo"].map((k) => item[k]).find((v) => typeof v === "string" && v);
     return (first as string) || "Untitled";
   };

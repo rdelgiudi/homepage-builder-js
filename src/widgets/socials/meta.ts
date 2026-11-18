@@ -14,7 +14,7 @@ export const socialItemSchema = z.object({
       labels: { auto: "Auto", ...Object.fromEntries(SOCIAL_PLATFORM_KEYS.map((k) => [k, PLATFORMS[k].name])) },
     }),
   label: z.string().optional().meta({ title: "Label", description: "Tooltip and button text. Empty = the platform's name" }),
-});
+}).meta({ ui: "social-link" }); // the admin list titles each item by its (detected) platform
 
 /** Look of a row of social links — shared with the profile card. */
 export const socialStyleFields = {
