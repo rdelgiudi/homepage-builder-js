@@ -95,7 +95,7 @@ function PlayWithMe({ section, gradientBorders }: { section: PlayWithMeSection; 
             </a>
           )}
           {section.showSteam && status.steamId && (
-            <a href={`https://steamcommunity.com/profiles/${status.steamId}`} target="_blank" rel="noopener noreferrer" className={`${button} bg-[#1b2838] text-white hover:bg-[#2a475e]`}>
+            <a href={`https://steamcommunity.com/profiles/${status.steamId}`} target="_blank" rel="noopener noreferrer" className={`${button} bg-[#1b2838] text-white ring-1 ring-inset ring-white/15 hover:bg-[#2a475e]`}>
               <Logo platform="steam" />
               Add on Steam
             </a>
