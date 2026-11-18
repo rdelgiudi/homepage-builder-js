@@ -57,7 +57,10 @@ interface OverwatchData {
   ranks?: CompetitiveRanks;
   mostPlayedHeroes?: HeroStats[];
   generalStats?: GeneralStats | null;
+  /** When Blizzard last updated the public career profile (it only changes after matches). */
   lastUpdated?: number;
+  /** When this site last fetched the profile. */
+  fetchedAt?: number;
   suggestion?: string;
 }
 
@@ -234,9 +237,24 @@ function StatBar({ label, value, maxValue, color }: { label: string; value: numb
   );
 }
 
+function checkedAgo(at: number, now: number): string {
+  const min = Math.floor((now - at) / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  const h = Math.floor(min / 60);
+  return h < 24 ? `${h} h ago` : new Date(at).toLocaleString();
+}
+
 export default function OverwatchStatus() {
   const [data, setData] = useState<OverwatchData | null>(null);
   const [loading, setLoading] = useState(true);
+  // Ticks so "Checked … ago" stays current between server updates.
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
 
   useWebSocket({
     onMessage: useCallback((msg: unknown) => {
@@ -430,9 +448,11 @@ export default function OverwatchStatus() {
         </div>
       )}
 
-      {data.lastUpdated && (
+      {(data.lastUpdated || data.fetchedAt) && (
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-4 text-center">
-          Updated {new Date(data.lastUpdated).toLocaleString()}
+          {data.lastUpdated && <span title="When Blizzard last updated this career profile">Profile updated {new Date(data.lastUpdated).toLocaleString()}</span>}
+          {data.lastUpdated && data.fetchedAt && " · "}
+          {data.fetchedAt && now && <span title={new Date(data.fetchedAt).toLocaleString()}>Checked {checkedAgo(data.fetchedAt, now)}</span>}
         </p>
       )}
     </div>

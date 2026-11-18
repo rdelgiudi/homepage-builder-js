@@ -837,6 +837,8 @@ const overwatchConfig = {
 
 let overwatchData = null;
 let overwatchHash = '';
+let overwatchBroadcastAt = 0;
+const OVERWATCH_CHECKED_BROADCAST_MS = 5 * 60 * 1000;
 let overwatchRefreshPromise = null;
 
 async function fetchOverwatchData() {
@@ -947,14 +949,22 @@ async function refreshOverwatch() {
   overwatchRefreshPromise = (async () => {
     try {
       const t0 = Date.now();
-      const data = await fetchOverwatchData();
-      const hash = computeOverwatchHash(data);
+      const fetched = await fetchOverwatchData();
+      // The hash leaves out fetchedAt, so an unchanged profile doesn't count as a change.
+      const hash = computeOverwatchHash(fetched);
+      const data = { ...fetched, fetchedAt: Date.now() };
       if (hash === overwatchHash) {
-        console.log(`[${new Date().toISOString()}] [Overwatch] No changes detected`);
-        return;
+        // Same stats: keep the fetch time current for new visitors and the snapshot route,
+        // and tell open pages at most every few minutes so their "checked" time stays honest.
+        overwatchData = data;
+        if (Date.now() - overwatchBroadcastAt < OVERWATCH_CHECKED_BROADCAST_MS) {
+          console.log(`[${new Date().toISOString()}] [Overwatch] No changes detected`);
+          return;
+        }
       }
       overwatchHash = hash;
       overwatchData = data;
+      overwatchBroadcastAt = Date.now();
       const count = broadcastMessage({ type: 'overwatch', data, hash });
       console.log(`[${new Date().toISOString()}] [Overwatch] Relayed to ${count} browser client(s) in ${Date.now() - t0}ms`);
     } catch (e) {

@@ -39,22 +39,23 @@ export async function GET(request: NextRequest) {
             next: { revalidate: 0 },
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return { key: `${owner}/${repo}`, data: await res.json() };
+          return { data: await res.json() };
         })
       );
 
-      for (const result of fetched) {
+      // allSettled keeps the input order, so result i belongs to toFetch[i].
+      fetched.forEach((result, i) => {
+        const key = `${toFetch[i].owner}/${toFetch[i].repo}`;
         if (result.status === "fulfilled") {
-          cache.set(result.value.key, { data: result.value.data, expiry: now + TTL_OK });
-          results[result.value.key] = result.value.data;
+          cache.set(key, { data: result.value.data, expiry: now + TTL_OK });
+          results[key] = result.value.data;
         } else {
           const errMsg = result.reason?.message || "Failed to fetch";
-          const match = result.reason?.message?.match(/\/([^/]+\/[^/]+)$/);
-          const key = match?.[1] || "unknown";
+          console.error(`[${new Date().toISOString()}] [GitHub] ${key}: ${errMsg}`);
           cache.set(key, { data: { error: errMsg }, expiry: now + TTL_ERR });
           results[key] = { error: errMsg };
         }
-      }
+      });
     }
 
     return NextResponse.json({ repos: results });

@@ -19,6 +19,13 @@ interface RepoData {
   license: { spdx_id: string } | null;
   topics: string[];
   updated_at: string;
+  /** Last push to any branch. `updated_at` only moves when the repo's metadata changes (description, stars…). */
+  pushed_at: string | null;
+}
+
+/** The latest of the last push and the last metadata change. */
+function lastActivity(data: RepoData): string {
+  return data.pushed_at && data.pushed_at > data.updated_at ? data.pushed_at : data.updated_at;
 }
 
 const languageColors: Record<string, string> = {
@@ -123,7 +130,7 @@ function RepoCard({ config, data, enableGradientBorders }: { config: RepoConfig;
                 {data.license.spdx_id}
               </span>
             )}
-            <span>Updated {timeAgo(data.updated_at)}</span>
+            <span>Updated {timeAgo(lastActivity(data))}</span>
           </div>
         </div>
       </div>
