@@ -6,6 +6,8 @@
 export interface PresenceLike {
   id?: string;
   status?: string;
+  /** Per-device Discord status; only the keys of connected clients are present. */
+  clientStatus?: { desktop?: string; mobile?: string; web?: string } | null;
   activities?: { type?: number; name?: string; timestamps?: { start?: number } }[];
   lastSeen?: string | null;
 }
@@ -14,7 +16,8 @@ export interface SteamLike {
   player?: { steamid?: string; personastate?: number; gameextrainfo?: string; gameid?: string; lobbysteamid?: string } | null;
 }
 
-export type PlayState = "playing" | "open" | "away" | "busy" | "offline" | "unknown";
+/** `mobile` = online on Discord, but only from a phone: probably away from the PC. */
+export type PlayState = "playing" | "open" | "mobile" | "away" | "busy" | "offline" | "unknown";
 
 export interface PlayStatus {
   state: PlayState;
@@ -52,10 +55,15 @@ export function playStatus(presence: PresenceLike | null, steam: SteamLike | nul
   const online = discord === "online" || persona === 1 || persona === 5 || persona === 6;
   const away = discord === "idle" || persona === 3 || persona === 4;
   const busy = discord === "dnd" || persona === 2;
+  // Discord only on the phone (no desktop app, no browser tab): online there doesn't mean at the PC.
+  // Idle on the phone stays plain "away" (handled below), as does a Steam away state.
+  const cs = presence?.clientStatus;
+  const phoneOnly = !!cs?.mobile && !cs.desktop && !cs.web;
 
   if (availability === "open") return { ...base, state: online || away || !known ? "open" : "offline" };
   if (!known) return { ...base, state: "unknown" };
   if (busy) return { ...base, state: "busy" };
+  if (phoneOnly && discord === "online") return { ...base, state: "mobile" };
   if (online) return { ...base, state: "open" };
   if (away) return { ...base, state: "away" };
   return { ...base, state: "offline" };

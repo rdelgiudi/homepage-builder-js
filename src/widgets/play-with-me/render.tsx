@@ -9,6 +9,7 @@ import { playStatus, type PlayState, type PresenceLike, type SteamLike } from ".
 const LOOK: Record<PlayState, { dot: string; headline: (game: string | null) => string }> = {
   playing: { dot: "bg-green-500", headline: (game) => `Playing ${game}` },
   open: { dot: "bg-green-500", headline: () => "Up for a game" },
+  mobile: { dot: "bg-yellow-500", headline: () => "Probably away, on my phone" },
   away: { dot: "bg-yellow-500", headline: () => "Away, maybe later" },
   busy: { dot: "bg-red-500", headline: () => "Not up for games right now" },
   offline: { dot: "bg-gray-400", headline: () => "Offline" },
@@ -23,6 +24,9 @@ function Logo({ platform }: { platform: "steam" | "discord" }) {
     </svg>
   );
 }
+
+const PHONE =
+  "M 187 0 L 813 0 C 916.277 0 1000 83.723 1000 187 L 1000 1313 C 1000 1416.277 916.277 1500 813 1500 L 187 1500 C 83.723 1500 0 1416.277 0 1313 L 0 187 C 0 83.723 83.723 0 187 0 Z M 125 1000 L 875 1000 L 875 250 L 125 250 Z M 500 1125 C 430.964 1125 375 1180.964 375 1250 C 375 1319.036 430.964 1375 500 1375 C 569.036 1375 625 1319.036 625 1250 C 625 1180.964 569.036 1125 500 1125 Z";
 
 function duration(since: number, now: number): string {
   const min = Math.max(0, Math.floor((now - since) / 60000));
@@ -69,9 +73,16 @@ function PlayWithMe({ section, gradientBorders }: { section: PlayWithMeSection; 
   return (
     <Card className="text-left">
       <div className="flex items-center gap-2.5">
-        <span className={`relative w-3 h-3 shrink-0 rounded-full ${look.dot}`} aria-hidden>
-          {(status.state === "open" || status.state === "playing") && <span className={`absolute inset-0 rounded-full ${look.dot} animate-ping opacity-40`} />}
-        </span>
+        {status.state === "mobile" ? (
+          // Discord's own phone glyph, in the "away" yellow.
+          <svg viewBox="0 0 1000 1500" className="w-3 h-[18px] shrink-0 fill-yellow-500" aria-hidden>
+            <path d={PHONE} />
+          </svg>
+        ) : (
+          <span className={`relative w-3 h-3 shrink-0 rounded-full ${look.dot}`} aria-hidden>
+            {(status.state === "open" || status.state === "playing") && <span className={`absolute inset-0 rounded-full ${look.dot} animate-ping opacity-40`} />}
+          </span>
+        )}
         <p className="min-w-0 flex-1 truncate font-semibold text-gray-900 dark:text-white">{look.headline(status.game)}</p>
         {status.state === "playing" && status.since && now && <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">{duration(status.since, now)}</span>}
       </div>

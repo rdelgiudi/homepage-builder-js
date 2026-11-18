@@ -430,6 +430,22 @@ describe("play with me", () => {
     assert.equal(busy.join, null);
   });
 
+  it("treats Discord on the phone only as probably away", () => {
+    const phone = { mobile: "online" };
+    assert.equal(playStatus({ status: "online", clientStatus: phone, activities: [] }, null, "auto").state, "mobile");
+    // Steam online doesn't override it: that may be the Steam phone app too.
+    assert.equal(playStatus({ status: "online", clientStatus: phone, activities: [] }, steam, "auto").state, "mobile");
+    // Idle on the phone is plain away; busy and playing still win.
+    assert.equal(playStatus({ status: "idle", clientStatus: { mobile: "idle" }, activities: [] }, null, "auto").state, "away");
+    assert.equal(playStatus({ status: "dnd", clientStatus: { mobile: "dnd" }, activities: [] }, null, "auto").state, "busy");
+    assert.equal(playStatus({ status: "online", clientStatus: phone, activities: [{ type: 0, name: "Hades" }] }, null, "auto").state, "playing");
+    // Phone plus the desktop app or a browser tab = at the PC.
+    assert.equal(playStatus({ status: "online", clientStatus: { mobile: "online", desktop: "online" }, activities: [] }, null, "auto").state, "open");
+    assert.equal(playStatus({ status: "online", clientStatus: { mobile: "online", web: "online" }, activities: [] }, null, "auto").state, "open");
+    // "Always open" is the owner's call.
+    assert.equal(playStatus({ status: "online", clientStatus: phone, activities: [] }, null, "open").state, "open");
+  });
+
   it("never builds a link from ids that aren't numbers", () => {
     const s = playStatus({ id: "javascript:x" }, { player: { steamid: "1", gameid: "730", lobbysteamid: "x" } }, "auto");
     assert.equal(s.discordId, null);
