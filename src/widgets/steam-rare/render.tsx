@@ -16,6 +16,8 @@ interface Achievement {
 
 interface RareData {
   profile: string;
+  /** Only when the header is "profile"; null if Steam didn't answer. */
+  player: { name: string; avatar: string | null } | null;
   scanned: number;
   achievements: Achievement[];
 }
@@ -111,23 +113,32 @@ function SteamRare({ section, gradientBorders }: { section: SteamRareSection; gr
 
   return (
     <SteamCard>
-      <div className="flex items-center gap-4">
-        <Badge />
-        <div className="min-w-0">
-          <p className="font-semibold text-lg text-gray-900 dark:text-white">Rarest achievements</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">From the {data.scanned} most-played games</p>
+      {section.header === "profile" && (
+        <div className="flex items-center gap-4 mb-4">
+          {data.player?.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Steam avatar CDN isn't in next.config images
+            <img src={data.player.avatar} alt="" width={64} height={64} className="w-16 h-16 shrink-0 rounded-full" />
+          ) : (
+            <Badge />
+          )}
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-lg text-gray-900 dark:text-white">{data.player?.name ?? "Rarest achievements"}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {data.player ? `Rarest achievements · from the ${data.scanned} most-played games` : `From the ${data.scanned} most-played games`}
+            </p>
+          </div>
+          <a
+            href={data.profile}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`ml-auto shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-all hover:scale-105${gradientBorders ? " gradient-border-card" : ""}`}
+          >
+            View Profile
+          </a>
         </div>
-        <a
-          href={data.profile}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`ml-auto shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-all hover:scale-105${gradientBorders ? " gradient-border-card" : ""}`}
-        >
-          View Profile
-        </a>
-      </div>
+      )}
 
-      <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+      <div className={section.header === "profile" ? "border-t border-gray-200 dark:border-gray-700 pt-4" : ""}>
         {list.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">No unlocked achievements found in these games.</p>
         ) : section.layout === "grid" ? (
@@ -193,7 +204,10 @@ function SteamRare({ section, gradientBorders }: { section: SteamRareSection; gr
             })}
           </ul>
         )}
-        <p className="mt-4 text-[11px] text-gray-400 dark:text-gray-500">Percentages are the share of all Steam players who unlocked it.</p>
+        <p className="mt-4 text-[11px] text-gray-400 dark:text-gray-500">
+          Percentages are the share of all Steam players who unlocked it.
+          {section.header === "none" && ` From your ${data.scanned} most-played games.`}
+        </p>
       </div>
     </SteamCard>
   );

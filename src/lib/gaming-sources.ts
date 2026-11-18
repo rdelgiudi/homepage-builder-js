@@ -362,7 +362,7 @@ export async function steamRare(p: Params) {
   const steamId = process.env.STEAM_ID;
   if (!key || !steamId || !/^\d{17}$/.test(steamId)) throw new WidgetError("Set STEAM_API_KEY and STEAM_ID on the server to show achievements.", 503);
   const scan = section.scanGames;
-  return cached(`steam-rare:${scan}`, 6 * HOUR, async () => {
+  const rare = await cached(`steam-rare:${scan}`, 6 * HOUR, async () => {
     const owned = await getJson<{ response?: { games?: OwnedGame[] } }>(
       `https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${encodeURIComponent(key)}&steamid=${steamId}&include_appinfo=true&include_played_free_games=true&format=json`
     );
@@ -375,6 +375,22 @@ export async function steamRare(p: Params) {
     all.sort((a, b) => a.percent - b.percent || (b.unlockedAt ?? "").localeCompare(a.unlockedAt ?? ""));
     return { profile: `https://steamcommunity.com/profiles/${steamId}`, scanned: games.length, achievements: all.slice(0, 50) };
   });
+  // The profile header (avatar + name) is cached on its own, much shorter, so a new
+  // avatar or name shows up without waiting for the 6-hour achievement scan.
+  const player = section.header === "profile" ? await steamPlayer(key, steamId) : null;
+  return { ...rare, player };
+}
+
+/** Name and avatar for the profile header; null when Steam doesn't answer (the header then shows only the button). */
+function steamPlayer(key: string, steamId: string): Promise<{ name: string; avatar: string | null } | null> {
+  return cached("steam-rare:player", HOUR, async () => {
+    const r = await getJson<{ response?: { players?: { personaname?: string; avatarfull?: string }[] } }>(
+      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${encodeURIComponent(key)}&steamids=${steamId}`
+    );
+    const p = r.response?.players?.[0];
+    if (!p?.personaname) return null;
+    return { name: p.personaname, avatar: httpUrl(p.avatarfull) };
+  }).catch(() => null);
 }
 
 // --- Play history (recorded locally from Discord presence; no outbound request) ---

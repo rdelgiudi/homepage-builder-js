@@ -275,7 +275,15 @@ function GameSection({ title, games, achievements }: { title: string; games: Ste
   );
 }
 
-export default function SteamStatus({ enableGradientBorders }: { enableGradientBorders?: boolean }) {
+export default function SteamStatus({
+  enableGradientBorders,
+  showRecent = true,
+  showTop = true,
+}: {
+  enableGradientBorders?: boolean;
+  showRecent?: boolean;
+  showTop?: boolean;
+}) {
   const [data, setData] = useState<SteamData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -342,7 +350,8 @@ export default function SteamStatus({ enableGradientBorders }: { enableGradientB
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm dark:shadow-none border border-gray-200 dark:border-0">
-      <div className="flex items-center gap-4 mb-4">
+      {/* No bottom margin when both game rows are switched off, so the card doesn't end in a gap. */}
+      <div className={`flex items-center gap-4${(showRecent && recentGames.length > 0) || (showTop && ownedGames.length > 0) ? " mb-4" : ""}`}>
         <div className="relative">
           <Image
             src={avatarUrl}
@@ -379,11 +388,11 @@ export default function SteamStatus({ enableGradientBorders }: { enableGradientB
         </a>
       </div>
 
-      {recentGames.length > 0 && (
+      {showRecent && recentGames.length > 0 && (
         <GameSection title="Recently Played" games={recentGames} achievements={achievements} />
       )}
 
-      {ownedGames.length > 0 && (
+      {showTop && ownedGames.length > 0 && (
         <GameSection title="Top Games" games={ownedGames} achievements={achievements} />
       )}
     </div>

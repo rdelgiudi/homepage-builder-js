@@ -5,5 +5,5 @@ import type { SteamSection } from "./meta";
 export const view: WidgetView<SteamSection> = {
   titled: true,
   frame: "wrap",
-  render: (_section, ctx) => <SteamStatus enableGradientBorders={ctx.gradientBorders} />,
+  render: (section, ctx) => <SteamStatus enableGradientBorders={ctx.gradientBorders} showRecent={section.showRecent} showTop={section.showTop} />,
 };

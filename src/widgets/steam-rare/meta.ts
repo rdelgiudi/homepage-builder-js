@@ -26,6 +26,10 @@ export const schema = z.object({
     .boolean()
     .default(false)
     .meta({ title: "Uncover hidden achievements", description: "Off = spoiler achievements show only the game until a visitor clicks to see them" }),
+  header: z
+    .enum(["profile", "none"])
+    .default("profile")
+    .meta({ title: "Header", description: "Profile = your Steam avatar, name and a View Profile button. None = just the achievements (e.g. when a Steam widget already shows your profile)" }),
   rareBorder: z.boolean().default(true).meta({ title: "Rare border", description: "Animated gold ring around achievements fewer than 10% of players have" }),
 });
 
@@ -38,6 +42,6 @@ export const meta = {
   category: "gaming",
   description: "Your rarest unlocked Steam achievements, by global unlock rate",
   schema,
-  defaults: { limit: 6, scanGames: 40, layout: "list", columns: 3, showHidden: false, rareBorder: true },
+  defaults: { limit: 6, scanGames: 40, layout: "list", columns: 3, showHidden: false, rareBorder: true, header: "profile" },
   requiresEnv: ["STEAM_API_KEY", "STEAM_ID"],
 } satisfies WidgetMeta;
