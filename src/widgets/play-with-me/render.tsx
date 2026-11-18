@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { Card } from "../common";
+import { PLATFORMS } from "../socials/platforms";
 import type { WidgetView } from "../types";
 import type { PlayWithMeSection } from "./meta";
 import { playStatus, type PlayState, type PresenceLike, type SteamLike } from "./status";
@@ -13,6 +14,15 @@ const LOOK: Record<PlayState, { dot: string; headline: (game: string | null) => 
   offline: { dot: "bg-gray-400", headline: () => "Offline" },
   unknown: { dot: "bg-gray-400", headline: () => "Want to play together?" },
 };
+
+/** A platform logo in the button's text colour (white on the brand background). */
+function Logo({ platform }: { platform: "steam" | "discord" }) {
+  return (
+    <svg viewBox="0 0 24 24" width={16} height={16} fill="currentColor" aria-hidden className="shrink-0">
+      <path d={PLATFORMS[platform].path ?? undefined} />
+    </svg>
+  );
+}
 
 function duration(since: number, now: number): string {
   const min = Math.max(0, Math.floor((now - since) / 60000));
@@ -54,7 +64,7 @@ function PlayWithMe({ section, gradientBorders }: { section: PlayWithMeSection; 
 
   const status = playStatus(presence, steam, section.availability);
   const look = LOOK[status.state];
-  const button = `inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all${gradientBorders ? " gradient-border-card" : ""}`;
+  const button = `inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-all${gradientBorders ? " gradient-border-card" : ""}`;
 
   return (
     <Card className="text-left">
@@ -80,16 +90,19 @@ function PlayWithMe({ section, gradientBorders }: { section: PlayWithMeSection; 
         <div className="mt-3 flex flex-wrap gap-2">
           {section.joinLink && status.join && (
             <a href={status.join} className={`${button} bg-green-600 text-white hover:bg-green-700`}>
-              ▶ Join game
+              <span aria-hidden className="w-4 text-center leading-none">▶</span>
+              Join game
             </a>
           )}
           {section.showSteam && status.steamId && (
             <a href={`https://steamcommunity.com/profiles/${status.steamId}`} target="_blank" rel="noopener noreferrer" className={`${button} bg-[#1b2838] text-white hover:bg-[#2a475e]`}>
+              <Logo platform="steam" />
               Add on Steam
             </a>
           )}
           {section.showDiscord && status.discordId && (
             <a href={`https://discord.com/users/${status.discordId}`} target="_blank" rel="noopener noreferrer" className={`${button} bg-[#5865F2] text-white hover:bg-[#4752c4]`}>
+              <Logo platform="discord" />
               Message on Discord
             </a>
           )}
