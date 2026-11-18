@@ -124,7 +124,7 @@ function SteamRare({ section, gradientBorders }: { section: SteamRareSection; gr
           <div className="min-w-0">
             <p className="truncate font-semibold text-lg text-gray-900 dark:text-white">{data.player?.name ?? "Rarest achievements"}</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {data.player ? `Rarest achievements · from the ${data.scanned} most-played games` : `From the ${data.scanned} most-played games`}
+              {data.player ? `Rarest achievements · from my ${data.scanned} most-played games` : `From my ${data.scanned} most-played games`}
             </p>
           </div>
           <a
@@ -206,7 +206,7 @@ function SteamRare({ section, gradientBorders }: { section: SteamRareSection; gr
         )}
         <p className="mt-4 text-[11px] text-gray-400 dark:text-gray-500">
           Percentages are the share of all Steam players who unlocked it.
-          {section.header === "none" && ` From your ${data.scanned} most-played games.`}
+          {section.header === "none" && ` From my ${data.scanned} most-played games.`}
         </p>
       </div>
     </SteamCard>
