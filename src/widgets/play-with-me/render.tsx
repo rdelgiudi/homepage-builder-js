@@ -9,7 +9,7 @@ import { playStatus, type PlayState, type PresenceLike, type SteamLike } from ".
 const LOOK: Record<PlayState, { dot: string; headline: (game: string | null) => string }> = {
   playing: { dot: "bg-green-500", headline: (game) => `Playing ${game}` },
   open: { dot: "bg-green-500", headline: () => "Up for a game" },
-  mobile: { dot: "bg-yellow-500", headline: () => "Probably away, on my phone" },
+  mobile: { dot: "bg-green-500", headline: () => "Probably away, on my phone" },
   away: { dot: "bg-yellow-500", headline: () => "Away, maybe later" },
   busy: { dot: "bg-red-500", headline: () => "Not up for games right now" },
   offline: { dot: "bg-gray-400", headline: () => "Offline" },
@@ -74,8 +74,8 @@ function PlayWithMe({ section, gradientBorders }: { section: PlayWithMeSection; 
     <Card className="text-left">
       <div className="flex items-center gap-2.5">
         {status.state === "mobile" ? (
-          // Discord's own phone glyph, in the "away" yellow.
-          <svg viewBox="0 0 1000 1500" className="w-3 h-[18px] shrink-0 fill-yellow-500" aria-hidden>
+          // Discord's own phone glyph, green like Discord's online-on-mobile icon.
+          <svg viewBox="0 0 1000 1500" className="w-3 h-[18px] shrink-0 fill-green-500" aria-hidden>
             <path d={PHONE} />
           </svg>
         ) : (
