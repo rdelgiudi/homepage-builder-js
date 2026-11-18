@@ -5,7 +5,13 @@ import type { DiscordUserSection } from "./meta";
 export const view: WidgetView<DiscordUserSection> = {
   titled: true,
   frame: "wrap",
-  render: (_section, ctx) => (
-    <DiscordUser enableGradient={ctx.progressGradient} gradientColors={ctx.progressGradientColors} titleGradientColors={ctx.titleGradient} framed={ctx.framed} />
+  render: (section, ctx) => (
+    <DiscordUser
+      enableGradient={ctx.progressGradient}
+      animateGradient={section.progressAnimation}
+      gradientColors={section.progressColors?.length ? section.progressColors : ctx.progressGradientColors}
+      titleGradientColors={ctx.titleGradient}
+      framed={ctx.framed}
+    />
   ),
 };

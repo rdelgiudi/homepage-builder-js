@@ -6,6 +6,15 @@ export const schema = z.object({
   ...base("discord-user"),
   ...titleFields,
   ...frameField,
+  progressColors: z.array(z.string()).optional().meta({
+    title: "Progress bar colors",
+    ui: "gradient",
+    description: "Color stops for the music progress bar and its sparkles. Empty = the site's progress bar colors (Effects), else the title gradient",
+  }),
+  progressAnimation: z.boolean().default(true).meta({
+    title: "Animate progress bar gradient",
+    description: "Off = the colors stay still. Has no effect when the progress gradient is turned off in Effects",
+  }),
 });
 export type DiscordUserSection = z.infer<typeof schema>;
 

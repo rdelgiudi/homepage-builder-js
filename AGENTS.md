@@ -232,7 +232,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - **text** — Paragraph with icon, optional `align` (left/center/right)
 - **links** — Row of link cards (items: label, url, icon, style: primary/secondary, invertDark; optional: text, icon, invertDark for section title)
 - **discord-server** — Discord server widget (uses DISCORD_SERVER_ID)
-- **discord-user** — Discord user presence (WebSocket subscriber, shows phone icon on mobile)
+- **discord-user** — Discord user presence (WebSocket subscriber, shows phone icon on mobile); optional `progressColors` (gradient stops for the music progress bar + sparkles) overrides `effects.progressGradientColors` → `titleGradient`; `progressAnimation` (default `true`) = `false` keeps the gradient still
 - **steam** — Steam profile & games (includes achievement progress for recent and top games); `showRecent` / `showTop` toggle the two game rows
 - **overwatch** — Overwatch competitive stats
 - **markdown** — Renders `content/<file>.md` via `/api/markdown?file=<file>`
@@ -546,8 +546,8 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 
 ### Progress bar gradient + sparkles
 - Music activities (type 2 or "youtube music") with timestamps get an animated gradient progress bar.
-- `animate-gradient-bar` class: horizontal gradient shifted via `gradient-shift` 3s animation.
-- Colors come from `effects.progressGradientColors` → `titleGradient` → default blue→purple→pink.
+- `animate-gradient-bar` class: horizontal gradient shifted via `gradient-shift` 3s animation. Omitted when the section's `progressAnimation` is `false` (the gradient is then drawn at `100%` size, not moving).
+- Colors come from the section's `progressColors` → `effects.progressGradientColors` → `titleGradient` → default blue→purple→pink (an empty array counts as unset).
 - When `progressGradient` is `false`, falls back to solid `bg-[#5865F2]` (Discord blurple) with no sparkles.
 - Continuous random spark particles via the `ProgressSparkles` component (defined in `DiscordUser.tsx`): spawns at random intervals (60–200ms via recursive `setTimeout`) with random angle in the right-side half-circle range (-10° to -90° from horizontal), random distance (18–46px), random size (2–4.5px), random color from the gradient palette. Trajectory driven by CSS custom properties `--spark-x` / `--spark-y` on a single `spark-particle` keyframe. Each spark self-removes after 1s.
 - Progress percentage extracted as `progressPct` local variable to keep fill width and sparkle position aligned.

@@ -446,13 +446,14 @@ async function getVibrantColorFromImage(url: string): Promise<string | null> {
 
 interface DiscordUserProps {
   enableGradient?: boolean;
+  animateGradient?: boolean;
   gradientColors?: string[];
   titleGradientColors?: string[];
   framed?: boolean;
 }
 
-export default function DiscordUser({ enableGradient = true, gradientColors, titleGradientColors, framed }: DiscordUserProps) {
-  const resolvedGradient = gradientColors ?? titleGradientColors;
+export default function DiscordUser({ enableGradient = true, animateGradient = true, gradientColors, titleGradientColors, framed }: DiscordUserProps) {
+  const resolvedGradient = gradientColors?.length ? gradientColors : titleGradientColors;
   const [data, setData] = useState<DiscordUserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [imgError, setImgError] = useState(false);
@@ -836,12 +837,15 @@ export default function DiscordUser({ enableGradient = true, gradientColors, tit
                 <div className="flex-1 h-1 relative">
                   <div className="absolute inset-0 dark:bg-[#1e1f22] bg-gray-200 rounded-full overflow-hidden">
                     <div
-                      className={`h-full ${enableGradient ? '' : 'bg-[#5865F2]'} rounded-full${enableGradient ? ' animate-gradient-bar' : ''}`}
+                      className={`h-full ${enableGradient ? '' : 'bg-[#5865F2]'} rounded-full${enableGradient && animateGradient ? ' animate-gradient-bar' : ''}`}
                       style={enableGradient ? {
                         width: `${progressPct}%`,
                         transition: crossfadeData ? 'width 0.5s ease-out' : 'none',
-                        background: resolvedGradient?.length ? `linear-gradient(90deg, ${resolvedGradient.join(', ')})` : undefined,
-                        backgroundSize: resolvedGradient?.length ? '200% 100%' : undefined
+                        // Animated: the class shifts a 200%-wide gradient. Still: the gradient spans the bar as is.
+                        // backgroundImage, not the `background` shorthand: React re-sets only changed keys, and
+                        // re-setting the shorthand (new colors) resets background-size to auto, which freezes the animation.
+                        backgroundImage: `linear-gradient(90deg, ${(resolvedGradient?.length ? resolvedGradient : DEFAULT_GRADIENT_COLORS).join(', ')})`,
+                        backgroundSize: animateGradient ? '200% 100%' : '100% 100%'
                       } : {
                         width: `${progressPct}%`,
                         transition: crossfadeData ? 'width 0.5s ease-out' : 'none'
