@@ -1,6 +1,6 @@
 # Project Overview
 
-Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON config: 44 widget types (Discord, Steam, Overwatch, GitHub, guestbook, reactions, polls, contact form, game recommendations, weather, feeds, YouTube, Twitch, Speedrun.com, TETR.IO, game servers, play history, …), five site layouts, configurable backgrounds and canvas effects, real-time WebSocket updates, and an optional admin panel (`/admin`) with a drag-and-drop builder, live draft preview and publish.
+Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON config: 52 widget types (profile card, social icons, blog posts, Discord, Steam, Overwatch, GitHub, guestbook, reactions, polls, contact form, game recommendations, weather, feeds, YouTube, Twitch, Speedrun.com, TETR.IO, game servers, play history, …), five site layouts, configurable backgrounds and canvas effects, real-time WebSocket updates, and an optional admin panel (`/admin`) with a drag-and-drop builder, live draft preview and publish.
 
 ## Architecture
 
@@ -55,9 +55,10 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   ├── globals.css
 │   │   ├── layout.tsx               # Root layout (html/body + metadata only — shared by site and admin)
 │   │   ├── loading.tsx              # Cold-load skeleton
-│   │   └── page.tsx                 # Homepage — <SitePage> with the published config (homepage.json read at runtime via fs)
+│   │   ├── page.tsx                 # Homepage — <SitePage> with the published config (homepage.json read at runtime via fs)
+│   │   └── posts/[slug]/page.tsx    # One blog post (lib/posts.ts) inside <SiteShell>
 │   ├── components/
-│   │   ├── SitePage.tsx             # The whole site rendered from a config; used by / and /admin/preview. Builds WidgetContext; mounts ThemeSwitcher, FaviconAnimation, ConfigSync
+│   │   ├── SitePage.tsx             # SiteShell (page colour, background, effects, header, counters, ConfigSync, ThemeSwitcher) + SitePage (the whole site from a config; used by / and /admin/preview, builds WidgetContext)
 │   │   ├── SiteHeader.tsx           # Site name + tagline (`top` / `side` variants)
 │   │   ├── Tabs.tsx                 # Tab navigation (top bar or side column, mobile drawer, transitions)
 │   │   ├── OnePage.tsx              # "onepage" layout: all tabs as sections, sticky jump bar with scroll-spy
@@ -131,12 +132,17 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   ├── gaming-sources.ts        # speedrun, tetrio, game-server, steam-rare, play-history sources + pure mappers (unit-tested)
 │   │   ├── a2s.ts                   # Valve A2S_INFO over UDP (challenge handshake), parseA2SReply(), parseServerAddress()
 │   │   ├── play-history.ts          # Reads play_sessions; summarizePlay() (per-day minutes in a time zone, top games) — pure, unit-tested
-│   │   └── game-suggestions.ts      # game_suggestions + suggested_games tables, Steam store search/appdetails lookups, topSuggested()
-│   ├── widgets/                     # Widget registry — one folder per section type (44 types)
+│   │   ├── game-suggestions.ts      # game_suggestions + suggested_games tables, Steam store search/appdetails lookups, topSuggested()
+│   │   ├── media-sources.ts         # `media` widget: AniList (GraphQL), Letterboxd (RSS), Open Library (reading log) + pure mappers
+│   │   └── posts.ts                 # Blog posts = dated markdown files in src/content/: listPosts(), getPost(), the `posts` widget source
+│   ├── widgets/                     # Widget registry — one folder per section type (52 types)
 │   │   ├── <type>/meta.ts           # Server-safe: zod options schema, label, icon, category, defaults, requiresEnv
 │   │   ├── <type>/render.tsx        # Client: WidgetView { titled, frame, render(section, ctx) }
 │   │   ├── embed/player.ts          # toPlayer(): link → player URL (kept in .ts so tests can import it)
 │   │   ├── support/platforms.ts     # Support platforms: brand classes + supportUrl() (fixed host + validated username)
+│   │   ├── socials/platforms.ts     # Social platforms (Simple Icons paths, brand hex, hosts) + detectPlatform/socialHref/resolveSocials; SocialLinks.tsx is shared with `profile`
+│   │   ├── schedule/occurrences.ts  # upcoming(): weekly slots → next occurrences (pure, unit-tested)
+│   │   ├── stats/count.ts           # parseCount/formatCount for the count-up (pure, unit-tested)
 │   │   ├── meta.ts                  # Server-safe index: SectionSchema (discriminated union), widgetMetas
 │   │   ├── registry.tsx             # Client index: renderSection(section, ctx)
 │   │   ├── fields.ts                # Shared zod fields (base id/type/span, titleFields, frameField)
@@ -151,7 +157,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 ├── tests/
 │   ├── register.mjs                 # Node module hooks: `@/` alias + extensionless imports
 │   ├── unit/                        # config, security, widgets, tailwind (no network, no database)
-│   ├── integration/                 # server.ts (starts the built server) + admin.test.ts (HTTP tests)
+│   ├── integration/                 # server.ts (starts the built server) + admin.test.ts, widgets.test.ts (HTTP tests)
 │   └── fixtures/homepage.v1.json    # Original v1 config — proves old configs still load
 ├── scripts/admin-hash.js            # `npm run admin:hash` — prints an ADMIN_PASSWORD_HASH line
 ├── discord-presence.js              # Discord.js bot (in-process; exports start/onPresenceUpdate)
@@ -266,6 +272,14 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - **game-shelf** — Game covers/list (`items: [{ title, appid?, image?, url?, status?, rating? 1–5, note? }]`, `layout`: `covers` | `list`, `columns`, `groupBy`: `none` | `status` | `custom`, `groupStyle`: `line` (one sideways-scrolling row per group) | `wrap`, `groupOrder`). Status groups: fixed order/headings in `SHELF_GROUPS` (`widgets/game-shelf/groups.ts`), status badges hidden. Custom groups: each item's free-text `group`, matched case-insensitively (heading = first spelling), `groupOrder` names first, the rest in first-appearance order, no group → "Other" last; badges stay. Both pure functions are unit-tested.
 - **play-with-me** — Live "up for a game?" card from Discord + Steam status (`availability`: `auto` | `open` | `busy`, `note`, `games`, `showSteam`, `showDiscord`, `joinLink`).
 - **game-suggest** — Visitors search Steam and suggest a game (`intro`, `askName`, `buttonText`, `successText`, `showList`). Suggestions land in the admin **Suggestions** screen.
+- **profile** — Profile card: `avatar` (upload/URL), `avatarShape`, `name`, `pronouns`, `location`, `bio`, `layout` (`centered` | `side`), `card`, plus `socials` (same items as the socials widget) and its `style`/`colors`/`size`.
+- **socials** — Row of social links: `items: [{ url, platform: "auto" | <platform>, label? }]`, `style` (`icons` | `buttons`), `colors` (`brand` | `mono`), `size`. See "Social links".
+- **projects** — Portfolio cards: `items: [{ title, description?, image?, url?, linkLabel?, source?, tags, status?, year? }]`, `layout` (`cards` | `list`), `columns` 1–3.
+- **notice** — Coloured banner: `tone` (info/success/warning/danger/neutral), `icon?`, `title?`, `message`, `linkText?`/`linkUrl?`, `until` (datetime in `timezone`, hidden afterwards), `dismissible` (localStorage, keyed by section id + a hash of the text). Untitled, unframed. The text field is `message`, not `text`: `renderSection` treats any section with `text` as having a title row.
+- **schedule** — Weekly slots `items: [{ label, icon?, days: ["mon"…], time: "HH:mm", duration (min, 0 = none), url? }]` in the owner's `timezone`; after mount the next week's occurrences are listed in the visitor's own zone with "Live now" / "in 3 h" (`occurrences.ts`). The server renders the plain configured times.
+- **media** — "Watching / reading": `service` (`anilist` | `letterboxd` | `openlibrary`), `username`, `kind` (anime/manga, AniList), `list` (`current` | `finished` | `planned`; Letterboxd is always the diary), `limit`, `layout` (`covers` | `list`), `columns`, `showRatings`.
+- **stats** — Big numbers: `items: [{ value, label, icon? }]`, `columns`, `style` (`cards` | `plain`), `gradient` (title gradient), `countUp` (from 0 when scrolled into view; the final value is in the server HTML and for reduced motion).
+- **posts** — Blog post list (`limit`, `tag`, `layout` `list` | `cards`, `showSummary`, `showReadingTime`). See "Blog posts".
 
 ## Critical Gotchas
 
@@ -303,7 +317,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - Markdown files (Content screen), comment moderation and the Inbox are **not** part of the draft — they apply immediately.
 
 ### Admin forms are generated from the schema
-- `components/admin/schemas.ts` converts the zod schemas with `z.toJSONSchema(schema, { io: "input" })`; `SchemaForm` walks the result. A control is chosen from the JSON Schema type plus the `ui` hint set via `.meta({ ui })`: `color`, `gradient` (string array as color stops), `textarea`, `icon`, `tristate` (optional boolean: unset = inherit), `content-file` (dropdown of `src/content/*.md`), `emoji-list`. Enums with ≤ 4 options render as a segmented control; bounded numbers get a slider; arrays of objects get a collapsible list editor.
+- `components/admin/schemas.ts` converts the zod schemas with `z.toJSONSchema(schema, { io: "input" })`; `SchemaForm` walks the result. A control is chosen from the JSON Schema type plus the `ui` hint set via `.meta({ ui })`: `color`, `gradient` (string array as color stops), `textarea`, `icon`, `tristate` (optional boolean: unset = inherit), `content-file` (dropdown of `src/content/*.md`), `emoji-list`, `time` (HH:mm picker). `.meta({ labels: { value: "Name" } })` gives enum values display names. An array of enum values (e.g. weekdays) renders as toggle buttons. Enums with ≤ 5 options render as a segmented control; bounded numbers get a slider; arrays of objects get a collapsible list editor.
 - "Optional" = not in `required` and no `default`. Clearing an optional string/array/boolean **removes the key** rather than storing `""`/`[]`/`false`.
 - `id`, `version` and any `const` property (a section's `type`, `background.base.type`) are never rendered. Don't hide keys by name beyond that — `background.effect.type` is a real, editable field.
 - Adding a field with `.meta({ title, description })` to a schema is all it takes for it to appear in the panel.
@@ -357,7 +371,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - `clock` / `countdown` render the time only after mount (server and client HTML must match); the countdown's `target` is wall time in the widget's `timezone`, converted with `zonedTimeToMs`.
 - `poll`: votes in `poll_votes` (primary key `poll_id` + `visitor_hash`, so one vote per visitor, replaced on re-vote), keyed by **option text** — renaming an option starts it from zero, removed options' votes are ignored. The poll must exist in the config (`findSection`) for votes to be accepted.
 - Client-side building blocks are in `src/widgets/common.tsx`: `useWidgetData(url | null)` + `DataCard` handle "not set up yet" / loading / error so each widget only writes its success state. `Card` uses `bg-white dark:bg-[#2b2d31]`, which is already in the card-opacity selector list.
-- The admin palette groups widgets by `meta.category` (`PALETTE_GROUPS` in `Builder.tsx`); a new category needs an entry there. New form hints: `date`, `datetime`, `timezone`.
+- The admin palette groups widgets by `meta.category` (`PALETTE_GROUPS` in `Builder.tsx`); a new category needs an entry there. New form hints: `date`, `datetime`, `timezone`, `time`.
 
 ### Contact form and Inbox (`contact` section + `/api/contact` + `/api/admin/messages`)
 - `POST /api/contact` is public (served by the public container); the message is stored in `messages` (`src/lib/messages.ts`, same `visitors.db`) and read only through the admin routes, so both containers see it via the shared `DATA_DIR`. A message is accepted only for a `contact` section that exists (`findSection`), so a site without the widget accepts nothing.
@@ -399,6 +413,20 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - Tables (`src/lib/game-suggestions.ts`): `game_suggestions` (one row per visitor per game, `UNIQUE(appid, visitor_hash)`; suggesting again replaces the note and marks it unread, answered with `again: true`) and `suggested_games` (title + owner status `open | planned | playing | played | dismissed`).
 - `GET /api/game-suggestions?id=` is the public top 10 (only when the section has `showList`); dismissed games never appear, and only `appid/title/status/count` leave the server.
 - Admin: the **Suggestions** screen groups by game; status, read/unread and delete act on the game, block/delete on one suggestion. Its nav badge is polled every 30 s with the comments/inbox badges. Deletes and blocks are audited (`suggestion.*`).
+
+### Social links (`socials`, `profile`)
+- `src/widgets/socials/platforms.ts` lists ~60 platforms with Simple Icons path data (`simple-icons` package, CC0; imported by name so only those icons are bundled, about 24 kB gzipped). Brands Simple Icons doesn't ship (LinkedIn, Xbox, Nexus Mods) get a short text `glyph` in their colour.
+- A link must be http(s) or an e-mail address (`socialHref`, which turns `me@x.y` into `mailto:`); anything else is dropped. `platform: "auto"` matches the host (and its subdomains) against each platform's `hosts`; an unknown host with a `/@name` path is taken as Mastodon, a `/rss`/`/feed`-style path as RSS, everything else as "website" (globe icon).
+- Icon colour on a brand background is white unless the colour is very light (`contrastOn`, luminance > 0.5). Links get `rel="me"` for Mastodon verification.
+
+### Media log (`media` + `src/lib/media-sources.ts`)
+- Fixed hosts and no keys, so the request carries a validated username (like chess): AniList GraphQL (`postJson()` in `widget-data.ts`), Letterboxd `/<user>/rss/` (diary only; list entries without `letterboxd:filmTitle` are skipped), Open Library `/people/<user>/books/<shelf>.json` (covers from `covers.openlibrary.org`). Cached 30 min per service/user/list.
+- AniList answers "no such user" and "private" with 404 and some unknown names with 500; Open Library answers a private log with 403 — each is turned into a message that says what to fix. Goodreads was dropped: its RSS answers 404 for every account.
+
+### Blog posts (`posts` + `/posts/[slug]` + `src/lib/posts.ts`)
+- A post is any `src/content/*.md` whose front matter has a `date` (`YYYY-MM-DD`; gray-matter turns an unquoted date into a `Date`, `postDate()` handles both). `title`, `summary` (else an excerpt of the body), `tags` and `draft: true` are optional. Files without a date stay plain content for the markdown widget. They are edited in the admin **Content** screen like any other file and are live immediately (not part of the draft).
+- The page is `/posts/<file name without .md>`, served by the public container; the slug goes through `resolveContentFile()`. It renders inside `SiteShell` (same background, header, effects as the site) at 870px; "Back" links to the first tab that has a `posts` widget.
+- Unknown slugs call `notFound()`. Under the root `loading.tsx` that is streamed with status 200 (same reason as the admin 404 in `websocket-server.js`), so a missing post is a soft 404.
 
 ### Widget registry (`src/widgets/`)
 - Adding a widget = `src/widgets/<type>/meta.ts` + `render.tsx`, then one line each in `widgets/meta.ts` (`SectionSchema` + `widgetMetas`) and `widgets/registry.tsx` (`views`). The `views` map is typed against `SectionType`, so a missing renderer is a compile error.
@@ -728,7 +756,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - **No SQLite in unit tests:** `db.ts` loads better-sqlite3 with `require()`, which doesn't exist in the ES-module scope Node uses for `.ts` files. Code that touches the database is covered by the integration tests instead (or takes its inputs as parameters, like `initialStatus(name, body, settings)`).
 - The `MODULE_TYPELESS_PACKAGE_JSON` warning is silenced in the scripts. Don't add `"type": "module"` to `package.json` to get rid of it — that would turn `websocket-server.js` and the other CommonJS files into ES modules and break them.
 - `tests/fixtures/homepage.v1.json` is the original v1 example (from before config v2). Keep it as is: it is what proves old configs still load.
-- **Integration tests** (`tests/integration/server.ts`) start the built `websocket-server.js` in production mode in a temp folder with symlinks to `.next`, `node_modules` etc., their own `homepage.json`, content and `DATA_DIR`, on a free port. Every integration env var is set to an empty string so the real `.env` (dotenv never overrides a set variable) can't log the Discord bot in. Node's `fetch` keeps no cookies and sends no `Origin`; the `Client` helper does both. Limits to keep in mind when adding tests: 8 failed sign-ins per server start, one comment per visitor per 5s, one poll vote per visitor per second, one contact message per visitor per 30s (30 per 10 min in total), one game suggestion per visitor per 20s (30 per 10 min). Valid suggestions and searches need Steam, so the tests only cover the paths that don't reach it.
+- **Integration tests** (`tests/integration/server.ts`; `admin.test.ts`, `widgets.test.ts`) start the built `websocket-server.js` in production mode in a temp folder with symlinks to `.next`, `node_modules` etc., their own `homepage.json`, content and `DATA_DIR`, on a free port. Every integration env var is set to an empty string so the real `.env` (dotenv never overrides a set variable) can't log the Discord bot in. Node's `fetch` keeps no cookies and sends no `Origin`; the `Client` helper does both. Limits to keep in mind when adding tests: 8 failed sign-ins per server start, one comment per visitor per 5s, one poll vote per visitor per second, one contact message per visitor per 30s (30 per 10 min in total), one game suggestion per visitor per 20s (30 per 10 min). Valid suggestions and searches need Steam, so the tests only cover the paths that don't reach it.
 - Tests are type-checked by `tsc` and by `next build` (tsconfig includes `**/*.ts`), so **a type error in a test fails the production and Docker build**. Use `@/` imports, not `.ts` extensions.
 - `tests/unit/tailwind.test.ts` fails when a folder with `.tsx` files is missing from Tailwind's `content` list (the Phase 0 regression where widget styles were silently dropped).
 

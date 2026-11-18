@@ -17,6 +17,8 @@ export interface JsonSchema {
   default?: unknown;
   const?: unknown;
   enum?: string[];
+  /** Display names for enum values (`.meta({ labels })`); missing ones are humanized. */
+  labels?: Record<string, string>;
   minimum?: number;
   maximum?: number;
   properties?: Record<string, JsonSchema>;

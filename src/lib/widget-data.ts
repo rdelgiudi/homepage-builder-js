@@ -63,8 +63,8 @@ const MAX_TEXT_BYTES = 3 * 1024 * 1024;
 
 type ExtraHeaders = Record<string, string>;
 
-async function request(url: string, accept: string, headers: ExtraHeaders = {}, method = "GET"): Promise<Response> {
-  const res = await fetch(url, { method, headers: { "User-Agent": USER_AGENT, Accept: accept, ...headers }, signal: AbortSignal.timeout(TIMEOUT_MS), cache: "no-store" });
+async function request(url: string, accept: string, headers: ExtraHeaders = {}, method = "GET", body?: string): Promise<Response> {
+  const res = await fetch(url, { method, body, headers: { "User-Agent": USER_AGENT, Accept: accept, ...headers }, signal: AbortSignal.timeout(TIMEOUT_MS), cache: "no-store" });
   if (res.status === 404) throw new WidgetError("Not found. Check the name or address in this widget's settings.", 404);
   if (!res.ok) throw new WidgetError(`The source answered with an error (${res.status}).`);
   return res;
@@ -72,6 +72,11 @@ async function request(url: string, accept: string, headers: ExtraHeaders = {}, 
 
 export async function getJson<T = unknown>(url: string, headers?: ExtraHeaders, method?: "GET" | "POST"): Promise<T> {
   return (await request(url, "application/json", headers, method)).json() as Promise<T>;
+}
+
+/** POSTs a JSON body (e.g. a GraphQL query) and reads the JSON answer. */
+export async function postJson<T = unknown>(url: string, body: unknown, headers: ExtraHeaders = {}): Promise<T> {
+  return (await request(url, "application/json", { "Content-Type": "application/json", ...headers }, "POST", JSON.stringify(body))).json() as Promise<T>;
 }
 
 export async function getText(url: string, accept = "*/*", headers?: ExtraHeaders): Promise<string> {

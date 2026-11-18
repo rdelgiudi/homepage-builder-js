@@ -49,6 +49,14 @@ import * as playHistory from "./play-history/meta";
 import * as gameShelf from "./game-shelf/meta";
 import * as playWithMe from "./play-with-me/meta";
 import * as gameSuggest from "./game-suggest/meta";
+import * as profile from "./profile/meta";
+import * as socials from "./socials/meta";
+import * as projects from "./projects/meta";
+import * as notice from "./notice/meta";
+import * as schedule from "./schedule/meta";
+import * as media from "./media/meta";
+import * as stats from "./stats/meta";
+import * as posts from "./posts/meta";
 
 export const SectionSchema = z.discriminatedUnion("type", [
   header.schema,
@@ -95,6 +103,14 @@ export const SectionSchema = z.discriminatedUnion("type", [
   gameShelf.schema,
   playWithMe.schema,
   gameSuggest.schema,
+  profile.schema,
+  socials.schema,
+  projects.schema,
+  notice.schema,
+  schedule.schema,
+  media.schema,
+  stats.schema,
+  posts.schema,
 ]);
 export type Section = z.infer<typeof SectionSchema>;
 export type SectionType = Section["type"];
@@ -104,12 +120,16 @@ export const widgetMetas: WidgetMeta[] = [
   // content
   header.meta,
   text.meta,
+  notice.meta,
   markdown.meta,
   quote.meta,
   now.meta,
   faq.meta,
   skills.meta,
   timeline.meta,
+  stats.meta,
+  projects.meta,
+  posts.meta,
   divider.meta,
   // media
   image.meta,
@@ -117,14 +137,18 @@ export const widgetMetas: WidgetMeta[] = [
   youtube.meta,
   twitch.meta,
   music.meta,
+  media.meta,
   meme.meta,
   // info
   clock.meta,
   countdown.meta,
+  schedule.meta,
   weather.meta,
   rss.meta,
   status.meta,
   // social
+  profile.meta,
+  socials.meta,
   links.meta,
   support.meta,
   buttons.meta,

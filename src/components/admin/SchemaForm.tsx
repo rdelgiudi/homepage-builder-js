@@ -135,7 +135,7 @@ function Control({ node, optional, value, onChange, label }: Omit<FieldProps, "n
   }
 
   if (node.enum) {
-    const options = node.enum.map((v) => ({ value: v, label: humanize(v) }));
+    const options = node.enum.map((v) => ({ value: v, label: node.labels?.[v] ?? humanize(v) }));
     if (options.length <= 5) {
       return <Segmented label={label} options={options} value={(value as string) ?? ""} onChange={(v) => onChange(v === value && optional ? undefined : v)} />;
     }
@@ -174,6 +174,26 @@ function Control({ node, optional, value, onChange, label }: Omit<FieldProps, "n
     const set = (next: unknown[]) => onChange(next.length || !optional ? next : undefined);
     if (node.items?.type === "object") return <ObjectList node={node.items} items={list as Obj[]} onChange={set} label={label} />;
     if (node.ui === "gradient") return <GradientEditor colors={list as string[]} onChange={set} />;
+    // A set of fixed choices (e.g. weekdays): toggle buttons, kept in the enum's order.
+    if (node.items?.enum) {
+      const choices = node.items.enum;
+      const labels = node.labels ?? node.items.labels;
+      const on = new Set(list as string[]);
+      return (
+        <div className="adm-seg" role="group" aria-label={label}>
+          {choices.map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={on.has(v)}
+              onClick={() => set(choices.filter((c) => (c === v ? !on.has(c) : on.has(c))))}
+            >
+              {labels?.[v] ?? humanize(v)}
+            </button>
+          ))}
+        </div>
+      );
+    }
     return <StringList items={list as string[]} onChange={set} label={label} />;
   }
 
@@ -183,6 +203,7 @@ function Control({ node, optional, value, onChange, label }: Omit<FieldProps, "n
 
   if (node.ui === "color") return <ColorInput value={text} onChange={set} label={label} />;
   if (node.ui === "date") return <input type="date" className="adm-input" aria-label={label} value={text} onChange={(e) => set(e.target.value)} />;
+  if (node.ui === "time") return <input type="time" className="adm-input" aria-label={label} value={text} onChange={(e) => set(e.target.value)} />;
   if (node.ui === "datetime") return <input type="datetime-local" className="adm-input" aria-label={label} value={text} onChange={(e) => set(e.target.value)} />;
   if (node.ui === "timezone") return <TimezoneInput value={text} onChange={set} label={label} />;
   if (node.ui === "image" || node.ui === "video") return <MediaInput kind={node.ui} value={text} onChange={set} label={label} />;

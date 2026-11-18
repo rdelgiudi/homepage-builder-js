@@ -4,6 +4,8 @@
  * sources whose host the site owner chose (rss, mastodon) take a section id instead.
  */
 import { gamingSources } from "@/lib/gaming-sources";
+import { media } from "@/lib/media-sources";
+import { posts } from "@/lib/posts";
 import { cached, decodeEntities, findSection, getJson, getText, htmlToText, httpUrl, USER_AGENT, WidgetError } from "@/lib/widget-data";
 
 const MIN = 60 * 1000;
@@ -498,5 +500,7 @@ export const widgetSources: Record<string, (params: Params) => Promise<unknown>>
   twitch,
   music,
   status,
+  media,
+  posts,
   ...gamingSources,
 };

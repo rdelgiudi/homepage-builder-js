@@ -50,6 +50,14 @@ import { view as playHistory } from "./play-history/render";
 import { view as gameShelf } from "./game-shelf/render";
 import { view as playWithMe } from "./play-with-me/render";
 import { view as gameSuggest } from "./game-suggest/render";
+import { view as profile } from "./profile/render";
+import { view as socials } from "./socials/render";
+import { view as projects } from "./projects/render";
+import { view as notice } from "./notice/render";
+import { view as schedule } from "./schedule/render";
+import { view as media } from "./media/render";
+import { view as stats } from "./stats/render";
+import { view as posts } from "./posts/render";
 
 const views: { [K in SectionType]: WidgetView<Extract<Section, { type: K }>> } = {
   header,
@@ -96,6 +104,14 @@ const views: { [K in SectionType]: WidgetView<Extract<Section, { type: K }>> } =
   "game-shelf": gameShelf,
   "play-with-me": playWithMe,
   "game-suggest": gameSuggest,
+  profile,
+  socials,
+  projects,
+  notice,
+  schedule,
+  media,
+  stats,
+  posts,
 };
 
 /** Renders one section: optional title row, optional gradient frame, then the widget body. */
