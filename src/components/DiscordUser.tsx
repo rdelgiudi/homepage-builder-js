@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import quantize from "quantize";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { DEFAULT_PROGRESS_COLORS as DEFAULT_GRADIENT_COLORS, gradientImage } from "@/widgets/progress";
+import { DEFAULT_PROGRESS_COLORS as DEFAULT_GRADIENT_COLORS, gradientImage, type ProgressStyle } from "@/widgets/progress";
 
 function ProgressSparkles({ progressPct, gradientColors, crossfadeData }: { progressPct: number; gradientColors: string[] | undefined; crossfadeData: object | undefined }) {
   const [sparks, setSparks] = useState<Array<{id: number; x: number; y: number; size: number; color: string; delay: number}>>([]);
@@ -444,14 +444,14 @@ async function getVibrantColorFromImage(url: string): Promise<string | null> {
 }
 
 interface DiscordUserProps {
-  enableGradient?: boolean;
-  animateGradient?: boolean;
-  gradientColors?: string[];
+  /** Progress bar look, resolved by the widget (`widgets/progress.ts`). */
+  progress: ProgressStyle;
   framed?: boolean;
 }
 
-export default function DiscordUser({ enableGradient = true, animateGradient = true, gradientColors, framed }: DiscordUserProps) {
-  const resolvedGradient = gradientColors; // already resolved by widgets/progress.ts
+export default function DiscordUser({ progress, framed }: DiscordUserProps) {
+  const { colors: resolvedGradient, animate: animateGradient, sparkles: showSparkles } = progress;
+  const enableGradient = resolvedGradient !== null;
   const [data, setData] = useState<DiscordUserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [imgError, setImgError] = useState(false);
@@ -842,7 +842,7 @@ export default function DiscordUser({ enableGradient = true, animateGradient = t
                         // Animated: the class shifts a 200%-wide gradient. Still: the gradient spans the bar as is.
                         // backgroundImage, not the `background` shorthand: React re-sets only changed keys, and
                         // re-setting the shorthand (new colors) resets background-size to auto, which freezes the animation.
-                        backgroundImage: gradientImage(resolvedGradient?.length ? resolvedGradient : DEFAULT_GRADIENT_COLORS),
+                        backgroundImage: gradientImage(resolvedGradient),
                         backgroundSize: animateGradient ? '200% 100%' : '100% 100%'
                       } : {
                         width: `${progressPct}%`,
@@ -850,7 +850,7 @@ export default function DiscordUser({ enableGradient = true, animateGradient = t
                       }}
                     />
                   </div>
-                  {enableGradient && (
+                  {enableGradient && showSparkles && (
                     <ProgressSparkles progressPct={progressPct} gradientColors={resolvedGradient} crossfadeData={crossfadeData} />
                   )}
                 </div>

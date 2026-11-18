@@ -41,11 +41,33 @@ export const frameField = {
     .meta({ title: "Gradient frame", ui: "tristate", description: "Follows the site-wide setting unless set here" }),
 };
 
-/** Per-section progress bar colors (discord-user, steam); unset = `effects.progressGradientColors`, then the title gradient. */
+export const PROGRESS_COLOR_MODES = ["site", "custom"] as const;
+
+/** Per-section progress bar colors (discord-user, steam). Resolved by `progressStyle()` in `widgets/progress.ts`. */
 export const progressColorsField = {
-  progressColors: z.array(z.string()).optional().meta({
+  progressColorMode: z.enum(PROGRESS_COLOR_MODES).default("site").meta({
     title: "Progress bar colors",
+    labels: { site: "Site default", custom: "Custom" },
+    description: "Site default = the progress bar settings in Effects",
+  }),
+  progressColors: z.array(z.string()).optional().meta({
+    title: "Custom colors",
     ui: "gradient",
-    description: "Empty = the site's progress bar colors (Effects), else the title gradient",
+    description: "Empty = the site's progress bar colors",
+    showIf: { progressColorMode: ["custom"] },
+  }),
+};
+
+/** Per-section overrides of `effects.progressAnimation` / `effects.progressSparkles`; unset = the site default. */
+export const progressEffectFields = {
+  progressAnimation: z.boolean().optional().meta({
+    title: "Animate progress bar gradient",
+    ui: "tristate",
+    description: "Follows the site-wide setting unless set here",
+  }),
+  progressSparkles: z.boolean().optional().meta({
+    title: "Progress bar sparkles",
+    ui: "tristate",
+    description: "Follows the site-wide setting unless set here",
   }),
 };

@@ -1,6 +1,6 @@
 import SteamStatus from "@/components/SteamStatus";
 import type { WidgetView } from "../types";
-import { progressColors } from "../progress";
+import { progressStyle } from "../progress";
 import type { SteamSection } from "./meta";
 
 export const view: WidgetView<SteamSection> = {
@@ -11,7 +11,7 @@ export const view: WidgetView<SteamSection> = {
       enableGradientBorders={ctx.gradientBorders}
       showRecent={section.showRecent}
       showTop={section.showTop}
-      progressColors={progressColors(section.progressColors, ctx)}
+      progressColors={progressStyle(section, ctx).colors}
     />
   ),
 };

@@ -113,6 +113,8 @@ export default function SitePage({ config, preview }: { config: HomepageConfig; 
     gradientBorders: effects.gradientBorders,
     progressGradient: effects.progressGradient,
     progressGradientColors: effects.progressGradientColors,
+    progressAnimation: effects.progressAnimation,
+    progressSparkles: effects.progressSparkles,
     titleGradient,
     discordServerId: process.env.DISCORD_SERVER_ID,
     widgetFrame: effects.widgetFrame,

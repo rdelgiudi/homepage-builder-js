@@ -3,6 +3,9 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { gradientImage } from "@/widgets/progress";
+
+/** Achievement bar color when the progress gradient is off (Steam's link blue). */
+const STEAM_SOLID_BAR = "#66c0f4";
 import Image from "next/image";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
@@ -280,15 +283,15 @@ export default function SteamStatus({
   enableGradientBorders,
   showRecent = true,
   showTop = true,
-  progressColors = [],
+  progressColors = null,
 }: {
   enableGradientBorders?: boolean;
   showRecent?: boolean;
   showTop?: boolean;
-  /** Achievement bar color stops, already resolved by the widget (`widgets/progress.ts`). */
-  progressColors?: string[];
+  /** Achievement bar color stops, already resolved by the widget (`widgets/progress.ts`); `null` = solid. */
+  progressColors?: string[] | null;
 }) {
-  const barImage = gradientImage(progressColors);
+  const barImage = gradientImage(progressColors ?? [STEAM_SOLID_BAR]);
   const [data, setData] = useState<SteamData | null>(null);
   const [loading, setLoading] = useState(true);
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { base, titleFields, frameField, progressColorsField } from "../fields";
+import { base, titleFields, frameField, progressColorsField, progressEffectFields } from "../fields";
 import type { WidgetMeta } from "../types";
 
 export const schema = z.object({
@@ -7,10 +7,7 @@ export const schema = z.object({
   ...titleFields,
   ...frameField,
   ...progressColorsField,
-  progressAnimation: z.boolean().default(true).meta({
-    title: "Animate progress bar gradient",
-    description: "Off = the colors stay still. Has no effect when the progress gradient is turned off in Effects",
-  }),
+  ...progressEffectFields,
 });
 export type DiscordUserSection = z.infer<typeof schema>;
 

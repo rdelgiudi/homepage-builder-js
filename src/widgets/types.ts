@@ -28,6 +28,8 @@ export interface WidgetContext {
   gradientBorders: boolean;
   progressGradient: boolean;
   progressGradientColors?: string[];
+  progressAnimation: boolean;
+  progressSparkles: boolean;
   titleGradient: string[];
   discordServerId?: string;
   /** Site default for the gradient frame; a section's own `widgetFrame` overrides it. */

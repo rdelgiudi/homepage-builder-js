@@ -10,6 +10,7 @@ import { BackgroundBaseSchema } from "@/lib/schema/config";
 import { infoRequest, parseA2SReply, parseServerAddress } from "@/lib/a2s";
 import { fromGameAchievements, minecraftStatus, rareAchievements, speedrunRun, tetrioLevel, tetrioProfile } from "@/lib/gaming-sources";
 import { summarizePlay } from "@/lib/play-history";
+import { DEFAULT_PROGRESS_COLORS, gradientImage, progressStyle } from "@/widgets/progress";
 import { playStatus } from "@/widgets/play-with-me/status";
 import { groupShelf, groupShelfCustom } from "@/widgets/game-shelf/groups";
 import { searchTerm, storeResults } from "@/lib/game-suggestions";
@@ -533,5 +534,37 @@ describe("widget cache", () => {
     await full();
     await full();
     assert.equal(calls, 3, "a real answer is served from the cache");
+  });
+});
+
+describe("progressStyle", () => {
+  const site = { progressGradient: true, progressGradientColors: ["#111", "#222"], progressAnimation: true, progressSparkles: false, titleGradient: ["#aaa", "#bbb"] };
+
+  it("follows the site by default", () => {
+    assert.deepEqual(progressStyle({ progressColorMode: "site", progressColors: ["#f00"] }, site), { colors: ["#111", "#222"], animate: true, sparkles: false });
+    assert.deepEqual(progressStyle({ progressColorMode: "site" }, { ...site, progressGradientColors: [] }).colors, ["#aaa", "#bbb"]);
+    assert.deepEqual(progressStyle({ progressColorMode: "site" }, { ...site, progressGradientColors: undefined, titleGradient: [] }).colors, DEFAULT_PROGRESS_COLORS);
+  });
+
+  it("custom colors win, empty custom falls back to the site's", () => {
+    assert.deepEqual(progressStyle({ progressColorMode: "custom", progressColors: ["#f00"] }, site).colors, ["#f00"]);
+    assert.deepEqual(progressStyle({ progressColorMode: "custom", progressColors: [] }, site).colors, ["#111", "#222"]);
+    // Custom turns the gradient on even when the site has it off.
+    assert.deepEqual(progressStyle({ progressColorMode: "custom", progressColors: ["#f00"] }, { ...site, progressGradient: false }).colors, ["#f00"]);
+  });
+
+  it("the site gradient off is a solid bar with no effects", () => {
+    const solid = { colors: null, animate: false, sparkles: false };
+    assert.deepEqual(progressStyle({ progressColorMode: "site", progressSparkles: true }, { ...site, progressGradient: false }), solid);
+  });
+
+  it("tri-state overrides beat the site defaults", () => {
+    const s = progressStyle({ progressColorMode: "site", progressAnimation: false, progressSparkles: true }, site);
+    assert.equal(s.animate, false);
+    assert.equal(s.sparkles, true);
+  });
+
+  it("gradientImage repeats a single stop", () => {
+    assert.equal(gradientImage(["#f00"]), "linear-gradient(90deg, #f00, #f00)");
   });
 });

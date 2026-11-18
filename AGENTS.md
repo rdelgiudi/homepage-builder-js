@@ -217,8 +217,10 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 | `gradientBorders` | boolean | `true` | Animated gradient border + subtle scale on hover for link cards, buttons, GitHub project cards, Steam "View Profile", and Meme "New Meme" |
 | `tabTransitions` | boolean | `true` | Smooth crossfade when switching tabs |
 | `customScrollbar` | boolean | `true` | Thin rounded scrollbar styling |
-| `progressGradient` | boolean | `true` | Animated gradient fill on music activity progress bar + tiny sparkle particles at the current position |
-| `progressGradientColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the progress bar; falls back to `titleGradient` colors, then to a default blue→purple→pink gradient |
+| `progressGradient` | boolean | `true` | Gradient fill on the Discord music progress bar and the Steam achievement bars; `false` = plain solid bars (no animation, no sparkles) |
+| `progressGradientColors` | string[] | `titleGradient` fallback | Custom gradient color stops for the progress bars; falls back to `titleGradient` colors, then to a default blue→purple→pink gradient |
+| `progressAnimation` | boolean | `true` | The Discord music bar's gradient slowly shifts |
+| `progressSparkles` | boolean | `true` | Sparkle particles at the Discord music bar's current position (+ the burst on track change) |
 | `widgetFrame` | boolean | `false` | Animated gradient frame around widget sections using title gradient colors — every widget whose view has `frame: "wrap"` or `"self"` (all except header, text, links, divider). Can be overridden per section with a `widgetFrame` field on the section object. |
 | `widgetFrameWidth` | number | `2` | Border width in pixels for the widget gradient frame |
 | `mouseTrail` | boolean | `false` | Comet-style mouse trail — continuous tapering gradient line following the cursor (no trail drawn while stationary) |
@@ -232,8 +234,8 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - **text** — Paragraph with icon, optional `align` (left/center/right)
 - **links** — Row of link cards (items: label, url, icon, style: primary/secondary, invertDark; optional: text, icon, invertDark for section title)
 - **discord-server** — Discord server widget (uses DISCORD_SERVER_ID)
-- **discord-user** — Discord user presence (WebSocket subscriber, shows phone icon on mobile); optional `progressColors` (gradient stops for the music progress bar + sparkles) overrides `effects.progressGradientColors` → `titleGradient`; `progressAnimation` (default `true`) = `false` keeps the gradient still
-- **steam** — Steam profile & games (includes achievement progress for recent and top games); `showRecent` / `showTop` toggle the two game rows; optional `progressColors` for the achievement bars (same fallback as `discord-user`)
+- **discord-user** — Discord user presence (WebSocket subscriber, shows phone icon on mobile); music bar: `progressColorMode` (`site` | `custom`) + `progressColors` (used for `custom`), tri-state `progressAnimation` / `progressSparkles` (unset = the `effects.*` value). See "Progress bar gradient + sparkles"
+- **steam** — Steam profile & games (includes achievement progress for recent and top games); `showRecent` / `showTop` toggle the two game rows; `progressColorMode` + `progressColors` for the achievement bars (same as `discord-user`)
 - **overwatch** — Overwatch competitive stats
 - **markdown** — Renders `content/<file>.md` via `/api/markdown?file=<file>`
 - **meme** — Random meme from external API (supports `popular` flag; NSFW/spoiler always filtered server-side)
@@ -546,9 +548,10 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 
 ### Progress bar gradient + sparkles
 - Music activities (type 2 or "youtube music") with timestamps get an animated gradient progress bar.
-- `animate-gradient-bar` class: horizontal gradient shifted via `gradient-shift` 3s animation. Omitted when the section's `progressAnimation` is `false` (the gradient is then drawn at `100%` size, not moving).
-- Colors come from the section's `progressColors` → `effects.progressGradientColors` → `titleGradient` → default blue→purple→pink (an empty array counts as unset), resolved by `progressColors()` in `src/widgets/progress.ts` (client-safe, shared with Steam; `progressColorsField` in `fields.ts` is the shared schema field).
-- When `progressGradient` is `false`, falls back to solid `bg-[#5865F2]` (Discord blurple) with no sparkles.
+- `animate-gradient-bar` class: horizontal gradient shifted via `gradient-shift` 3s animation. Omitted when animation is off (the gradient is then drawn at `100%` size, not moving).
+- **Resolution** is one pure function, `progressStyle(section, ctx)` in `src/widgets/progress.ts` (client-safe, unit-tested, shared with Steam), called in the widget's `render.tsx`; the components get the result and don't look at the config. Per section: `progressColorMode` `site` (default) follows `effects.progressGradient`, `custom` forces the gradient on with the section's `progressColors` (there is no per-section "off"; a solid bar comes only from `effects.progressGradient: false`). Colors: section's `progressColors` (custom only) → `effects.progressGradientColors` → `titleGradient` → default blue→purple→pink (an empty array counts as unset). `progressAnimation` / `progressSparkles` are tri-state (`ui: "tristate"`, like `widgetFrame`): unset = `effects.progressAnimation` / `effects.progressSparkles`. A solid bar has neither. The shared schema fields are `progressColorsField` / `progressEffectFields` in `widgets/fields.ts`.
+- Solid bar: `bg-[#5865F2]` (Discord blurple) on Discord, `#66c0f4` (Steam blue) on Steam.
+- Bar fills set `backgroundImage` + `backgroundSize`, never the `background` shorthand: React re-sets only changed style keys, and re-setting the shorthand (new colors) resets `background-size`, which froze the animation.
 - Continuous random spark particles via the `ProgressSparkles` component (defined in `DiscordUser.tsx`): spawns at random intervals (60–200ms via recursive `setTimeout`) with random angle in the right-side half-circle range (-10° to -90° from horizontal), random distance (18–46px), random size (2–4.5px), random color from the gradient palette. Trajectory driven by CSS custom properties `--spark-x` / `--spark-y` on a single `spark-particle` keyframe. Each spark self-removes after 1s.
 - Progress percentage extracted as `progressPct` local variable to keep fill width and sparkle position aligned.
 - **Diminish on track change**: When a new song starts (crossfade), the progress bar fill gets `transition: width 0.5s ease-out` and the sparkle container gets `transition: left 0.5s ease-out` so both smoothly animate from the old position to the new (usually ~0%). Normal per-second ticks have `transition: none` to avoid lag.
@@ -635,7 +638,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - `SteamStatus.tsx` displays a thin gradient progress bar + "X/Y unlocked" below each game card.
 - Hover popup uses `createPortal` to `document.body` (escapes parent `overflow-hidden` clipping) with `position: fixed`. A `useEffect` listens to `scroll` (capture phase) and `resize` events to recalculate `popupRect` via `getBoundingClientRect`, keeping the popup pinned to the game card during scrolling.
 - Popup has `min-w-[220px]` and shows "Playtime" and "Achievements" subsection titles, a larger progress bar with percentage, and up to 3 recent achievements (icon + name).
-- Both achievement bars (card + popup) use the same color chain as the Discord music bar: the section's `progressColors` → `effects.progressGradientColors` → `titleGradient` → default (`progressColors()` in `widgets/progress.ts`, resolved in each widget's `render.tsx`). The bars are static (no animation, no sparkles), and `effects.progressGradient` doesn't affect them.
+- Both achievement bars (card + popup) use the same color settings as the Discord music bar (`progressStyle()` in `widgets/progress.ts`, including `effects.progressGradient: false` → solid). They are static: animation and sparkles don't apply.
 
 ### Server-side logging
 - All server-side logging uses raw `console.log`/`console.error`/`console.warn` with timestamp prefix: `[${new Date().toISOString()}] [Tag]`.
