@@ -431,6 +431,11 @@ html.dark.custom-scrollbar * {
   background-size: 200% 100%;
   animation: gradient-shift 3s ease infinite;
 }
+@media (prefers-reduced-motion: reduce) {
+  .animate-gradient-bar {
+    animation: none;
+  }
+}
 
 @keyframes spark-particle {
   0% { transform: translate(0, 0) scale(1.2); opacity: 1; }

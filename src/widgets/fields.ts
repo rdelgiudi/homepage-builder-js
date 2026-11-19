@@ -58,13 +58,18 @@ export const progressColorsField = {
   }),
 };
 
-/** Per-section overrides of `effects.progressAnimation` / `effects.progressSparkles`; unset = the site default. */
-export const progressEffectFields = {
+/** Per-section override of `effects.progressAnimation`; unset = the site default. */
+export const progressAnimationField = {
   progressAnimation: z.boolean().optional().meta({
     title: "Animate progress bar gradient",
     ui: "tristate",
     description: "Follows the site-wide setting unless set here",
   }),
+};
+
+/** Per-section overrides of `effects.progressAnimation` / `effects.progressSparkles`; unset = the site default. */
+export const progressEffectFields = {
+  ...progressAnimationField,
   progressSparkles: z.boolean().optional().meta({
     title: "Progress bar sparkles",
     ui: "tristate",

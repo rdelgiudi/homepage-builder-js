@@ -81,7 +81,14 @@ function getStatus(player: SteamPlayer): { dotColor: string; textColor: string; 
 const GAME_CARD_WIDTH = 96;
 const GAME_GAP = 12;
 
-function GameCard({ game, achievement, barImage }: { game: SteamGame; achievement?: AchievementData; barImage: string }) {
+/** How the achievement bars look: shared by the card bar and the hover popup's bar. */
+interface BarLook {
+  image: string;
+  size: string;
+  className: string;
+}
+
+function GameCard({ game, achievement, bar }: { game: SteamGame; achievement?: AchievementData; bar: BarLook }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [rotateX, setRotateX] = useState(0);
   const [rotateY, setRotateY] = useState(0);
@@ -171,10 +178,11 @@ function GameCard({ game, achievement, barImage }: { game: SteamGame; achievemen
           <div className="mt-1">
             <div className="h-1 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
               <div
-                className="h-full rounded-full transition-all duration-500"
+                className={`h-full rounded-full transition-all duration-500${bar.className}`}
                 style={{
                   width: `${(achievement.unlocked / achievement.total) * 100}%`,
-                  backgroundImage: barImage,
+                  backgroundImage: bar.image,
+                  backgroundSize: bar.size,
                 }}
               />
             </div>
@@ -217,10 +225,11 @@ function GameCard({ game, achievement, barImage }: { game: SteamGame; achievemen
                     <div className="flex items-center gap-2 mb-1">
                       <div className="flex-1 h-1.5 rounded-full bg-gray-700 overflow-hidden">
                         <div
-                          className="h-full rounded-full"
+                          className={`h-full rounded-full${bar.className}`}
                           style={{
                             width: `${(achievement.unlocked / achievement.total) * 100}%`,
-                            backgroundImage: barImage,
+                            backgroundImage: bar.image,
+                            backgroundSize: bar.size,
                           }}
                         />
                       </div>
@@ -250,7 +259,7 @@ function GameCard({ game, achievement, barImage }: { game: SteamGame; achievemen
   );
 }
 
-function GameSection({ title, games, achievements, barImage }: { title: string; games: SteamGame[]; achievements?: Record<number, AchievementData>; barImage: string }) {
+function GameSection({ title, games, achievements, bar }: { title: string; games: SteamGame[]; achievements?: Record<number, AchievementData>; bar: BarLook }) {
   const sectionRef = useRef<HTMLDivElement>(null);
   const [maxGames, setMaxGames] = useState(6);
 
@@ -272,7 +281,7 @@ function GameSection({ title, games, achievements, barImage }: { title: string; 
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{title}</p>
       <div className="flex gap-3 pb-2">
         {games.slice(0, maxGames).map((game) => (
-          <GameCard key={game.appid} game={game} achievement={achievements?.[game.appid]} barImage={barImage} />
+          <GameCard key={game.appid} game={game} achievement={achievements?.[game.appid]} bar={bar} />
         ))}
       </div>
     </div>
@@ -284,14 +293,24 @@ export default function SteamStatus({
   showRecent = true,
   showTop = true,
   progressColors = null,
+  progressAnimate = false,
 }: {
   enableGradientBorders?: boolean;
   showRecent?: boolean;
   showTop?: boolean;
   /** Achievement bar color stops, already resolved by the widget (`widgets/progress.ts`); `null` = solid. */
   progressColors?: string[] | null;
+  /** Shift the gradient (resolved by the widget; ignored for a solid bar). */
+  progressAnimate?: boolean;
 }) {
-  const barImage = gradientImage(progressColors ?? [STEAM_SOLID_BAR]);
+  // Animated like the Discord music bar: a 200%-wide gradient shifted by `animate-gradient-bar`.
+  // Set backgroundImage/backgroundSize separately, never the `background` shorthand (see AGENTS.md).
+  const animate = !!progressColors && progressAnimate;
+  const bar: BarLook = {
+    image: gradientImage(progressColors ?? [STEAM_SOLID_BAR]),
+    size: animate ? "200% 100%" : "100% 100%",
+    className: animate ? " animate-gradient-bar" : "",
+  };
   const [data, setData] = useState<SteamData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -397,11 +416,11 @@ export default function SteamStatus({
       </div>
 
       {showRecent && recentGames.length > 0 && (
-        <GameSection title="Recently Played" games={recentGames} achievements={achievements} barImage={barImage} />
+        <GameSection title="Recently Played" games={recentGames} achievements={achievements} bar={bar} />
       )}
 
       {showTop && ownedGames.length > 0 && (
-        <GameSection title="Top Games" games={ownedGames} achievements={achievements} barImage={barImage} />
+        <GameSection title="Top Games" games={ownedGames} achievements={achievements} bar={bar} />
       )}
     </div>
   );

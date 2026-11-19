@@ -349,7 +349,8 @@ globalThis.__wssBroadcast = broadcastMessage;
 // (e.g. after a tab switch remounts them) instead of waiting for the next
 // periodic re-broadcast.
 globalThis.__serverSnapshots = {
-  getSteam: () => steamData,
+  // Achievements are always taken from the cache, so a widget that mounts later gets them too.
+  getSteam: () => (steamData ? { ...steamData, achievements: achievementsSnapshot() } : null),
   getOverwatch: () => overwatchData,
   getPresence: () => enrichedData,
   getViewers: () => (wss ? wss.clients.size : 0),
@@ -682,12 +683,8 @@ async function refreshSteam() {
       steamIdentityHash = identityHash;
       steamGamesHash = gamesHash;
       steamData = data;
-      const achievements = {};
-      for (const [appid, c] of steamAchievementCache) {
-        achievements[appid] = { total: c.total, unlocked: c.unlocked, recent: c.recent };
-      }
-      steamData.achievements = achievements;
-      const count = broadcastMessage({ type: 'steam', data: { ...steamData, achievements }, identityHash, gamesHash });
+      steamData.achievements = achievementsSnapshot();
+      const count = broadcastMessage({ type: 'steam', data: steamData, identityHash, gamesHash });
       console.log(`[${new Date().toISOString()}] [Steam] Relayed to ${count} browser client(s) in ${Date.now() - t0}ms`);
       refreshSteamAchievements();
     } catch (e) {
@@ -753,6 +750,16 @@ async function fetchSteamAchievements(appid) {
   }
 }
 
+/** What the widget gets: per appid { total, unlocked, recent } for the games currently shown. */
+function achievementsSnapshot() {
+  const achievements = {};
+  for (const id of getUniqueAppIds()) {
+    const c = steamAchievementCache.get(id);
+    if (c) achievements[id] = { total: c.total, unlocked: c.unlocked, recent: c.recent };
+  }
+  return achievements;
+}
+
 function getUniqueAppIds() {
   if (!steamData) return [];
   const ids = new Set();
@@ -800,20 +807,11 @@ async function refreshSteamAchievements() {
 
       const results = await fetchWithConcurrency(stale, fetchSteamAchievements, 3);
 
-      let changed = false;
-      for (const [appid, data] of results) {
-        const existing = steamAchievementCache.get(appid);
-        if (!existing || existing.unlocked !== data.unlocked || existing.total !== data.total) {
-          changed = true;
-        }
-      }
-
-      if (changed) {
-        const achievements = {};
-        for (const id of appIds) {
-          const c = steamAchievementCache.get(id);
-          if (c) achievements[id] = { total: c.total, unlocked: c.unlocked, recent: c.recent };
-        }
+      // Compare with what clients last got. (Comparing results with the cache can't work:
+      // fetchSteamAchievements() has already written them into it, so nothing ever "changed"
+      // and the first achievements of a run were never broadcast.)
+      const achievements = achievementsSnapshot();
+      if (JSON.stringify(achievements) !== JSON.stringify(steamData.achievements || {})) {
         steamData.achievements = achievements;
         const count = broadcastMessage({ type: 'steam', data: steamData, identityHash: steamIdentityHash, gamesHash: steamGamesHash });
         console.log(`[${new Date().toISOString()}] [Steam Achievements] Updated ${results.size} games, relayed to ${count} client(s) in ${Date.now() - t0}ms`);
@@ -1045,11 +1043,7 @@ app.prepare().then(() => {
       ws.send(JSON.stringify({ type: 'presence', data: enrichedData }));
     }
     if (steamData) {
-      const achievements = {};
-      for (const [appid, c] of steamAchievementCache) {
-        achievements[appid] = { total: c.total, unlocked: c.unlocked, recent: c.recent };
-      }
-      ws.send(JSON.stringify({ type: 'steam', data: { ...steamData, achievements }, identityHash: steamIdentityHash, gamesHash: steamGamesHash }));
+      ws.send(JSON.stringify({ type: 'steam', data: { ...steamData, achievements: achievementsSnapshot() }, identityHash: steamIdentityHash, gamesHash: steamGamesHash }));
     }
     if (overwatchData) {
       ws.send(JSON.stringify({ type: 'overwatch', data: overwatchData, hash: overwatchHash }));

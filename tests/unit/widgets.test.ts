@@ -15,6 +15,7 @@ import { playStatus } from "@/widgets/play-with-me/status";
 import { groupShelf, groupShelfCustom } from "@/widgets/game-shelf/groups";
 import { searchTerm, storeResults } from "@/lib/game-suggestions";
 import { cached } from "@/lib/widget-data";
+import { schema as steamSchema } from "@/widgets/steam/meta";
 
 describe("feed parsing", () => {
   it("reads RSS items, including CDATA and entities", () => {
@@ -562,6 +563,17 @@ describe("progressStyle", () => {
     const s = progressStyle({ progressColorMode: "site", progressAnimation: false, progressSparkles: true }, site);
     assert.equal(s.animate, false);
     assert.equal(s.sparkles, true);
+  });
+
+  it("steam: animation follows the site unless set, and there is no sparkles option", () => {
+    const base = { id: "s", type: "steam" };
+    const unset = steamSchema.parse(base);
+    assert.equal(unset.progressAnimation, undefined);
+    assert.equal(progressStyle(unset, site).animate, true);
+    assert.equal(progressStyle(unset, { ...site, progressAnimation: false }).animate, false);
+    const off = steamSchema.parse({ ...base, progressAnimation: false });
+    assert.equal(progressStyle(off, site).animate, false);
+    assert.ok(!("progressSparkles" in steamSchema.shape));
   });
 
   it("gradientImage repeats a single stop", () => {

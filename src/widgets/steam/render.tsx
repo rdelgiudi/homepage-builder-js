@@ -6,12 +6,16 @@ import type { SteamSection } from "./meta";
 export const view: WidgetView<SteamSection> = {
   titled: true,
   frame: "wrap",
-  render: (section, ctx) => (
-    <SteamStatus
-      enableGradientBorders={ctx.gradientBorders}
-      showRecent={section.showRecent}
-      showTop={section.showTop}
-      progressColors={progressStyle(section, ctx).colors}
-    />
-  ),
+  render: (section, ctx) => {
+    const progress = progressStyle(section, ctx);
+    return (
+      <SteamStatus
+        enableGradientBorders={ctx.gradientBorders}
+        showRecent={section.showRecent}
+        showTop={section.showTop}
+        progressColors={progress.colors}
+        progressAnimate={progress.animate}
+      />
+    );
+  },
 };

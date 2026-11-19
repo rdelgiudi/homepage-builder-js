@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { base, titleFields, frameField, progressColorsField } from "../fields";
+import { base, titleFields, frameField, progressAnimationField, progressColorsField } from "../fields";
 import type { WidgetMeta } from "../types";
 
 export const schema = z.object({
@@ -9,6 +9,8 @@ export const schema = z.object({
   showRecent: z.boolean().default(true).meta({ title: "Recently played", description: "Row of games played in the last two weeks" }),
   showTop: z.boolean().default(true).meta({ title: "Top games", description: "Row of your most-played games" }),
   ...progressColorsField,
+  // Achievement bars: animation only. Sparkles mark a moving position, which these bars don't have.
+  ...progressAnimationField,
 });
 export type SteamSection = z.infer<typeof schema>;
 
