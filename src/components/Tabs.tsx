@@ -6,6 +6,7 @@ import { Icon } from "@/widgets/shared";
 import TabSections, { type GridOptions } from "@/components/TabSections";
 import type { WidgetContext } from "@/widgets/types";
 import type { Tab } from "@/lib/schema/config";
+import { useScrollStrip } from "./useScrollStrip";
 
 function HamburgerButton({ open, onClick, label, className = "" }: { open: boolean; onClick: () => void; label: string; className?: string }) {
   return (
@@ -41,13 +42,25 @@ interface TabsProps {
   /** Hide the navigation entirely when there is only one tab. */
   hideNavIfSingle?: boolean;
   grid?: GridOptions;
+  /** Phones: `menu` = compact bar + drawer, `bottom` = a tab bar fixed at the bottom of the screen. */
+  mobileNav?: "menu" | "bottom";
+  /**
+   * Profile layout: a pinned tab's widgets, shown in a sticky column beside the open tab
+   * (above it on phones). The tab bar stays full width above both.
+   */
+  column?: ReactNode;
+  /**
+   * The same navigation at every width (link in bio): one scrolling row of small tabs, also
+   * on phones (no menu button and drawer).
+   */
+  uniformNav?: boolean;
 }
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
-export default function Tabs({ tabs, enableTransitions, widgetContext, widthClass, nav = "top", sideHeader, hideNavIfSingle, grid }: TabsProps) {
+export default function Tabs({ tabs, enableTransitions, widgetContext, widthClass, nav = "top", sideHeader, hideNavIfSingle, grid, mobileNav = "menu", column, uniformNav = false }: TabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState(0);
@@ -55,6 +68,9 @@ export default function Tabs({ tabs, enableTransitions, widgetContext, widthClas
   const [visible, setVisible] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  // The desktop tab row: scrolls (with fades) when the tabs don't fit the page column.
+  const strip = useScrollStrip<HTMLDivElement>(activeTab, tabs.length);
   const [drawerTop, setDrawerTop] = useState(0);
   const transitioning = useRef(false);
 
@@ -111,6 +127,14 @@ export default function Tabs({ tabs, enableTransitions, widgetContext, widthClas
     }
   };
 
+  // Bottom bar with more tabs than fit: keep the open one in view (scrolls the bar only).
+  useEffect(() => {
+    const el = bottomRef.current;
+    const button = el?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!el || !button || el.scrollWidth <= el.clientWidth) return;
+    el.scrollTo({ left: Math.max(0, button.offsetLeft - (el.clientWidth - button.offsetWidth) / 2), behavior: "smooth" });
+  }, [activeTab]);
+
   if (tabs.length === 0) return null;
   // The tab list can change under us (live config refresh, admin preview) — never index past it.
   const activeIndex = Math.min(activeTab, tabs.length - 1);
@@ -118,6 +142,7 @@ export default function Tabs({ tabs, enableTransitions, widgetContext, widthClas
 
   const side = nav === "side";
   const showNav = !(hideNavIfSingle && tabs.length === 1);
+  const bottom = showNav && mobileNav === "bottom";
 
   return (
     <div className={side ? "w-full md:grid md:grid-cols-[230px_minmax(0,1fr)] md:gap-10" : "w-full"}>
@@ -148,16 +173,22 @@ export default function Tabs({ tabs, enableTransitions, widgetContext, widthClas
       )}
       <div className="min-w-0">
       {showNav && (
-      <div ref={barRef} className={`sticky top-0 z-50 w-screen ml-[calc(50%-50vw)] bg-tab-bar border-b border-gray-300 dark:border-gray-700 h-12 md:h-auto${side ? " md:hidden" : ""}`}>
+      <div
+        ref={barRef}
+        className={`sticky top-0 z-50 w-screen ml-[calc(50%-50vw)] bg-tab-bar border-b border-gray-300 dark:border-gray-700 ${uniformNav ? "" : "h-12 md:h-auto"}${side ? " md:hidden" : ""}${bottom ? " hidden md:block" : ""}`}
+      >
         <div className={`${widthClass} mx-auto px-4 md:px-8 flex items-center gap-3 pt-2 pb-2 h-full`}>
-          {/* Desktop tab bar */}
-          <div className="hidden md:flex gap-4 justify-center flex-1">
+          {/* Desktop tab bar. `min-w-0`: as a flex item it would otherwise refuse to shrink below
+              its tabs and run out of the page column on the right (narrow layouts, many tabs);
+              `safe center` centres it while it fits and starts it at the left when it doesn't. */}
+          <div ref={strip.ref} style={strip.style} className={`scroll-strip is-centered ${uniformNav ? "flex gap-1" : "hidden md:flex gap-4"} flex-1 min-w-0 overflow-x-auto py-1`}>
             {tabs.map((tab, index) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => handleTabClick(index)}
-                className={`flex items-center gap-2 px-4 py-2 transition-all duration-200 ${
+                aria-current={activeIndex === index ? "page" : undefined}
+                className={`flex shrink-0 items-center whitespace-nowrap ${uniformNav ? "gap-1.5 px-2.5 py-1.5 text-sm" : "gap-2 px-4 py-2"} transition-all duration-200 ${
                   activeIndex === index
                     ? "text-blue-600 dark:text-white border-b-2 border-blue-600 dark:border-blue-400"
                     : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white hover:scale-105 gradient-tab"
@@ -170,7 +201,7 @@ export default function Tabs({ tabs, enableTransitions, widgetContext, widthClas
           </div>
 
           {/* Mobile: hamburger + current tab label (pinned to the tab bar) */}
-          <div className="flex md:hidden items-center gap-4 flex-1">
+          <div className={uniformNav ? "hidden" : "flex md:hidden items-center gap-4 flex-1"}>
             <HamburgerButton open={menuOpen} onClick={() => setMenuOpen((o) => !o)} label={menuOpen ? "Close menu" : "Open menu"} />
             <span className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
               {tabs[activeIndex].icon && <Icon icon={tabs[activeIndex].icon} invertDark={tabs[activeIndex].invertDark} width={18} height={18} />}
@@ -208,12 +239,45 @@ export default function Tabs({ tabs, enableTransitions, widgetContext, widthClas
         </div>
       </div>
 
-      <div
-        className={`${side ? "pt-4 md:pt-10" : "pt-4"}${enableTransitions ? ' transition-all duration-100 ease-out' : ''} ${
-          visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
-        }`}
-      >
-        <TabSections tab={tabs[mountedIndex]} widgetContext={widgetContext} animate={enableTransitions && visible} grid={grid} />
+      {/* Phones, mobileNav = "bottom": every tab one tap away. SiteShell lifts the page end,
+          counters and theme switch above it (main[data-bottom-nav] in globals.css). */}
+      {bottom && (
+        <nav
+          ref={bottomRef}
+          className="md:hidden fixed inset-x-0 bottom-0 z-50 flex overflow-x-auto bg-tab-bar border-t border-gray-300 dark:border-gray-700 pb-[env(safe-area-inset-bottom)] [scrollbar-width:none]"
+          aria-label="Tabs"
+        >
+          {tabs.map((tab, index) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => handleTabClick(index)}
+              aria-current={activeIndex === index ? "page" : undefined}
+              className={`flex-1 min-w-[72px] h-[60px] flex flex-col items-center justify-center gap-0.5 px-2 border-t-2 -mt-px text-[11px] leading-tight transition-colors ${
+                activeIndex === index ? "text-blue-600 dark:text-white border-blue-600 dark:border-blue-400" : "text-gray-500 dark:text-gray-400 border-transparent"
+              }`}
+            >
+              {tab.icon ? <Icon icon={tab.icon} invertDark={tab.invertDark} width={22} height={22} /> : <span className="h-[22px]" aria-hidden />}
+              <span className="max-w-full truncate">{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+      )}
+
+      <div className={column ? "md:grid md:grid-cols-[300px_minmax(0,1fr)] md:gap-8 md:items-start" : undefined}>
+        {column && (
+          // Sticky beside the open tab; scrolls on its own when it is taller than the window.
+          <aside className="pt-4 pb-6 md:pb-0 md:sticky md:top-20 md:max-h-[calc(100dvh-6rem)] md:overflow-y-auto md:pr-1 [scrollbar-width:thin]" aria-label="Profile">
+            {column}
+          </aside>
+        )}
+        <div
+          className={`${side ? "pt-4 md:pt-10" : "pt-4"}${enableTransitions ? ' transition-all duration-100 ease-out' : ''} ${
+            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
+          }`}
+        >
+          <TabSections tab={tabs[mountedIndex]} widgetContext={widgetContext} animate={enableTransitions && visible} grid={grid} />
+        </div>
       </div>
       </div>
     </div>

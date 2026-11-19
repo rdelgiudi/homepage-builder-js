@@ -9,7 +9,7 @@ export const CONFIG_VERSION = 2;
 
 const GradientSchema = z.array(z.string());
 
-export const SITE_LAYOUTS = ["tabs", "sidebar", "onepage", "bento", "linkinbio"] as const;
+export const SITE_LAYOUTS = ["tabs", "sidebar", "onepage", "bento", "linkinbio", "masonry", "profile"] as const;
 export type SiteLayout = (typeof SITE_LAYOUTS)[number];
 
 export const EffectsSchema = z.object({
@@ -97,7 +97,9 @@ export const LayoutSchema = z.object({
   /**
    * Site shell (see src/components/SitePage.tsx):
    * `tabs` top tab bar · `sidebar` name + navigation in a left column · `onepage` every tab
-   * stacked on one scrolling page · `bento` wide page, widgets in a grid · `linkinbio` narrow column.
+   * stacked on one scrolling page · `bento` wide page, widgets in a grid · `linkinbio` narrow column ·
+   * `masonry` widgets in staggered columns · `profile` one tab as a sticky column beside the others.
+   * What each layout does with the tabs' own settings: src/lib/layouts.ts.
    */
   site: z.enum(SITE_LAYOUTS).default("tabs").meta({ title: "Site layout" }),
   bentoColumns: z
@@ -107,6 +109,27 @@ export const LayoutSchema = z.object({
     .max(4)
     .default(2)
     .meta({ title: "Widgets per row", description: "For widgets without a width of their own. Each tab's widgets can still be made wider or narrower", showIf: { site: ["bento"] } }),
+  masonryColumns: z
+    .number()
+    .int()
+    .min(2)
+    .max(3)
+    .default(3)
+    .meta({ title: "Columns", description: "On wide screens; fewer on smaller ones, one on phones", showIf: { site: ["masonry"] } }),
+  fullWidth: z.boolean().default(false).meta({ title: "Use the full screen width", description: "Off = the page stops growing at 1280px, like the other layouts", showIf: { site: ["bento", "masonry"] } }),
+  pinnedTab: z
+    .string()
+    .optional()
+    .meta({ title: "Tab shown in the column", ui: "tab", description: "Its widgets stay beside the other tabs, e.g. a profile card and socials. Not set = no column", showIf: { site: ["profile"] } }),
+  mobileNav: z
+    .enum(["menu", "bottom"])
+    .default("menu")
+    .meta({
+      title: "Tabs on phones",
+      labels: { menu: "Menu button", bottom: "Bar at the bottom" },
+      description: "Bar at the bottom = every tab one tap away, within thumb reach",
+      showIf: { site: ["tabs", "sidebar", "bento", "masonry", "profile"] },
+    }),
   sectionHeadings: z
     .boolean()
     .default(true)

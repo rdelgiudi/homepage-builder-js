@@ -10,8 +10,9 @@ import SiteHeader from "@/components/SiteHeader";
 import BackgroundLayer from "@/components/BackgroundLayer";
 import { slugify } from "@/lib/schema/migrate";
 import OnePage from "@/components/OnePage";
-import type { WidgetContext } from "@/widgets/types";
-import { LAYOUT_FEATURES, gridOptions } from "@/lib/layouts";
+import { COLUMN_GRID, LAYOUT_FEATURES, bottomNav, gridOptions, pinnedTabId } from "@/lib/layouts";
+import { widgetContextFor } from "@/lib/widget-context";
+import TabSections from "@/components/TabSections";
 
 function TabsFallback() {
   return (
@@ -31,7 +32,11 @@ export const PAGE_WIDTH: Record<SiteLayout, string> = {
   onepage: "max-w-[870px]",
   bento: "max-w-[1280px]",
   linkinbio: "max-w-[480px]",
+  masonry: "max-w-[1280px]",
+  profile: "max-w-[1240px]",
 };
+/** `layout.fullWidth` (bento, masonry): no cap, the page uses the whole screen. */
+const FULL_WIDTH = "max-w-none";
 
 /**
  * Everything around the content: page colour, background layer, effects, the name/tagline
@@ -44,6 +49,7 @@ export function SiteShell({
   width,
   hideHeaderFromMd = false,
   tabBackgrounds = false,
+  bottomNav = false,
   children,
 }: {
   config: HomepageConfig;
@@ -53,6 +59,8 @@ export function SiteShell({
   hideHeaderFromMd?: boolean;
   /** Follow per-tab backgrounds (`?tab=`). Off for pages without tabs. */
   tabBackgrounds?: boolean;
+  /** Phones show the tab bar at the bottom: lift the counters, theme switch and page end above it. */
+  bottomNav?: boolean;
   children: React.ReactNode;
 }) {
   const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, background, effects, counters, tabs } = config;
@@ -68,7 +76,12 @@ export function SiteShell({
   } as React.CSSProperties;
 
   return (
-    <main className="min-h-screen bg-page relative z-10 overflow-x-clip" style={pageVars} data-card-opacity={surface.cards < 100 ? "" : undefined}>
+    <main
+      className="min-h-screen bg-page relative z-10 overflow-x-clip"
+      style={pageVars}
+      data-card-opacity={surface.cards < 100 ? "" : undefined}
+      data-bottom-nav={bottomNav ? "" : undefined}
+    >
       <Suspense fallback={null}>
         <BackgroundLayer
           base={background.base}
@@ -86,7 +99,7 @@ export function SiteShell({
 
       <div className={`w-full ${width} mx-auto px-4 md:px-8 pb-8`}>{children}</div>
 
-      <div className="fixed bottom-4 left-4 z-30">
+      <div className="site-fixed-bottom fixed bottom-4 left-4 z-30">
         <VisitorCounter showViewers={counters.viewers} showVisitors={counters.visitors} />
       </div>
       <ConfigSync preview={preview} />
@@ -106,32 +119,27 @@ export default function SitePage({ config, preview }: { config: HomepageConfig; 
   const header = { name, tagline, titleGradient, taglineGradient };
 
   const site = config.layout.site;
-  const width = PAGE_WIDTH[site];
+  const width = config.layout.fullWidth && (site === "bento" || site === "masonry") ? FULL_WIDTH : PAGE_WIDTH[site];
   // What the layout does with each tab's own settings (forced grid / stack, default width): lib/layouts.ts.
   const grid = gridOptions(config.layout);
   const features = LAYOUT_FEATURES[site];
+  // Profile layout: one tab is the column beside the others and leaves the tab bar.
+  const pinnedId = pinnedTabId(config);
+  const pinned = pinnedId ? tabs.find((t) => t.id === pinnedId) : undefined;
+  const barTabs = pinned ? tabs.filter((t) => t !== pinned) : tabs;
+  const phoneBottomNav = bottomNav(config.layout, barTabs.length);
 
-  const widgetContext: WidgetContext = {
-    gradientBorders: effects.gradientBorders,
-    progressGradient: effects.progressGradient,
-    progressGradientColors: effects.progressGradientColors,
-    progressAnimation: effects.progressAnimation,
-    progressSparkles: effects.progressSparkles,
-    titleGradient,
-    discordServerId: process.env.DISCORD_SERVER_ID,
-    widgetFrame: effects.widgetFrame,
-    widgetFrameWidth: effects.widgetFrameWidth,
-  };
+  const widgetContext = widgetContextFor(config);
 
   return (
     // The one-page layout shows every tab at once, so there is no "open tab" background to follow.
-    <SiteShell config={config} preview={preview} width={width} hideHeaderFromMd={site === "sidebar"} tabBackgrounds={features.tabBackground}>
+    <SiteShell config={config} preview={preview} width={width} hideHeaderFromMd={site === "sidebar"} tabBackgrounds={features.tabBackground} bottomNav={phoneBottomNav}>
       <Suspense fallback={<TabsFallback />}>
         {site === "onepage" ? (
           <OnePage tabs={tabs} widgetContext={widgetContext} widthClass={width} grid={grid} headings={config.layout.sectionHeadings} />
         ) : (
           <Tabs
-            tabs={tabs}
+            tabs={barTabs}
             enableTransitions={effects.tabTransitions}
             widgetContext={widgetContext}
             widthClass={width}
@@ -139,6 +147,9 @@ export default function SitePage({ config, preview }: { config: HomepageConfig; 
             sideHeader={site === "sidebar" ? <SiteHeader {...header} variant="side" /> : undefined}
             hideNavIfSingle={features.tabNav === "multiple"}
             grid={grid}
+            mobileNav={phoneBottomNav ? "bottom" : "menu"}
+            uniformNav={features.uniformNav}
+            column={pinned ? <TabSections tab={pinned} widgetContext={widgetContext} grid={COLUMN_GRID} /> : undefined}
           />
         )}
       </Suspense>

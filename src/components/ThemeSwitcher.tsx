@@ -8,7 +8,7 @@ export default function ThemeSwitcher() {
   return (
     <button
       onClick={toggleTheme}
-      className="fixed bottom-6 right-6 z-50 p-1 bg-gray-200 dark:bg-gray-700 rounded-full hover:opacity-90"
+      className="site-fixed-bottom fixed bottom-6 right-6 z-50 p-1 bg-gray-200 dark:bg-gray-700 rounded-full hover:opacity-90"
       aria-label="Toggle theme"
     >
       <div className="relative w-16 h-8 rounded-full bg-gray-300 dark:bg-gray-600">

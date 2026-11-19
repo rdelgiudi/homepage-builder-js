@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useScrollStrip } from "./useScrollStrip";
 import { useSearchParams } from "next/navigation";
 import type { Tab } from "@/lib/schema/config";
 import { Icon } from "@/widgets/shared";
@@ -27,34 +28,9 @@ interface OnePageProps {
 export default function OnePage({ tabs, widgetContext, widthClass, grid, headings = true }: OnePageProps) {
   const searchParams = useSearchParams();
   const [active, setActive] = useState(tabs[0]?.id ?? "");
-  const bar = useRef<HTMLDivElement>(null);
-  /** Which ends of the jump bar have more buttons beyond them (drawn as a fade). */
-  const [more, setMore] = useState({ left: false, right: false });
-
-  // On a phone the jump bar is wider than the screen: keep the highlighted button in view
-  // (centred), scrolling only the bar itself, never the page.
-  useEffect(() => {
-    const el = bar.current;
-    const button = el?.querySelector<HTMLElement>(`[data-jump="${CSS.escape(active)}"]`);
-    if (!el || !button || el.scrollWidth <= el.clientWidth) return;
-    const left = button.offsetLeft - (el.clientWidth - button.offsetWidth) / 2;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el.scrollTo({ left: Math.max(0, left), behavior: reduce ? "auto" : "smooth" });
-  }, [active]);
-
-  useEffect(() => {
-    const el = bar.current;
-    if (!el) return;
-    const update = () => setMore({ left: el.scrollLeft > 2, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 });
-    update();
-    el.addEventListener("scroll", update, { passive: true });
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
-    return () => {
-      el.removeEventListener("scroll", update);
-      observer.disconnect();
-    };
-  }, [tabs.length]);
+  // On a phone the jump bar is wider than the screen: it scrolls, keeps the highlighted
+  // button in view and fades the edges with more buttons beyond.
+  const strip = useScrollStrip<HTMLDivElement>(active, tabs.length);
 
   /** While a jump is animating, the clicked section stays highlighted (timestamp it ends). */
   const jumpUntil = useRef(0);
@@ -102,11 +78,11 @@ export default function OnePage({ tabs, widgetContext, widthClass, grid, heading
     <div className="w-full">
       {tabs.length > 1 && (
         <nav className="sticky top-0 z-50 w-screen ml-[calc(50%-50vw)] bg-tab-bar border-b border-gray-300 dark:border-gray-700" aria-label="Sections">
-          {/* `safe center`: centred when it fits, but never pushes the first buttons out of reach when it doesn't. */}
+          {/* `is-centered` (safe center): centred when it fits, but never pushes the first buttons out of reach when it doesn't. */}
           <div
-            ref={bar}
-            className={`jump-bar ${widthClass} mx-auto px-2 md:px-8 relative flex gap-1 md:gap-4 justify-start md:justify-[safe_center] overflow-x-auto`}
-            style={{ "--fade-l": more.left ? "28px" : "0px", "--fade-r": more.right ? "28px" : "0px" } as CSSProperties}
+            ref={strip.ref}
+            className={`scroll-strip is-centered ${widthClass} mx-auto px-2 md:px-8 relative flex gap-1 md:gap-4 overflow-x-auto`}
+            style={strip.style}
           >
             {tabs.map((tab) => (
               <button

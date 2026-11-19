@@ -54,7 +54,9 @@ function createConnection() {
   if (typeof window === "undefined") return;
 
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const url = `${protocol}//${window.location.host}/ws`;
+  // A stream overlay page (an OBS Browser Source) says so, and isn't counted as a viewer.
+  const overlay = window.location.pathname.startsWith("/overlay/");
+  const url = `${protocol}//${window.location.host}/ws${overlay ? "?overlay=1" : ""}`;
 
   const ws = new WebSocket(url);
 

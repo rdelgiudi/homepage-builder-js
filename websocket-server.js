@@ -339,6 +339,11 @@ let enrichedData = null;
 let wss;
 // Maps each connected WebSocket to its visitor hash (deduped for viewer count).
 const viewerHashes = new Map();
+// Stream overlay pages (/overlay/<id>, opened with /ws?overlay=1, e.g. an OBS Browser Source).
+// They get every update but aren't people: left out of both viewer counts. They do stay in
+// wss.clients, so an open overlay keeps the data it shows refreshing (no idle pause).
+const overlaySockets = new WeakSet();
+let overlayCount = 0;
 
 // Exposed for the Next.js API routes (same process) to broadcast real-time
 // events — e.g. emoji reactions — to every connected browser client.
@@ -353,7 +358,7 @@ globalThis.__serverSnapshots = {
   getSteam: () => (steamData ? { ...steamData, achievements: achievementsSnapshot() } : null),
   getOverwatch: () => overwatchData,
   getPresence: () => enrichedData,
-  getViewers: () => (wss ? wss.clients.size : 0),
+  getViewers: () => (wss ? Math.max(0, wss.clients.size - overlayCount) : 0),
 };
 
 // --- Idle pause ---
@@ -1028,12 +1033,18 @@ app.prepare().then(() => {
     resumeFromIdle();
     // Try to attribute this connection to a visitor from the upgrade request's
     // cookie (covers returning visitors / multiple tabs sharing the cookie).
-    const cookieVisitorId = getCookieValue(req?.headers?.cookie || null, 'visitor_id');
-    viewerHashes.set(ws, cookieVisitorId ? hashVisitor(cookieVisitorId) : undefined);
+    const overlay = new URL(req?.url || '/', 'http://localhost').searchParams.get('overlay') === '1';
+    if (overlay) {
+      overlaySockets.add(ws);
+      overlayCount++;
+    } else {
+      const cookieVisitorId = getCookieValue(req?.headers?.cookie || null, 'visitor_id');
+      viewerHashes.set(ws, cookieVisitorId ? hashVisitor(cookieVisitorId) : undefined);
+    }
     ws.on('message', (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
-        if (msg.type === 'identify' && typeof msg.visitorId === 'string') {
+        if (msg.type === 'identify' && typeof msg.visitorId === 'string' && !overlaySockets.has(ws)) {
           viewerHashes.set(ws, hashVisitor(msg.visitorId));
           broadcastViewerCount();
         }
@@ -1053,6 +1064,10 @@ app.prepare().then(() => {
     ws.on('close', () => {
       console.log(`[${new Date().toISOString()}] [WS] Browser client disconnected (${wss.clients.size} total)`);
       viewerHashes.delete(ws);
+      if (overlaySockets.has(ws)) {
+        overlaySockets.delete(ws);
+        overlayCount--;
+      }
       broadcastViewerCount();
     });
   });

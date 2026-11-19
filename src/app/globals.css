@@ -143,6 +143,40 @@ main, header, footer, section, article, aside, div {
   }
 }
 
+/* Masonry layout: widgets flow down CSS columns, each as tall as it needs (no row gaps).
+   One column on narrow columns, two from 600px, the chosen count (data-cols) from 960px.
+   Reading order runs down each column. */
+.section-masonry {
+  column-count: 1;
+  column-gap: 2rem;
+}
+.section-masonry > * {
+  break-inside: avoid;
+  margin-bottom: 1.5rem;
+}
+@container (min-width: 600px) {
+  .section-masonry {
+    column-count: 2;
+  }
+}
+@container (min-width: 960px) {
+  .section-masonry[data-cols="3"] {
+    column-count: 3;
+  }
+}
+
+/* Bottom tab bar on phones (layout.mobileNav = "bottom"): keep the page's end, the counters
+   and the theme switch above it. */
+@media (max-width: 767px) {
+  main[data-bottom-nav] {
+    --bottom-nav-h: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: var(--bottom-nav-h);
+  }
+  main[data-bottom-nav] .site-fixed-bottom {
+    bottom: calc(var(--bottom-nav-h) + 12px);
+  }
+}
+
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -689,15 +723,23 @@ html.dark.custom-scrollbar * {
   }
 }
 
-/* ===== One page jump bar =====
-   Scrolls sideways on phones; a fade at an end means more buttons beyond it (OnePage sets
-   --fade-l / --fade-r from the scroll position). No scrollbar: it would cover the underline. */
-.jump-bar {
+/* ===== Scrolling button rows (one-page jump bar, tab bar in a narrow layout) =====
+   Scroll sideways when wider than their box; a fade at an end means more buttons beyond it
+   (useScrollStrip sets --fade-l / --fade-r from the scroll position). No scrollbar: it would
+   cover the underline. overflow-y hidden: a hover-scaled button mustn't add a vertical scroll. */
+.scroll-strip {
+  overflow-y: hidden;
   scrollbar-width: none;
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade-r, 0px)), transparent 100%);
   mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade-r, 0px)), transparent 100%);
 }
-.jump-bar::-webkit-scrollbar {
+/* Centred while it fits; when it overflows, `safe` starts it at the left so the first buttons
+   stay reachable (plain `center` would push them out on both sides). */
+.scroll-strip.is-centered {
+  justify-content: center;
+  justify-content: safe center;
+}
+.scroll-strip::-webkit-scrollbar {
   display: none;
 }
 

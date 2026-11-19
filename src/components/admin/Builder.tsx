@@ -29,7 +29,7 @@ import { useAdmin } from "./store";
 import { RowEditor, SpanControl } from "./LayoutControls";
 import { WidgetIcon } from "@/widgets/BrandIcon";
 import { COLUMNS, fitRow, packRows, placeInGrid, removeFromGrid, rowIds, setRowSpans, spanOf, splitRow, type DropTarget, type PlaceResult } from "./grid-layout";
-import { gridOptions, ignoredTabSettings, isGridTab as isGridTabIn } from "@/lib/layouts";
+import { arrangeOf, gridOptions, ignoredTabSettings, isGridTab as isGridTabIn, pinnedTabId } from "@/lib/layouts";
 
 /** A row is selected through any of its widgets' ids (rows have no id of their own). */
 type Selection = { kind: "tab" | "section" | "row"; id: string } | null;
@@ -223,6 +223,45 @@ interface EnvStatus {
   env: { name: string; set: boolean }[];
 }
 
+/**
+ * The stream overlay address for a widget (`/overlay/<id>`: just this widget on a transparent
+ * background, for an OBS Browser Source). It shows the published version only.
+ */
+function OverlayLink({ id, live }: { id: string; live: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const url = typeof window === "undefined" ? `/overlay/${id}` : `${window.location.origin}/overlay/${encodeURIComponent(id)}`;
+  return (
+    <details className="adm-field adm-overlay">
+      <summary className="adm-label">Use as a stream overlay</summary>
+      {live ? (
+        <>
+          <div className="adm-inline">
+            <input className="adm-input" readOnly value={url} aria-label="Overlay address" onFocus={(e) => e.currentTarget.select()} />
+            <button
+              type="button"
+              className="adm-btn is-small"
+              onClick={() => {
+                navigator.clipboard?.writeText(url).then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                });
+              }}
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <span className="adm-hint">
+            Add it in OBS as a Browser Source: just this widget, on a transparent background, updating live. Add <code>?theme=light</code> for light colours or{" "}
+            <code>?title=0</code> to hide the title. An open overlay counts as someone watching, so Steam and Discord data keep refreshing.
+          </span>
+        </>
+      ) : (
+        <span className="adm-hint">Publish first: the overlay shows the live version of this widget.</span>
+      )}
+    </details>
+  );
+}
+
 /** Status line while dragging in the grid: where the widget would go and the row's new widths. */
 function gridStatus(hover: GridHover, sections: Section[], defaultSpan: number): string {
   const { target, result } = hover;
@@ -238,7 +277,7 @@ function gridStatus(hover: GridHover, sections: Section[], defaultSpan: number):
  * preview should show. Returned as pieces so the shell can keep the preview mounted between them.
  */
 export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlug: string } {
-  const { config, update } = useAdmin();
+  const { config, published, update } = useAdmin();
   const [tabId, setTabId] = useState<string | null>(config.tabs[0]?.id ?? null);
   const [selection, setSelection] = useState<Selection>(null);
   const [dragging, setDragging] = useState<string | null>(null);
@@ -265,7 +304,9 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
   // Widths matter where widgets can sit side by side. Which tabs that is depends on the site
   // layout (bento: all, link in bio: none, otherwise the tab's own setting): lib/layouts.ts.
   const layoutGrid = gridOptions(config.layout);
-  const isGridTab = (t: Tab) => isGridTabIn(layoutGrid, t);
+  // Profile layout: the tab shown as the column is always one widget per row.
+  const pinnedId = pinnedTabId(config);
+  const isGridTab = (t: Tab) => isGridTabIn(layoutGrid, t, pinnedId);
   const gridActive = !!tab && isGridTab(tab);
   const defaultSpan = layoutGrid.defaultSpan;
   const gridView = gridActive && !listView;
@@ -273,7 +314,7 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
   const without = (t: Tab, id: string) => (isGridTab(t) ? removeFromGrid(t.sections, id, defaultSpan) : t.sections.filter((s) => s.id !== id));
 
   const selectedTab = selection?.kind === "tab" ? config.tabs.find((t) => t.id === selection.id) ?? null : null;
-  const tabIgnored = ignoredTabSettings(config.layout, config.tabs.length);
+  const tabIgnored = ignoredTabSettings(config, selectedTab?.id);
 
   const sensors = useSensors(
     // A small distance threshold keeps a plain click a click.
@@ -458,6 +499,11 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
               <span className="adm-row-text">
                 <span className="adm-row-title">{t.label || "Untitled"}</span>
               </span>
+              {t.id === pinnedId && (
+                <span className="adm-badge" title="Shown as the column beside the other tabs (Site screen → Layout)">
+                  column
+                </span>
+              )}
               <span className="adm-count">{t.sections.length}</span>
             </SortableRow>
           ))}
@@ -719,7 +765,11 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
           />
           {!gridActive && (
             <p className="adm-hint adm-span-hint">
-              {layoutGrid.arrange === "stack" ? (
+              {tab.id === pinnedId ? (
+                <>This tab is the column beside the other tabs, so its widgets are always full width.</>
+              ) : arrangeOf(layoutGrid, tab) === "masonry" ? (
+                <>In the Masonry layout every widget is one column wide and as tall as it needs; widgets flow top to bottom, column by column.</>
+              ) : layoutGrid.arrange === "stack" ? (
                 <>The Link in bio layout shows every widget at full width, so there is no width to set here.</>
               ) : (
                 <>
@@ -748,6 +798,7 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
               }
             />
           )}
+          <OverlayLink id={selectedSection.id} live={published.tabs.some((t) => t.sections.some((x) => x.id === selectedSection.id))} />
           {config.tabs.length > 1 && (
             <label className="adm-field">
               <span className="adm-label">Move to tab</span>
@@ -773,5 +824,6 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
     );
   }
 
-  return { outline, inspector, tabSlug: tab ? slugify(tab.label) : "" };
+  // The column tab isn't in the site's tab bar, so the preview stays on the tab it shows.
+  return { outline, inspector, tabSlug: tab && tab.id !== pinnedId ? slugify(tab.label) : "" };
 }

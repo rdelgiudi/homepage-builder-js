@@ -14,6 +14,8 @@ const LAYOUTS: Record<SiteLayout, { name: string; text: string }> = {
   onepage: { name: "One page", text: "Every tab on one scrolling page, with jump links." },
   bento: { name: "Bento", text: "Wide page; widgets sit in a grid, two per row by default." },
   linkinbio: { name: "Link in bio", text: "One narrow column, sized for phones." },
+  masonry: { name: "Masonry", text: "Widgets in staggered columns, each as tall as it needs. No gaps." },
+  profile: { name: "Profile column", text: "One tab stays in a column beside the others, e.g. your profile." },
 };
 
 /** Small wireframe of each layout. Blocks: `h` header, `n` navigation, `c` content. */
@@ -60,6 +62,29 @@ function Thumb({ layout }: { layout: SiteLayout }) {
           <rect x="42" y="18" width="32" height="14" rx="2" className={c} />
           <rect x="6" y="36" width="20" height="12" rx="2" className={c} />
           <rect x="30" y="36" width="44" height="12" rx="2" className={c} />
+        </svg>
+      );
+    case "masonry":
+      return (
+        <svg viewBox="0 0 80 52" aria-hidden>
+          <rect x="26" y="4" width="28" height="4" rx="1.5" className="adm-thumb-h" />
+          <rect x="6" y="11" width="68" height="3" rx="1.5" className="adm-thumb-n" />
+          <rect x="6" y="18" width="21" height="16" rx="2" className={c} />
+          <rect x="6" y="37" width="21" height="11" rx="2" className={c} />
+          <rect x="30" y="18" width="21" height="9" rx="2" className={c} />
+          <rect x="30" y="30" width="21" height="18" rx="2" className={c} />
+          <rect x="54" y="18" width="20" height="12" rx="2" className={c} />
+          <rect x="54" y="33" width="20" height="15" rx="2" className={c} />
+        </svg>
+      );
+    case "profile":
+      return (
+        <svg viewBox="0 0 80 52" aria-hidden>
+          <rect x="26" y="4" width="28" height="4" rx="1.5" className="adm-thumb-h" />
+          <rect x="6" y="11" width="68" height="3" rx="1.5" className="adm-thumb-n" />
+          <rect x="6" y="18" width="20" height="30" rx="2" className="adm-thumb-h" />
+          <rect x="30" y="18" width="44" height="14" rx="2" className={c} />
+          <rect x="30" y="35" width="44" height="13" rx="2" className={c} />
         </svg>
       );
     case "linkinbio":

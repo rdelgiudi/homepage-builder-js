@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { JsonSchema } from "./schemas";
 import { api, uploadFile } from "./api";
 import { resolveSocials, type SocialPlatformKey } from "@/widgets/socials/platforms";
+import { useAdmin } from "./store";
 
 type Obj = Record<string, unknown>;
 
@@ -212,6 +213,7 @@ function Control({ node, optional, value, onChange, label }: Omit<FieldProps, "n
   if (node.ui === "image" || node.ui === "video") return <MediaInput kind={node.ui} value={text} onChange={set} label={label} />;
   if (node.ui === "textarea") return <textarea className="adm-input" aria-label={label} rows={4} value={text} onChange={(e) => set(e.target.value)} />;
   if (node.ui === "content-file") return <ContentFileSelect value={text} onChange={set} label={label} />;
+  if (node.ui === "tab") return <TabSelect value={text} onChange={set} label={label} />;
   if (node.ui === "icon") {
     const isUrl = /^https?:\/\//.test(text);
     return (
@@ -448,6 +450,23 @@ function ObjectList({ node, items, onChange, label }: { node: JsonSchema; items:
 }
 
 let contentFiles: Promise<string[]> | null = null;
+
+/** One of the config's tabs, by id (e.g. the profile layout's column). Empty = none. */
+function TabSelect({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+  const { config } = useAdmin();
+  const missing = value && !config.tabs.some((t) => t.id === value);
+  return (
+    <select className="adm-input" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">None</option>
+      {missing && <option value={value}>{value} (deleted)</option>}
+      {config.tabs.map((t) => (
+        <option key={t.id} value={t.id}>
+          {t.label}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 function ContentFileSelect({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
   const [files, setFiles] = useState<string[]>([]);

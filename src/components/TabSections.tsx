@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import type { Tab } from "@/lib/schema/config";
 import { renderSection } from "@/widgets/registry";
 import type { WidgetContext } from "@/widgets/types";
-import { isGridTab, type GridOptions } from "@/lib/layouts";
+import { arrangeOf, type GridOptions } from "@/lib/layouts";
 
 export type { GridOptions };
 
@@ -18,14 +18,17 @@ interface TabSectionsProps {
 }
 
 /**
- * One tab's widgets, arranged as a stack or a 12-column grid. Shared by every site layout.
- * The grid goes to 12 columns by the width of its own column (container query on
- * `.section-grid-wrap`), not the window's, so narrow page columns stay one widget per row.
+ * One tab's widgets, arranged as a stack, a 12-column grid or masonry columns. Shared by
+ * every site layout. Grid and masonry respond to the width of their own column (container
+ * queries on `.section-grid-wrap`), not the window's, so narrow page columns stay one
+ * widget per row.
  */
 export default function TabSections({ tab, widgetContext, animate, grid }: TabSectionsProps) {
-  const isGrid = isGridTab(grid ?? { arrange: "choice", defaultSpan: 12 }, tab);
+  const arrange = arrangeOf(grid ?? { arrange: "choice", defaultSpan: 12 }, tab);
+  const isGrid = arrange === "grid";
+  const className = arrange === "grid" ? "section-grid gap-6 md:gap-8" : arrange === "masonry" ? "section-masonry" : "space-y-6 md:space-y-8";
   const stack = (
-    <div className={isGrid ? "section-grid gap-6 md:gap-8" : "space-y-6 md:space-y-8"}>
+    <div className={className} data-cols={arrange === "masonry" ? grid?.columns : undefined}>
       {tab.sections.map((section, index) => (
         <div
           key={section.id}
@@ -40,5 +43,5 @@ export default function TabSections({ tab, widgetContext, animate, grid }: TabSe
       ))}
     </div>
   );
-  return isGrid ? <div className="section-grid-wrap">{stack}</div> : stack;
+  return arrange === "stack" ? stack : <div className="section-grid-wrap">{stack}</div>;
 }

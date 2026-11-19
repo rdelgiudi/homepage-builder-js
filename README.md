@@ -7,7 +7,8 @@ A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integ
 ## Features
 
 - **One JSON config** (`src/config/homepage.json`) for everything, validated on load and editable without a rebuild — or through the admin panel
-- **Five site layouts**: top tabs, sidebar, one-page scroll, bento grid, link-in-bio; each tab can stack its widgets or lay them out on a 12-column grid
+- **Seven site layouts**: top tabs, sidebar, one-page scroll, bento grid, link-in-bio, masonry, profile column; each tab can stack its widgets or lay them out on a 12-column grid; optional bottom tab bar on phones
+- **Stream overlays**: any widget on its own transparent page (`/overlay/<widget id>`) for an OBS Browser Source
 - **44 widget types**:
   - Gaming and presence: Discord user presence (real-time over WebSocket, mobile indicator), Discord server, Steam (with achievement progress), rarest Steam achievements, Overwatch, chess ratings, Speedrun.com personal bests, TETR.IO, Minecraft and Steam game server status, play-time heatmap (recorded from Discord), game shelf, "play with me" card
   - Social and feeds: GitHub project cards, GitHub contribution heatmap, Mastodon, Bluesky, RSS/Atom, support buttons (Ko-fi, GitHub Sponsors, Patreon…), 88×31 button wall and webring
@@ -67,7 +68,7 @@ The tests need Node 26, the version the Dockerfile uses. The integration tests s
   "favicon": "",  // empty/omit = auto-generated animated gradient ring
   "titleGradient": ["#60a5fa", "#a78bfa", "#f472b6", "#a78bfa", "#60a5fa"],
   "taglineGradient": [],
-  "layout": { "site": "tabs" },  // "tabs" | "sidebar" | "onepage" | "bento" | "linkinbio"
+  "layout": { "site": "tabs" },  // "tabs" | "sidebar" | "onepage" | "bento" | "linkinbio" | "masonry" | "profile"
   "background": {
     "base": { "type": "solid", "light": "#f3f4f6", "dark": "#111827" },
     "effect": { "type": "comet" }  // "none" | "stars" | "comet" | "snow" | "fireflies" | "constellation" | "aurora"
@@ -118,6 +119,11 @@ The tests need Node 26, the version the Dockerfile uses. The integration tests s
   | `onepage` | Every tab on one scrolling page with a sticky jump bar |
   | `bento` | Wide page; every tab is a grid, two widgets per row by default |
   | `linkinbio` | One narrow column, sized for phones; no navigation if there is a single tab |
+  | `masonry` | Widgets in staggered columns (`masonryColumns`, 2–3), each as tall as it needs; reading order runs down each column |
+  | `profile` | One tab (`pinnedTab`, its id) stays in a sticky column beside the others, e.g. a profile card and socials; above them on phones |
+
+  Further `layout` options: `bentoColumns` (2–4 widgets per row in bento), `masonryColumns`, `fullWidth` (bento and masonry use the whole screen), `sectionHeadings` (one page: tab names above each section), `mobileNav` (`"menu"` or `"bottom"`: the tab bar at the bottom of the screen on phones).
+- **Stream overlay**: `/overlay/<widget id>` shows one widget of the published site on a transparent background — add it in OBS as a Browser Source. `?theme=light` for light colours, `?title=0` without the title row. The admin panel shows the address under each widget ("Use as a stream overlay"). An open overlay isn't counted as a viewer, but it does count as someone watching, so Steam/Discord data keep refreshing while it is open.
 - `tabs[].layout` — `"stack"` (default, one widget per row) or `"grid"` (12 columns).
 - `sections[].span` — a widget's width in a grid, 1–12 columns (e.g. `6` = half). Unset = full width in a grid tab, half in the bento layout. On phones every widget is full width.
 

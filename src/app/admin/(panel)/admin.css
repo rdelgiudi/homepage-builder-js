@@ -1056,6 +1056,24 @@ textarea.adm-input {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.adm-badge {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid var(--a-accent);
+  border-radius: 999px;
+  color: var(--a-accent);
+  font-size: 11px;
+}
+.adm-overlay summary {
+  cursor: pointer;
+}
+.adm-overlay[open] > * + * {
+  margin-top: 8px;
+}
+.adm-overlay .adm-inline .adm-input {
+  flex: 1;
+  min-width: 0;
+}
 .adm-count {
   flex: none;
   min-width: 20px;
