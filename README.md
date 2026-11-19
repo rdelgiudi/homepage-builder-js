@@ -589,7 +589,7 @@ The hash (salted scrypt) means the password itself is not stored anywhere — so
 | `/api/admin` | admin container (everything the panel calls) |
 | everything else | public container |
 
-The session cookie is scoped to those two prefixes, so it is never sent to the public container. Rebuild and recreate both containers together — the admin pages load their scripts from the public one, so they must run the same build. To keep the sign-in page off the internet as well, put an IP allow-list or VPN-only rule on the admin route.
+The session cookie is scoped to those two prefixes, so it is never sent to the public container. Rebuild and recreate both containers together — the admin pages load their scripts from the public one, so they must run the same build. To keep the sign-in page off the internet as well, put an IP allow-list or VPN-only rule on the admin route. The admin container runs with `APP_ROLE=admin` and gets the same integration keys (so the preview shows live data); that role only stops it from recording play history twice into the shared database.
 
 **Hand-editing still works.** `homepage.json` stays a plain file; the panel just reads and writes it. Publishing rewrites it in the current format (v2) and keeps the previous content under History.
 

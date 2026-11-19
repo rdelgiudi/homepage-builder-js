@@ -1124,7 +1124,9 @@ app.prepare().then(() => {
   }
 
   // Game sessions for the play-history widget (local SQLite writes; opt-in via the config).
-  if (discordConfig.botToken && discordConfig.userId) {
+  // Not in an APP_ROLE=admin container: it shares the database with the public one, which
+  // already records, and two recorders would write overlapping sessions.
+  if (discordConfig.botToken && discordConfig.userId && process.env.APP_ROLE !== 'admin') {
     try {
       require('./play-history').start(presenceModule, CONFIG_FILE);
     } catch (e) {

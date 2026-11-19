@@ -196,7 +196,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 | `DATA_DIR` | Directory for runtime-written state (default: `<cwd>/data`) |
 | `ADMIN_PASSWORD_HASH` | Enables the admin panel at `/admin`. scrypt hash from `npm run admin:hash`. |
 | `ADMIN_PASSWORD` | Plain-text alternative for local development; ignored when the hash is set. Neither set = the panel does not exist (404). |
-| `APP_ROLE` | `public` disables the admin panel on this instance even with an admin password set. Anything else / unset = normal. |
+| `APP_ROLE` | `public` disables the admin panel on this instance even with an admin password set. `admin` = normal, but the play-history recorder doesn't start (the admin half of the two-container setup, so only one process records into the shared database). Anything else / unset = normal. |
 
 ### homepage.json — content config (no secrets), **config v2**:
 
@@ -409,6 +409,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 
 ### Play history recorder (`play-history.js` + `src/lib/play-history.ts`)
 - `websocket-server.js` starts `play-history.js` (CommonJS — it can't use `db.ts`) when the Discord bot env vars are set. It opens its **own** better-sqlite3 connection to `DATA_DIR/visitors.db` (same path logic as `db.ts`, WAL, `busy_timeout`) and registers a **separate** `onPresenceUpdate` callback — not inside `processRawPresence`, whose idle skip would stop recording while nobody is on the site (a local write costs nothing).
+- **One recorder per database**: it is not started when `APP_ROLE=admin`. The example compose gives the admin container the Discord keys (for the preview), and two recorders on the same `visitors.db` would insert overlapping rows for the same game (double-counted hours) and close each other's open sessions on startup.
 - **Opt-in**: it records only while the *published* `homepage.json` contains a `play-history` section (re-read when the mtime changes); removing the widget closes open sessions. The draft doesn't count.
 - `play_sessions(game, started_at, ended_at, open)`: a row per Discord "Playing" activity (type 0) while status ≠ offline. Open rows get `ended_at = now` every 60 s (heartbeat), so after a crash a session ends at its last heartbeat; on startup all rows are closed. A new session is back-dated to Discord's start time (≤ 12 h) but never before the game's last recorded `ended_at`, so restarts don't double-count. Rows older than 400 days are deleted on startup.
 - The reader (`summarizePlay`) splits sessions at local midnight in the widget's `timezone` (invalid → UTC), ignores sessions < 2 min (launcher flicker), applies `hideGames` (case-insensitive; still recorded), and reports "playing now" only for open rows with a heartbeat < 3 min old. Levels: ≥1 min, ≥1 h, ≥2 h, ≥4 h.
@@ -784,6 +785,6 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 
 - One image, multi-stage build; started once or twice (public + admin).
 - `docker-entrypoint.sh` execs `websocket-server.js` in the foreground; `discord-presence.js` runs in-process.
-- `docker-compose-example.yml` runs two containers from the image for one hostname: `homepage` (public, `APP_ROLE=public`, config/content mounted `:ro`, holds the integration keys) and `homepage-admin` (config/content writable, only `ADMIN_PASSWORD_HASH` + `VISITOR_SALT`), sharing the `homepage_data` volume. The proxy routes `/admin` and `/api/admin` to `homepage-admin`. Publishing needs `src/config` writable in the admin container.
+- `docker-compose-example.yml` runs two containers from the image for one hostname: `homepage` (public, `APP_ROLE=public`, config/content mounted `:ro`, `NTFY_*`) and `homepage-admin` (`APP_ROLE=admin`, config/content writable, `ADMIN_PASSWORD_HASH`), sharing the `homepage_data` volume. Both merge the `x-preview-env` anchor (Discord, Steam, Overwatch, Twitch, Last.fm keys) so the admin preview has live data even when the admin container is opened on its own port; `HOST`/`VISITOR_SALT` are set per service. `NTFY_*` stays public-only (visitor posts go there). Compose can only `<<:`-merge into map-style `environment:`, so both services use `KEY: value`, not `- KEY=value`. The proxy routes `/admin` and `/api/admin` to `homepage-admin`. Publishing needs `src/config` writable in the admin container.
 - Traefik recommended as reverse proxy.
 - `.dockerignore` includes node_modules, .next, .env, visitors.db.

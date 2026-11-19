@@ -15,7 +15,11 @@
 #
 # The admin session cookie is scoped to those two prefixes, so the browser never sends
 # it to the public container. The preview's widgets, the WebSocket and all assets are
-# served by the public container, which is why only it needs the integration keys.
+# served by the public container, so with this proxy rule the admin container doesn't
+# strictly need the integration keys. Both get them anyway (x-preview-env below), so
+# the preview also has live data when the admin container is opened on its own port.
+# APP_ROLE=admin keeps the admin container from recording play history, which the
+# public container already does into the shared database.
 #
 # Always rebuild / recreate BOTH containers together: the admin pages load their
 # scripts (/_next/...) from the public container, so the two must run the same build.
@@ -25,10 +29,24 @@
 #
 # Variations:
 #   * No proxy path rule: publish the admin container on its own port instead
-#     (ports: ["127.0.0.1:3001:3000"]) and open http://localhost:3001/admin. Give it
-#     the integration keys too if you want live widget data in the preview.
+#     (ports: ["127.0.0.1:3001:3000"]) and open http://localhost:3001/admin.
 #   * One container: delete homepage-admin, remove APP_ROLE and the two ":ro" flags
 #     from homepage, and set ADMIN_PASSWORD_HASH there.
+#   * Admin preview without live data: drop "<<: *preview-env" from homepage-admin.
+
+# Keys the site's widgets read their data with. Shared so the admin panel's preview can
+# show the same live data as the real site.
+x-preview-env: &preview-env
+  DISCORD_SERVER_ID: ${DISCORD_SERVER_ID:-}
+  DISCORD_USER_ID: ${DISCORD_USER_ID:-}
+  DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+  STEAM_API_KEY: ${STEAM_API_KEY:-}
+  STEAM_ID: ${STEAM_ID:-}
+  OVERWATCH_BATTLE_TAG: ${OVERWATCH_BATTLE_TAG:-}
+  TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
+  TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
+  LASTFM_API_KEY: ${LASTFM_API_KEY:-}
+
 
 services:
   homepage:
@@ -42,24 +60,18 @@ services:
       - ./src/config:/app/src/config:ro
       - ./src/content:/app/src/content:ro
     environment:
-      - HOST=0.0.0.0
-      - APP_ROLE=public
-      - DISCORD_SERVER_ID=${DISCORD_SERVER_ID:-}
-      - DISCORD_USER_ID=${DISCORD_USER_ID:-}
-      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
-      - STEAM_API_KEY=${STEAM_API_KEY:-}
-      - STEAM_ID=${STEAM_ID:-}
-      - OVERWATCH_BATTLE_TAG=${OVERWATCH_BATTLE_TAG:-}
-      - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID:-}
-      - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET:-}
-      - LASTFM_API_KEY=${LASTFM_API_KEY:-}
-      # Optional ntfy notifications for new messages, comments and game suggestions (sent from this container).
-      - NTFY_URL=${NTFY_URL:-}
-      - NTFY_TOPIC=${NTFY_TOPIC:-}
-      - NTFY_TOKEN=${NTFY_TOKEN:-}
-      - NTFY_CLICK=${NTFY_CLICK:-}
-      - NTFY_EVENTS=${NTFY_EVENTS:-}
-      - VISITOR_SALT=${VISITOR_SALT:-}
+      <<: *preview-env
+      HOST: 0.0.0.0
+      APP_ROLE: public
+      # Must be the same in both containers so visitor ids hash the same way.
+      VISITOR_SALT: ${VISITOR_SALT:-}
+      # Optional ntfy notifications for new messages, comments and game suggestions.
+      # Only here: visitors' posts are handled by this container.
+      NTFY_URL: ${NTFY_URL:-}
+      NTFY_TOPIC: ${NTFY_TOPIC:-}
+      NTFY_TOKEN: ${NTFY_TOKEN:-}
+      NTFY_CLICK: ${NTFY_CLICK:-}
+      NTFY_EVENTS: ${NTFY_EVENTS:-}
     # labels:
     #   - traefik.enable=true
     #   - traefik.http.routers.homepage.rule=Host(`example.com`)
@@ -74,11 +86,14 @@ services:
       - ./src/config:/app/src/config
       - ./src/content:/app/src/content
     environment:
-      - HOST=0.0.0.0
+      <<: *preview-env
+      HOST: 0.0.0.0
+      # Admin panel on, play-history recorder off (the public container records).
+      APP_ROLE: admin
       # Generate with: docker compose run --rm homepage-admin node scripts/admin-hash.js
-      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:?set ADMIN_PASSWORD_HASH in .env}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:?set ADMIN_PASSWORD_HASH in .env}
       # Must be the same in both containers so visitor ids hash the same way.
-      - VISITOR_SALT=${VISITOR_SALT:-}
+      VISITOR_SALT: ${VISITOR_SALT:-}
     # labels:
     #   - traefik.enable=true
     #   - traefik.http.routers.homepage-admin.rule=Host(`example.com`) && (PathPrefix(`/admin`) || PathPrefix(`/api/admin`))
