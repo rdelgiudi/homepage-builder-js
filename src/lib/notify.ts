@@ -13,7 +13,8 @@ export const NOTIFY_KINDS = ["message", "comment", "suggestion"] as const;
 export type NotifyKind = (typeof NOTIFY_KINDS)[number];
 
 export interface Notice {
-  kind: NotifyKind;
+  /** "test" (from the admin panel's button) is sent whatever NTFY_EVENTS says. */
+  kind: NotifyKind | "test";
   title: string;
   message: string;
   tags: string[];
@@ -59,6 +60,15 @@ export function suggestionNotice(s: { title: string; name: string | null; note: 
   };
 }
 
+export function testNotice(siteName: string): Notice {
+  return {
+    kind: "test",
+    title: "Test notification",
+    message: `Notifications from ${siteName || "your homepage"} work.`,
+    tags: ["white_check_mark"],
+  };
+}
+
 /**
  * Which kinds are on. NTFY_EVENTS is a comma list of `message`, `comment`, `suggestion`;
  * unset or empty = all of them.
@@ -77,7 +87,7 @@ export function enabledKinds(env: NtfyEnv): Set<NotifyKind> {
 export function buildNtfyRequest(env: NtfyEnv, notice: Notice): NtfyRequest | null {
   const topic = env.NTFY_TOPIC?.trim();
   if (!topic || !TOPIC.test(topic)) return null;
-  if (!enabledKinds(env).has(notice.kind)) return null;
+  if (notice.kind !== "test" && !enabledKinds(env).has(notice.kind)) return null;
   let base: URL;
   try {
     base = new URL(env.NTFY_URL?.trim() || "https://ntfy.sh");

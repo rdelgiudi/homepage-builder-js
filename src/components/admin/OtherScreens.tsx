@@ -14,6 +14,8 @@ interface EnvRow {
   cells: Cell[];
   optional?: boolean;
   note?: string;
+  /** Set in both containers, to different values. */
+  mismatch?: boolean;
 }
 
 interface Integrations {
@@ -21,7 +23,7 @@ interface Integrations {
   columns: string[];
   publicReportedAt: number | null;
   widgets: { type: string; label: string; icon: string; env: EnvRow[] }[];
-  general: (EnvRow & { mismatch?: boolean })[];
+  general: EnvRow[];
   notifications: {
     where: string;
     reported: boolean;
@@ -61,7 +63,41 @@ function ColumnHead({ columns, first }: { columns: string[]; first?: string }) {
   );
 }
 
-function NotificationsCard({ n }: { n: Integrations["notifications"] }) {
+/**
+ * Two steps: a single-use ticket from the admin API, then the public route that sends it — that
+ * request goes to the container with the NTFY_* variables (the public one, behind the proxy).
+ */
+async function sendTestNotification(): Promise<string | null> {
+  const { ticket } = await api<{ ticket: string }>("notify-test", { method: "POST" });
+  const res = await fetch("/api/notify-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticket }), cache: "no-store" });
+  if (res.ok) return null;
+  const data = (await res.json().catch(() => ({}))) as { error?: unknown };
+  return typeof data.error === "string" ? data.error : `Request failed (${res.status})`;
+}
+
+function TestButton({ onDone }: { onDone: () => void }) {
+  const [state, setState] = useState<{ busy: boolean; ok?: boolean; text?: string }>({ busy: false });
+  const run = async () => {
+    setState({ busy: true });
+    try {
+      const error = await sendTestNotification();
+      setState(error ? { busy: false, ok: false, text: error } : { busy: false, ok: true, text: "Sent. Check your phone." });
+    } catch (err) {
+      setState({ busy: false, ok: false, text: (err as Error).message });
+    }
+    onDone();
+  };
+  return (
+    <div className="adm-test-row">
+      <button type="button" className="adm-btn is-small" onClick={run} disabled={state.busy}>
+        {state.busy ? "Sending…" : "Send test notification"}
+      </button>
+      {state.text && <span className={`adm-notice ${state.ok ? "" : "is-bad"}`}>{state.text}</span>}
+    </div>
+  );
+}
+
+function NotificationsCard({ n, onRefresh }: { n: Integrations["notifications"]; onRefresh: () => void }) {
   const topicSet = n.vars.some((v) => v.name === "NTFY_TOPIC" && v.cells[0] === true);
   return (
     <section className="adm-card">
@@ -93,6 +129,7 @@ function NotificationsCard({ n }: { n: Integrations["notifications"] }) {
       {topicSet && !n.valid && (
         <p className="adm-notice is-bad">NTFY_TOPIC or NTFY_URL is invalid, so nothing is sent. A topic may use letters, digits, - and _ (up to 64); the URL must start with http(s)://.</p>
       )}
+      <TestButton onDone={onRefresh} />
       {(n.lastSent || n.lastError) && (
         <p className="adm-hint">
           {n.lastSent ? `Last notification sent ${timeAgo(n.lastSent)}.` : "No notification has been sent successfully yet."}
@@ -111,11 +148,12 @@ function NotificationsCard({ n }: { n: Integrations["notifications"] }) {
 export function IntegrationsScreen() {
   const [data, setData] = useState<Integrations | null>(null);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
+  const load = () => {
     api<Integrations>("integrations")
       .then(setData)
       .catch((err) => setError((err as Error).message));
-  }, []);
+  };
+  useEffect(load, []);
   if (!data) return <div className="adm-center adm-muted">{error ?? "Checking…"}</div>;
   const split = data.columns.length > 1;
 
@@ -128,7 +166,7 @@ export function IntegrationsScreen() {
           {data.publicReportedAt
             ? `The public container's column is what it reported when it started, ${timeAgo(data.publicReportedAt)}. Restart it after changing its environment.`
             : "The public container hasn't reported its settings yet (it does when it starts). Run the current build in both containers and restart the public one."}{" "}
-          The admin container needs the widget keys only for live data in the preview.
+          The admin container needs the widget keys only for live data in the preview; values set in both are compared and must be the same.
         </p>
       )}
 
@@ -150,6 +188,7 @@ export function IntegrationsScreen() {
                   <td>
                     <code>{e.name}</code>
                     {e.note && <span className="adm-hint">{e.note}</span>}
+                    {e.mismatch && <span className="adm-notice is-bad">Different in the two containers. Use the same value in both, so the preview shows what the site shows.</span>}
                   </td>
                   {e.cells.map((c, j) => (
                     <td key={j} className="adm-cell-status">
@@ -178,7 +217,7 @@ export function IntegrationsScreen() {
         </table>
       </section>
 
-      <NotificationsCard n={data.notifications} />
+      <NotificationsCard n={data.notifications} onRefresh={load} />
 
       <section className="adm-card">
         <h2>Storage</h2>

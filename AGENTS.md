@@ -25,6 +25,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   │   ├── comments/route.ts    # Guestbook comments (SQLite, GET list + POST create; moderation-aware)
 │   │   │   ├── reactions/route.ts   # Anonymous emoji reactions (SQLite, GET counts + POST/DELETE, broadcasts to all clients)
 │   │   │   ├── poll/route.ts        # Poll results (GET) and voting (POST); SQLite poll_votes
+│   │   │   ├── notify-test/route.ts # POST { ticket } → sends a test ntfy notification (ticket from /api/admin/notify-test)
 │   │   │   ├── contact/route.ts     # Contact form POST → private `messages` row (rate limit, honeypot, block check)
 │   │   │   ├── game-suggestions/    # GET public top list, POST a suggestion (app id checked with Steam); search/ = rate-limited Steam store search
 │   │   │   ├── presence/route.ts    # Snapshot of current Discord presence (force-dynamic; reads in-memory server state)
@@ -42,7 +43,8 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   │       ├── comments/        # GET list by status, POST bulk; [id] PATCH/DELETE; settings PUT
 │   │   │       ├── messages/        # Inbox: GET list (unread/all, ?counts=1), POST bulk; [id] PATCH (read, blockAuthor)/DELETE
 │   │   │       ├── suggestions/     # Game suggestions grouped by game: GET (new/all, ?counts=1), POST game action (read/unread/status/delete); [id] PATCH blockAuthor/DELETE
-│   │   │       └── integrations/    # Which env vars are set, what is writable
+│   │   │       ├── notify-test/     # POST: single-use ticket for /api/notify-test
+│   │   │       └── integrations/    # Which env vars are set (per container), shared-value mismatches, ntfy status, what is writable
 │   │   ├── admin/
 │   │   │   ├── layout.tsx           # Guard only: notFound() when admin is disabled
 │   │   │   ├── (panel)/             # The panel's own chrome
@@ -122,7 +124,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   ├── comments.ts              # comments table + moderation columns, moderation settings, initialStatus()
 │   │   ├── messages.ts              # messages table (contact form), cleanText() (keeps newlines), isEmail(), messageCounts()
 │   │   ├── notify.ts                # ntfy notices + buildNtfyRequest()/ntfyEnvSummary() — pure, unit-tested
-│   │   ├── notify-admin.ts          # notifyAdmin(): sends (fire-and-forget, 30/10 min cap), stores last result in admin_state
+│   │   ├── notify-admin.ts          # sendNotice()/notifyAdmin() (30/10 min cap, last result in admin_state), test-notification tickets
 │   │   ├── env-report.ts            # Per-instance "which env vars are set" record in admin_state (written at startup), read by the Integrations screen
 │   │   ├── url.ts                   # httpUrl() — pure, client-safe (re-exported by widget-data.ts)
 │   │   ├── reactions.ts             # DEFAULT_EMOJIS constant shared by API + widget
@@ -426,8 +428,8 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - Admin: the **Suggestions** screen groups by game; status, read/unread and delete act on the game, block/delete on one suggestion. Its nav badge is polled every 30 s with the comments/inbox badges. Deletes and blocks are audited (`suggestion.*`).
 
 ### Integrations screen across two containers (`env-report.ts`)
-- Each instance writes `admin_state` key `env.report.<role>` (`public` / `admin` / `all`) at startup from `src/instrumentation.ts` (Next's `register()` hook — it runs under the custom server too, covered by `tests/integration/integrations.test.ts`): a boolean per known env var, `ntfyEnvSummary()`, and a 12-hex hash of `VISITOR_SALT`. **Never values.**
-- `/api/admin/integrations` on an `APP_ROLE=admin` instance shows two columns: Public (from that report, so it's as of the public container's last start) and Admin (live). Widget keys (`requiresEnv` + `optionalEnv`) and `VISITOR_SALT` are checked in both (salt hashes compared → "different in the two containers"); `ADMIN_PASSWORD_HASH` only in Admin; `NTFY_*` once, in whichever instance sends (Public when split). Single container (`all`) = one column from its own env.
+- Each instance writes `admin_state` key `env.report.<role>` (`public` / `admin` / `all`) at startup from `src/instrumentation.ts` (Next's `register()` hook — it runs under the custom server too, covered by `tests/integration/integrations.test.ts`): a boolean per known env var, `ntfyEnvSummary()`, and `fingerprints` for the shared vars (`sharedEnvNames()` = widget keys + `VISITOR_SALT`): HMAC-SHA256 (16 hex) keyed with a random secret created once in `admin_state` (`env.fingerprintKey`, `INSERT OR IGNORE` so two containers starting together agree). Keyed because plain hashes of short ids (Steam id, battle tag) could be reversed by guessing. **Never values; fingerprints never leave the server** — the route returns only a `mismatch` boolean.
+- `/api/admin/integrations` on an `APP_ROLE=admin` instance shows two columns: Public (from that report, so it's as of the public container's last start) and Admin (live). Widget keys (`requiresEnv` + `optionalEnv`) and `VISITOR_SALT` are checked in both, and when set in both their fingerprints are compared ("different in the two containers"); `ADMIN_PASSWORD_HASH` only in Admin; `NTFY_*` once, in whichever instance sends (Public when split). Single container (`all`) = one column from its own env.
 - `optionalEnv: [{ name, note }]` on a widget meta lists keys that add something but aren't required (music → `LASTFM_API_KEY`, play-with-me → Discord/Steam); shown neutral, not red, when unset. A new env var a widget reads belongs in `requiresEnv` or `optionalEnv`, or the screen won't list it.
 
 ### Admin notifications (ntfy)
@@ -437,6 +439,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - A process-wide cap of 30 pushes per 10 min across all kinds, because the guestbook has no global rate limit (a fresh cookie is a fresh visitor). Over the cap, pushes are dropped and logged once.
 - Env-only (`NTFY_TOPIC`, `NTFY_URL`, `NTFY_TOKEN`, `NTFY_CLICK`, `NTFY_EVENTS`), not `homepage.json`: the topic is effectively a secret on public ntfy.sh, and `homepage.json` sections are serialized into the page.
 - The last send result (`lastSent` / `lastError`) is stored in `admin_state` (`notify.status`), so the Integrations screen shows it whichever container sent.
+- **Test button** (Integrations → Notifications): the admin container may lack `NTFY_*` and the public one can't see the admin session, so the panel gets a single-use ticket from `POST /api/admin/notify-test` (random, stored hashed in `admin_state` `notify.testTicket`, 60 s, one at a time) and posts it to the **public** route `POST /api/notify-test`, which the proxy sends to the public container. That route consumes the ticket, sends a fixed `testNotice` (ignores `NTFY_EVENTS`, counts toward the cap) and waits for ntfy's answer (`sendNotice`), so the panel shows a real error. This is the one admin-triggered action outside `/admin`/`/api/admin` — it needs no session, only the ticket, and can only send that fixed text. With the admin container opened on its own port, the request reaches the admin container, which answers 409 if it has no `NTFY_TOPIC`.
 - Integration tests blank all `NTFY_*` vars so a developer's `.env` can't push from test runs.
 
 ### Social links (`socials`, `profile`)

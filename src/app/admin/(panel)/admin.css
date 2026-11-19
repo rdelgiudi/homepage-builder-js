@@ -973,6 +973,16 @@ textarea.adm-input {
   white-space: nowrap;
   width: 1%;
 }
+.adm-test-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+.adm-test-row .adm-notice {
+  margin: 0;
+}
 .adm-table td .adm-notice {
   display: block;
   margin-top: 4px;

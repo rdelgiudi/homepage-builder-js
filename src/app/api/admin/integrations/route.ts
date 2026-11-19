@@ -27,7 +27,8 @@ const NTFY_NOTES: Record<string, { note: string; optional?: boolean }> = {
  * In the two-container setup (this instance is APP_ROLE=admin) there are two columns: the
  * public container's answers come from the report it stored in the shared database at startup
  * (lib/env-report.ts), the admin column is this process. Keys the preview needs are checked in
- * both; NTFY_* only where notifications are sent (public), ADMIN_PASSWORD_HASH only here.
+ * both and compared by keyed hash (`mismatch` = set in both, different values); NTFY_* only
+ * where notifications are sent (public), ADMIN_PASSWORD_HASH only here.
  */
 export const GET = withAdmin(async () => {
   const role = instanceRole();
@@ -38,6 +39,12 @@ export const GET = withAdmin(async () => {
 
   const inPublic = (name: string): Cell => (pub ? !!pub.vars[name] : null);
   const both = (name: string): Cell[] => (split ? [inPublic(name), here.vars[name]] : [here.vars[name]]);
+  /** Set in both containers, to different values (compared by keyed hash; reports from older builds have none). */
+  const differs = (name: string) => {
+    const a = pub?.fingerprints?.[name];
+    const b = here.fingerprints[name];
+    return split && !!a && !!b && a !== b;
+  };
 
   // Notifications: one check, on whichever instance sends them.
   const sender = split ? pub : here;
@@ -54,8 +61,8 @@ export const GET = withAdmin(async () => {
         label: m.label,
         icon: m.icon,
         env: [
-          ...(m.requiresEnv ?? []).map((name) => ({ name, cells: both(name) })),
-          ...(m.optionalEnv ?? []).map((e) => ({ name: e.name, optional: true, note: e.note, cells: both(e.name) })),
+          ...(m.requiresEnv ?? []).map((name) => ({ name, cells: both(name), mismatch: differs(name) })),
+          ...(m.optionalEnv ?? []).map((e) => ({ name: e.name, optional: true, note: e.note, cells: both(e.name), mismatch: differs(e.name) })),
         ],
       })),
     general: [
@@ -64,7 +71,7 @@ export const GET = withAdmin(async () => {
         note: "Without it, visitor ids are hashed with a public default salt.",
         cells: both("VISITOR_SALT"),
         // Same comments, votes and blocks only work when both hash visitors the same way.
-        mismatch: split && !!pub && pub.saltCheck !== here.saltCheck,
+        mismatch: differs("VISITOR_SALT"),
       },
       {
         name: "ADMIN_PASSWORD_HASH",
