@@ -100,6 +100,17 @@ export const LayoutSchema = z.object({
    * stacked on one scrolling page · `bento` wide page, widgets in a grid · `linkinbio` narrow column.
    */
   site: z.enum(SITE_LAYOUTS).default("tabs").meta({ title: "Site layout" }),
+  bentoColumns: z
+    .number()
+    .int()
+    .min(2)
+    .max(4)
+    .default(2)
+    .meta({ title: "Widgets per row", description: "For widgets without a width of their own. Each tab's widgets can still be made wider or narrower", showIf: { site: ["bento"] } }),
+  sectionHeadings: z
+    .boolean()
+    .default(true)
+    .meta({ title: "Tab names as section headings", description: "Each section starts with its tab's icon and name. Off = only the jump bar names them", showIf: { site: ["onepage"] } }),
 });
 
 export const CountersSchema = z.object({

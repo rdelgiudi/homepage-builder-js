@@ -976,6 +976,12 @@ textarea.adm-input {
 .adm-span-hint {
   margin-top: 14px;
 }
+.adm-layout-note {
+  padding: 8px 10px;
+  border-left: 3px solid var(--a-accent);
+  border-radius: 0 6px 6px 0;
+  background: var(--a-raised);
+}
 .adm-row {
   display: flex;
   align-items: center;

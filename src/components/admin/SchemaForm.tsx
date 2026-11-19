@@ -29,16 +29,18 @@ interface FormProps {
   schema: JsonSchema;
   value: Obj;
   onChange: (value: Obj) => void;
+  /** Top-level keys not to render here (e.g. ones the site layout ignores, or edited by a custom control). Values are kept. */
+  hide?: string[];
 }
 
 /** Renders a control for every property of an object schema. */
-export default function SchemaForm({ schema, value, onChange }: FormProps) {
+export default function SchemaForm({ schema, value, onChange, hide }: FormProps) {
   const props = schema.properties ?? {};
   const required = new Set(schema.required ?? []);
   return (
     <div className="adm-form">
       {Object.entries(props).map(([key, node]) => {
-        if (HIDDEN_KEYS.has(key) || node.const !== undefined) return null;
+        if (HIDDEN_KEYS.has(key) || hide?.includes(key) || node.const !== undefined) return null;
         // `showIf`: only relevant for certain values of a sibling (falling back to its default).
         const hidden = Object.entries(node.showIf ?? {}).some(([sibling, allowed]) => !allowed.includes(value?.[sibling] ?? props[sibling]?.default));
         if (hidden) return null;

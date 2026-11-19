@@ -124,12 +124,17 @@ main, header, footer, section, article, aside, div {
 
 /* Grid tab layout: 12 columns from md up, one column below. Each cell's width is its
    section's `span`, passed as --span (inline styles can't be responsive, a variable can). */
+/* 12 columns once the tab's own column is wide enough (container query), whatever the
+   window's width: the sidebar's content column or a narrow layout stays one widget per row. */
+.section-grid-wrap {
+  container-type: inline-size;
+}
 .section-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
-@media (min-width: 768px) {
+@container (min-width: 640px) {
   .section-grid {
     grid-template-columns: repeat(12, minmax(0, 1fr));
   }
@@ -683,3 +688,16 @@ html.dark.custom-scrollbar * {
     display: inline;
   }
 }
+
+/* ===== One page jump bar =====
+   Scrolls sideways on phones; a fade at an end means more buttons beyond it (OnePage sets
+   --fade-l / --fade-r from the scroll position). No scrollbar: it would cover the underline. */
+.jump-bar {
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade-r, 0px)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade-r, 0px)), transparent 100%);
+}
+.jump-bar::-webkit-scrollbar {
+  display: none;
+}
+

@@ -28,9 +28,9 @@ function RootForm({ schema }: { schema: JsonSchema }) {
 }
 
 /** A form over one nested object of the config. */
-function KeyForm({ name, schema }: { name: "layout" | "counters" | "background" | "effects"; schema: JsonSchema }) {
+function KeyForm({ name, schema, hide }: { name: "layout" | "counters" | "background" | "effects"; schema: JsonSchema; hide?: string[] }) {
   const { config, update } = useAdmin();
-  return <SchemaForm schema={schema} value={config[name] as Obj} onChange={(v) => update((c) => ({ ...c, [name]: v }))} />;
+  return <SchemaForm schema={schema} value={config[name] as Obj} hide={hide} onChange={(v) => update((c) => ({ ...c, [name]: v }))} />;
 }
 
 export function SiteScreen() {
@@ -44,6 +44,8 @@ export function SiteScreen() {
       </Block>
       <Block title="Layout">
         <LayoutPicker />
+        {/* The layout's own options (bento: widgets per row, one page: section headings); `site` is the picker above. */}
+        <KeyForm name="layout" schema={formSchemas.layout} hide={["site"]} />
       </Block>
       <Block title="Counters">
         <KeyForm name="counters" schema={formSchemas.counters} />

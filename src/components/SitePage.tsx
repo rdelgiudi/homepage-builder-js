@@ -11,6 +11,7 @@ import BackgroundLayer from "@/components/BackgroundLayer";
 import { slugify } from "@/lib/schema/migrate";
 import OnePage from "@/components/OnePage";
 import type { WidgetContext } from "@/widgets/types";
+import { LAYOUT_FEATURES, gridOptions } from "@/lib/layouts";
 
 function TabsFallback() {
   return (
@@ -106,8 +107,9 @@ export default function SitePage({ config, preview }: { config: HomepageConfig; 
 
   const site = config.layout.site;
   const width = PAGE_WIDTH[site];
-  // Bento lays every tab out as a grid, two widgets per row unless a widget says otherwise.
-  const grid = site === "bento" ? { force: true, defaultSpan: 6 } : undefined;
+  // What the layout does with each tab's own settings (forced grid / stack, default width): lib/layouts.ts.
+  const grid = gridOptions(config.layout);
+  const features = LAYOUT_FEATURES[site];
 
   const widgetContext: WidgetContext = {
     gradientBorders: effects.gradientBorders,
@@ -123,10 +125,10 @@ export default function SitePage({ config, preview }: { config: HomepageConfig; 
 
   return (
     // The one-page layout shows every tab at once, so there is no "open tab" background to follow.
-    <SiteShell config={config} preview={preview} width={width} hideHeaderFromMd={site === "sidebar"} tabBackgrounds={site !== "onepage"}>
+    <SiteShell config={config} preview={preview} width={width} hideHeaderFromMd={site === "sidebar"} tabBackgrounds={features.tabBackground}>
       <Suspense fallback={<TabsFallback />}>
         {site === "onepage" ? (
-          <OnePage tabs={tabs} widgetContext={widgetContext} widthClass={width} grid={grid} />
+          <OnePage tabs={tabs} widgetContext={widgetContext} widthClass={width} grid={grid} headings={config.layout.sectionHeadings} />
         ) : (
           <Tabs
             tabs={tabs}
@@ -135,7 +137,7 @@ export default function SitePage({ config, preview }: { config: HomepageConfig; 
             widthClass={width}
             nav={site === "sidebar" ? "side" : "top"}
             sideHeader={site === "sidebar" ? <SiteHeader {...header} variant="side" /> : undefined}
-            hideNavIfSingle={site === "linkinbio"}
+            hideNavIfSingle={features.tabNav === "multiple"}
             grid={grid}
           />
         )}

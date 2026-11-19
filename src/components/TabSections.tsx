@@ -4,26 +4,27 @@ import type { CSSProperties } from "react";
 import type { Tab } from "@/lib/schema/config";
 import { renderSection } from "@/widgets/registry";
 import type { WidgetContext } from "@/widgets/types";
+import { isGridTab, type GridOptions } from "@/lib/layouts";
 
-export interface GridOptions {
-  /** Use the grid even when the tab itself is set to `stack` (the bento site layout). */
-  force: boolean;
-  /** Width of a widget that has no `span` of its own. */
-  defaultSpan: number;
-}
+export type { GridOptions };
 
 interface TabSectionsProps {
   tab: Tab;
   widgetContext: WidgetContext;
   /** Staggered fade-in for each section. */
   animate?: boolean;
+  /** From the site layout (`gridOptions()` in lib/layouts.ts); unset = the tab's own setting. */
   grid?: GridOptions;
 }
 
-/** One tab's widgets, arranged as a stack or a 12-column grid. Shared by every site layout. */
+/**
+ * One tab's widgets, arranged as a stack or a 12-column grid. Shared by every site layout.
+ * The grid goes to 12 columns by the width of its own column (container query on
+ * `.section-grid-wrap`), not the window's, so narrow page columns stay one widget per row.
+ */
 export default function TabSections({ tab, widgetContext, animate, grid }: TabSectionsProps) {
-  const isGrid = tab.layout === "grid" || !!grid?.force;
-  return (
+  const isGrid = isGridTab(grid ?? { arrange: "choice", defaultSpan: 12 }, tab);
+  const stack = (
     <div className={isGrid ? "section-grid gap-6 md:gap-8" : "space-y-6 md:space-y-8"}>
       {tab.sections.map((section, index) => (
         <div
@@ -39,4 +40,5 @@ export default function TabSections({ tab, widgetContext, animate, grid }: TabSe
       ))}
     </div>
   );
+  return isGrid ? <div className="section-grid-wrap">{stack}</div> : stack;
 }

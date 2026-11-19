@@ -29,6 +29,7 @@ import { useAdmin } from "./store";
 import { RowEditor, SpanControl } from "./LayoutControls";
 import { WidgetIcon } from "@/widgets/BrandIcon";
 import { COLUMNS, fitRow, packRows, placeInGrid, removeFromGrid, rowIds, setRowSpans, spanOf, splitRow, type DropTarget, type PlaceResult } from "./grid-layout";
+import { gridOptions, ignoredTabSettings, isGridTab as isGridTabIn } from "@/lib/layouts";
 
 /** A row is selected through any of its widgets' ids (rows have no id of their own). */
 type Selection = { kind: "tab" | "section" | "row"; id: string } | null;
@@ -261,16 +262,18 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
 
   const tab = config.tabs.find((t) => t.id === tabId) ?? config.tabs[0] ?? null;
   const selectedSection = selection?.kind === "section" ? tab?.sections.find((s) => s.id === selection.id) ?? null : null;
-  // Widths matter where widgets can sit side by side: grid tabs, and every tab in the bento layout.
-  const bento = config.layout.site === "bento";
-  const gridActive = bento || tab?.layout === "grid";
-  const defaultSpan = bento ? 6 : 12;
+  // Widths matter where widgets can sit side by side. Which tabs that is depends on the site
+  // layout (bento: all, link in bio: none, otherwise the tab's own setting): lib/layouts.ts.
+  const layoutGrid = gridOptions(config.layout);
+  const isGridTab = (t: Tab) => isGridTabIn(layoutGrid, t);
+  const gridActive = !!tab && isGridTab(tab);
+  const defaultSpan = layoutGrid.defaultSpan;
   const gridView = gridActive && !listView;
-  const isGridTab = (t: Tab) => bento || t.layout === "grid";
   /** Takes a section out of a tab; in a grid the rest of its row widens to fill it. */
   const without = (t: Tab, id: string) => (isGridTab(t) ? removeFromGrid(t.sections, id, defaultSpan) : t.sections.filter((s) => s.id !== id));
 
   const selectedTab = selection?.kind === "tab" ? config.tabs.find((t) => t.id === selection.id) ?? null : null;
+  const tabIgnored = ignoredTabSettings(config.layout, config.tabs.length);
 
   const sensors = useSensors(
     // A small distance threshold keeps a plain click a click.
@@ -651,8 +654,15 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
           <SchemaForm
             schema={formSchemas.tab}
             value={selectedTab as unknown as Obj}
+            // Settings the site layout ignores are hidden (their values stay) and explained below.
+            hide={tabIgnored.flatMap((x) => (x.key ? [x.key] : []))}
             onChange={(v) => update((c) => mapTab(c, selectedTab.id, (t) => ({ ...(v as unknown as Tab), sections: t.sections })))}
           />
+          {tabIgnored.map((x) => (
+            <p key={x.note} className="adm-hint adm-layout-note">
+              {x.note}
+            </p>
+          ))}
           <div className="adm-actions">
             <button type="button" className="adm-btn is-danger" onClick={() => removeTab(selectedTab)}>
               Delete tab
@@ -709,8 +719,14 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
           />
           {!gridActive && (
             <p className="adm-hint adm-span-hint">
-              Widths apply where widgets can sit side by side. To set this widget&apos;s width, select the tab &ldquo;{tab.label}&rdquo; and set{" "}
-              <strong>Arrange widgets</strong> to <strong>Grid</strong> (or pick the Bento layout on the Site screen).
+              {layoutGrid.arrange === "stack" ? (
+                <>The Link in bio layout shows every widget at full width, so there is no width to set here.</>
+              ) : (
+                <>
+                  Widths apply where widgets can sit side by side. To set this widget&apos;s width, select the tab &ldquo;{tab.label}&rdquo; and set{" "}
+                  <strong>Arrange widgets</strong> to <strong>Grid</strong> (or pick the Bento layout on the Site screen).
+                </>
+              )}
             </p>
           )}
           {gridActive && rowIds(tab.sections, selectedSection.id, defaultSpan).length > 1 && rowEditor(rowIds(tab.sections, selectedSection.id, defaultSpan), selectedSection.id)}
