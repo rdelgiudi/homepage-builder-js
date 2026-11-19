@@ -6,14 +6,107 @@ import { api, timeAgo } from "./api";
 import { useAdmin } from "./store";
 import { WidgetIcon } from "@/widgets/BrandIcon";
 
+/** true / false = set or not; null = that container hasn't reported yet; "na" = not needed there. */
+type Cell = boolean | null | "na";
+
+interface EnvRow {
+  name: string;
+  cells: Cell[];
+  optional?: boolean;
+  note?: string;
+}
+
 interface Integrations {
-  widgets: { type: string; label: string; icon: string; env: { name: string; set: boolean }[] }[];
-  general: { name: string; set: boolean; note: string }[];
-  storage: { label: string; path: string; writable: boolean }[];
   role: string;
+  columns: string[];
+  publicReportedAt: number | null;
+  widgets: { type: string; label: string; icon: string; env: EnvRow[] }[];
+  general: (EnvRow & { mismatch?: boolean })[];
+  notifications: {
+    where: string;
+    reported: boolean;
+    valid: boolean;
+    events: string[];
+    vars: EnvRow[];
+    lastSent: number | null;
+    lastError: { at: number; text: string } | null;
+  };
+  storage: { label: string; path: string; writable: boolean }[];
 }
 
 const Status = ({ ok, yes, no }: { ok: boolean; yes: string; no: string }) => <span className={`adm-tag ${ok ? "is-live" : "is-bad"}`}>{ok ? yes : no}</span>;
+
+/** Required: green / red. Optional: green / neutral, since leaving it out is fine. */
+function EnvCell({ cell, optional }: { cell: Cell; optional?: boolean }) {
+  if (cell === "na") return <span className="adm-muted">—</span>;
+  if (cell === null) return <span className="adm-tag" title="This container hasn't reported its settings yet">Unknown</span>;
+  if (optional && !cell) return <span className="adm-tag">Not set</span>;
+  return <Status ok={cell} yes="Set" no="Not set" />;
+}
+
+const EVENT_LABELS: Record<string, string> = { message: "contact messages", comment: "comments", suggestion: "game suggestions" };
+
+function ColumnHead({ columns, first }: { columns: string[]; first?: string }) {
+  if (columns.length < 2) return null;
+  return (
+    <thead>
+      <tr>
+        <th>{first}</th>
+        <th />
+        {columns.map((c) => (
+          <th key={c}>{c}</th>
+        ))}
+      </tr>
+    </thead>
+  );
+}
+
+function NotificationsCard({ n }: { n: Integrations["notifications"] }) {
+  const topicSet = n.vars.some((v) => v.name === "NTFY_TOPIC" && v.cells[0] === true);
+  return (
+    <section className="adm-card">
+      <h2>Notifications (ntfy)</h2>
+      <p className="adm-hint">
+        {!n.reported
+          ? "The public container sends them, and it hasn't reported its settings yet. It does that when it starts: run the current build in both containers and restart the public one."
+          : topicSet && n.valid
+            ? `${n.where === "Public" ? "The public container sends" : "Sends"} a push for new ${n.events.map((e) => EVENT_LABELS[e] ?? e).join(", ") || "nothing (NTFY_EVENTS matches no event)"}.`
+            : `Off${n.where === "Public" ? " in the public container, which is the one that sends them" : ""}.`}
+      </p>
+      {n.reported && (
+        <table className="adm-table">
+          <tbody>
+            {n.vars.map((v) => (
+              <tr key={v.name}>
+                <td>
+                  <code>{v.name}</code>
+                  {v.note && <span className="adm-hint">{v.note}</span>}
+                </td>
+                <td className="adm-cell-status">
+                  <EnvCell cell={v.cells[0]} optional={v.optional} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {topicSet && !n.valid && (
+        <p className="adm-notice is-bad">NTFY_TOPIC or NTFY_URL is invalid, so nothing is sent. A topic may use letters, digits, - and _ (up to 64); the URL must start with http(s)://.</p>
+      )}
+      {(n.lastSent || n.lastError) && (
+        <p className="adm-hint">
+          {n.lastSent ? `Last notification sent ${timeAgo(n.lastSent)}.` : "No notification has been sent successfully yet."}
+          {n.lastError && (!n.lastSent || n.lastError.at > n.lastSent) && (
+            <span className="adm-notice is-bad">
+              {" "}
+              Last attempt failed {timeAgo(n.lastError.at)}: {n.lastError.text}
+            </span>
+          )}
+        </p>
+      )}
+    </section>
+  );
+}
 
 export function IntegrationsScreen() {
   const [data, setData] = useState<Integrations | null>(null);
@@ -24,15 +117,25 @@ export function IntegrationsScreen() {
       .catch((err) => setError((err as Error).message));
   }, []);
   if (!data) return <div className="adm-center adm-muted">{error ?? "Checking…"}</div>;
+  const split = data.columns.length > 1;
 
   return (
     <div className="adm-page">
       <h1>Integrations</h1>
       <p className="adm-lede">Keys and ids are set as environment variables on the server, never here. This page only shows whether each one is present.</p>
+      {split && (
+        <p className="adm-hint">
+          {data.publicReportedAt
+            ? `The public container's column is what it reported when it started, ${timeAgo(data.publicReportedAt)}. Restart it after changing its environment.`
+            : "The public container hasn't reported its settings yet (it does when it starts). Run the current build in both containers and restart the public one."}{" "}
+          The admin container needs the widget keys only for live data in the preview.
+        </p>
+      )}
 
       <section className="adm-card">
         <h2>Widgets that need setup</h2>
         <table className="adm-table">
+          <ColumnHead columns={data.columns} />
           <tbody>
             {data.widgets.flatMap((w) =>
               w.env.map((e, i) => (
@@ -46,10 +149,13 @@ export function IntegrationsScreen() {
                   </td>
                   <td>
                     <code>{e.name}</code>
+                    {e.note && <span className="adm-hint">{e.note}</span>}
                   </td>
-                  <td>
-                    <Status ok={e.set} yes="Set" no="Not set" />
-                  </td>
+                  {e.cells.map((c, j) => (
+                    <td key={j} className="adm-cell-status">
+                      <EnvCell cell={c} optional={e.optional} />
+                    </td>
+                  ))}
                 </tr>
               ))
             )}
@@ -58,16 +164,21 @@ export function IntegrationsScreen() {
                 <td>General</td>
                 <td>
                   <code>{e.name}</code>
-                  {!e.set && <span className="adm-hint">{e.note}</span>}
+                  {e.cells.some((c) => c === false) && <span className="adm-hint">{e.note}</span>}
+                  {e.mismatch && <span className="adm-notice is-bad">Different in the two containers: visitors get different ids in each, so blocks and own-comment checks don&apos;t line up.</span>}
                 </td>
-                <td>
-                  <Status ok={e.set} yes="Set" no="Not set" />
-                </td>
+                {e.cells.map((c, j) => (
+                  <td key={j} className="adm-cell-status">
+                    <EnvCell cell={c} />
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
         </table>
       </section>
+
+      <NotificationsCard n={data.notifications} />
 
       <section className="adm-card">
         <h2>Storage</h2>

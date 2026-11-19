@@ -3,7 +3,8 @@ import { COOKIE_NAME, COOKIE_MAX_AGE, generateVisitorId, hashVisitorId, getVisit
 import { isBlocked } from "@/lib/admin/store";
 import { BODY_MAX, cleanText, EMAIL_MAX, isEmail, messagesDb, NAME_MAX } from "@/lib/messages";
 import { findSection, WidgetError } from "@/lib/widget-data";
-import { messageNotice, notifyAdmin } from "@/lib/notify";
+import { messageNotice } from "@/lib/notify";
+import { notifyAdmin } from "@/lib/notify-admin";
 
 export const dynamic = "force-dynamic";
 

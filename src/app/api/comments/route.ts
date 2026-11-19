@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { COOKIE_NAME, COOKIE_MAX_AGE, generateVisitorId, hashVisitorId, getVisitorIdFromCookie } from "@/lib/visitor";
 import { isBlocked } from "@/lib/admin/store";
 import { BODY_MAX, NAME_MAX, commentsDb, initialStatus, sanitize } from "@/lib/comments";
-import { commentNotice, notifyAdmin } from "@/lib/notify";
+import { commentNotice } from "@/lib/notify";
+import { notifyAdmin } from "@/lib/notify-admin";
 
 export const dynamic = "force-dynamic";
 

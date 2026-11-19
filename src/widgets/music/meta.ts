@@ -21,5 +21,6 @@ export const meta = {
   category: "media",
   description: "Your latest tracks from ListenBrainz or Last.fm",
   schema,
+  optionalEnv: [{ name: "LASTFM_API_KEY", note: "Only for the Last.fm service; ListenBrainz needs nothing." }],
   defaults: { service: "listenbrainz", username: "", limit: 5, showCovers: true },
 } satisfies WidgetMeta;

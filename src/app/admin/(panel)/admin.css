@@ -957,6 +957,26 @@ textarea.adm-input {
 .adm-table code {
   word-break: break-all;
 }
+.adm-table th {
+  padding: 0 8px 6px 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--a-muted);
+  text-align: right;
+}
+.adm-table th:last-child {
+  padding-right: 0;
+}
+/* Status cells (one per container in the two-container setup). */
+.adm-table td.adm-cell-status {
+  text-align: right;
+  white-space: nowrap;
+  width: 1%;
+}
+.adm-table td .adm-notice {
+  display: block;
+  margin-top: 4px;
+}
 
 /* ---------- comments ---------- */
 

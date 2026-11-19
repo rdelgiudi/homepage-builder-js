@@ -1,5 +1,6 @@
 /**
- * Optional push notifications to the site owner via ntfy (https://ntfy.sh or a self-hosted server)
+ * Pure part of the optional push notifications (no database, unit-tested); sending lives in
+ * notify-admin.ts. Optional push notifications to the site owner via ntfy (https://ntfy.sh or a self-hosted server)
  * for new contact messages, guestbook comments and game suggestions.
  * Off unless NTFY_TOPIC is set. Sent by whichever process handles the visitor's request — in the
  * two-container setup that is the public one, so the NTFY_* variables belong there.
@@ -26,11 +27,7 @@ export interface NtfyRequest {
 
 const PREVIEW_MAX = 400;
 const TOPIC = /^[A-Za-z0-9_-]{1,64}$/;
-/** At most this many pushes per window from all kinds together; the comment route has no global cap of its own. */
-const PUSH_LIMIT = 30;
-const PUSH_WINDOW_MS = 10 * 60 * 1000;
 
-const log = (...args: unknown[]) => console.error(`[${new Date().toISOString()}] [Notify]`, ...args);
 
 const preview = (text: string) => (text.length > PREVIEW_MAX ? `${text.slice(0, PREVIEW_MAX).trimEnd()}…` : text);
 
@@ -101,41 +98,14 @@ export function buildNtfyRequest(env: NtfyEnv, notice: Notice): NtfyRequest | nu
   return { url: base.toString(), headers, body: JSON.stringify(payload) };
 }
 
-let warnedInvalid = false;
-let warnedLimit = false;
-let sent: number[] = [];
+export const NTFY_VARS = ["NTFY_TOPIC", "NTFY_URL", "NTFY_TOKEN", "NTFY_CLICK", "NTFY_EVENTS"] as const;
 
-/** Fire and forget: never throws, never delays the caller beyond starting the request. */
-export function notifyAdmin(notice: Notice): void {
-  try {
-    if (!process.env.NTFY_TOPIC?.trim()) return;
-    const req = buildNtfyRequest(process.env, notice);
-    if (!req) {
-      if (!enabledKinds(process.env).has(notice.kind)) return;
-      if (!warnedInvalid) {
-        warnedInvalid = true;
-        log("NTFY_TOPIC or NTFY_URL is invalid; notifications are off.");
-      }
-      return;
-    }
-    const now = Date.now();
-    sent = sent.filter((t) => now - t < PUSH_WINDOW_MS);
-    if (sent.length >= PUSH_LIMIT) {
-      if (!warnedLimit) {
-        warnedLimit = true;
-        log(`More than ${PUSH_LIMIT} notifications in ${PUSH_WINDOW_MS / 60000} minutes; skipping until it calms down.`);
-      }
-      return;
-    }
-    warnedLimit = false;
-    sent.push(now);
-    fetch(req.url, { method: "POST", headers: req.headers, body: req.body, signal: AbortSignal.timeout(5000) })
-      .then(async (res) => {
-        if (!res.ok) log(`ntfy answered ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
-        else await res.body?.cancel();
-      })
-      .catch((err) => log("Could not reach ntfy:", err instanceof Error ? err.message : err));
-  } catch (err) {
-    log("Error:", err);
-  }
+/** Which NTFY_* variables are set (never their values) and whether they add up to a working setup. */
+export function ntfyEnvSummary(env: NtfyEnv) {
+  const probe = buildNtfyRequest({ ...env, NTFY_EVENTS: "" }, { kind: "message", title: "", message: "", tags: [] });
+  return {
+    vars: Object.fromEntries(NTFY_VARS.map((name) => [name, !!env[name]?.trim()])) as Record<(typeof NTFY_VARS)[number], boolean>,
+    valid: probe !== null,
+    events: [...enabledKinds(env)],
+  };
 }

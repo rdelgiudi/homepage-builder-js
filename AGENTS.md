@@ -99,6 +99,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │       ├── OtherScreens.tsx     # Integrations, History
 │   │       ├── LoginForm.tsx
 │   │       └── api.ts               # fetch helper for /api/admin/*
+│   ├── instrumentation.ts           # Next startup hook: recordEnvReport()
 │   ├── config/
 │   │   ├── homepage.json            # ALL site config (gitignored — copy from the example)
 │   │   └── homepage.example.json
@@ -120,7 +121,9 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   ├── visitor.ts               # visitor_id cookie + hashing helpers (shared by visitors/comments/reactions/poll)
 │   │   ├── comments.ts              # comments table + moderation columns, moderation settings, initialStatus()
 │   │   ├── messages.ts              # messages table (contact form), cleanText() (keeps newlines), isEmail(), messageCounts()
-│   │   ├── notify.ts                # Optional ntfy pushes (messages, comments, game suggestions): notices + buildNtfyRequest() (pure, unit-tested), notifyAdmin()
+│   │   ├── notify.ts                # ntfy notices + buildNtfyRequest()/ntfyEnvSummary() — pure, unit-tested
+│   │   ├── notify-admin.ts          # notifyAdmin(): sends (fire-and-forget, 30/10 min cap), stores last result in admin_state
+│   │   ├── env-report.ts            # Per-instance "which env vars are set" record in admin_state (written at startup), read by the Integrations screen
 │   │   ├── url.ts                   # httpUrl() — pure, client-safe (re-exported by widget-data.ts)
 │   │   ├── reactions.ts             # DEFAULT_EMOJIS constant shared by API + widget
 │   │   ├── reaction-bus.ts          # broadcastReaction() — pushes a reaction to all WS clients via globalThis.__wssBroadcast
@@ -422,11 +425,18 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - `GET /api/game-suggestions?id=` is the public top 10 (only when the section has `showList`); dismissed games never appear, and only `appid/title/status/count` leave the server.
 - Admin: the **Suggestions** screen groups by game; status, read/unread and delete act on the game, block/delete on one suggestion. Its nav badge is polled every 30 s with the comments/inbox badges. Deletes and blocks are audited (`suggestion.*`).
 
+### Integrations screen across two containers (`env-report.ts`)
+- Each instance writes `admin_state` key `env.report.<role>` (`public` / `admin` / `all`) at startup from `src/instrumentation.ts` (Next's `register()` hook — it runs under the custom server too, covered by `tests/integration/integrations.test.ts`): a boolean per known env var, `ntfyEnvSummary()`, and a 12-hex hash of `VISITOR_SALT`. **Never values.**
+- `/api/admin/integrations` on an `APP_ROLE=admin` instance shows two columns: Public (from that report, so it's as of the public container's last start) and Admin (live). Widget keys (`requiresEnv` + `optionalEnv`) and `VISITOR_SALT` are checked in both (salt hashes compared → "different in the two containers"); `ADMIN_PASSWORD_HASH` only in Admin; `NTFY_*` once, in whichever instance sends (Public when split). Single container (`all`) = one column from its own env.
+- `optionalEnv: [{ name, note }]` on a widget meta lists keys that add something but aren't required (music → `LASTFM_API_KEY`, play-with-me → Discord/Steam); shown neutral, not red, when unset. A new env var a widget reads belongs in `requiresEnv` or `optionalEnv`, or the screen won't list it.
+
 ### Admin notifications (ntfy)
+- Pure part (`notify.ts`: notice wording, `buildNtfyRequest`, `ntfyEnvSummary`) is separate from `notify-admin.ts` (sending, database) so unit tests can import it — `db.ts` can't load there.
 - `notifyAdmin(notice)` posts to ntfy fire-and-forget (5 s timeout, failures logged as `[Notify]`, never affect the response). Called by `/api/contact` (`messageNotice`), `/api/comments` (`commentNotice`, title says "awaits approval" when held) and `/api/game-suggestions` (`suggestionNotice`, Steam's title, "again" for a repeat) — each only **after the row is stored**, never for honeypot, blocked or rate-limited requests.
 - JSON publish (POST to the server root, `topic` in the body), not the `Title:` header style — header values must be ASCII and visitor names often aren't. Text is cut to 400 characters.
 - A process-wide cap of 30 pushes per 10 min across all kinds, because the guestbook has no global rate limit (a fresh cookie is a fresh visitor). Over the cap, pushes are dropped and logged once.
-- Env-only (`NTFY_TOPIC`, `NTFY_URL`, `NTFY_TOKEN`, `NTFY_CLICK`, `NTFY_EVENTS`), not `homepage.json`: the topic is effectively a secret on public ntfy.sh, and `homepage.json` sections are serialized into the page. The admin Integrations screen checks `NTFY_TOPIC` in the *admin* process, so in the two-container setup it can read "not set" while the public container sends fine.
+- Env-only (`NTFY_TOPIC`, `NTFY_URL`, `NTFY_TOKEN`, `NTFY_CLICK`, `NTFY_EVENTS`), not `homepage.json`: the topic is effectively a secret on public ntfy.sh, and `homepage.json` sections are serialized into the page.
+- The last send result (`lastSent` / `lastError`) is stored in `admin_state` (`notify.status`), so the Integrations screen shows it whichever container sent.
 - Integration tests blank all `NTFY_*` vars so a developer's `.env` can't push from test runs.
 
 ### Social links (`socials`, `profile`)

@@ -4,7 +4,8 @@ import { isBlocked } from "@/lib/admin/store";
 import { cleanText } from "@/lib/messages";
 import { NAME_MAX, NOTE_MAX, steamApp, suggestionsDb, topSuggested } from "@/lib/game-suggestions";
 import { findSection, WidgetError } from "@/lib/widget-data";
-import { notifyAdmin, suggestionNotice } from "@/lib/notify";
+import { suggestionNotice } from "@/lib/notify";
+import { notifyAdmin } from "@/lib/notify-admin";
 
 export const dynamic = "force-dynamic";
 

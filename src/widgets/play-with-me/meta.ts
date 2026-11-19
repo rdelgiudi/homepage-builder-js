@@ -29,5 +29,11 @@ export const meta = {
   category: "gaming",
   description: "Whether you're up for a game right now, and how to join you",
   schema,
+  optionalEnv: [
+    { name: "DISCORD_USER_ID", note: "Discord status (with DISCORD_BOT_TOKEN)." },
+    { name: "DISCORD_BOT_TOKEN", note: "Discord status (with DISCORD_USER_ID)." },
+    { name: "STEAM_API_KEY", note: "Steam status (with STEAM_ID). Needs Discord or Steam." },
+    { name: "STEAM_ID", note: "Steam status (with STEAM_API_KEY)." },
+  ],
   defaults: { availability: "auto", note: "Up for co-op most evenings. Add me!", games: [], showSteam: true, showDiscord: true, joinLink: false },
 } satisfies WidgetMeta;

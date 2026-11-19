@@ -21,6 +21,8 @@ export interface WidgetMeta<S extends z.ZodType = z.ZodType> {
   defaults: Record<string, unknown>;
   /** Env vars the widget needs to show real data. */
   requiresEnv?: string[];
+  /** Env vars that turn on part of the widget; it works without them. `note` says what they add. */
+  optionalEnv?: { name: string; note: string }[];
 }
 
 /** Site-wide values every widget may read. */
