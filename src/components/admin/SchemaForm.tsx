@@ -244,7 +244,8 @@ function TimezoneInput({ value, onChange, label }: { value: string; onChange: (v
   const [zones, setZones] = useState<string[]>([]);
   useEffect(() => {
     try {
-      timezones ??= ["UTC", ...Intl.supportedValuesOf("timeZone")];
+      // Some browsers (e.g. Firefox) already list "UTC"; a Set keeps it once (it's also the React key).
+      timezones ??= [...new Set(["UTC", ...Intl.supportedValuesOf("timeZone")])];
     } catch {
       timezones = ["UTC"];
     }
