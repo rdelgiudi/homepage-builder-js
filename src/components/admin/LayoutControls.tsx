@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { SITE_LAYOUTS, type SiteLayout } from "@/lib/schema/config";
 import { GRID_COLUMNS } from "@/widgets/fields";
 import { useAdmin } from "./store";
+import { moveDivider, rowPresets } from "./grid-layout";
 
 // --- site layout picker ---
 
@@ -170,3 +171,118 @@ export function SpanControl({ value, defaultSpan, onChange }: SpanControlProps) 
     </div>
   );
 }
+
+// --- a whole row of a grid ---
+
+const FRACTIONS: Record<number, string> = { 3: "¼", 4: "⅓", 6: "½", 8: "⅔", 9: "¾", 12: "1" };
+const fraction = (span: number) => FRACTIONS[span] ?? `${span}/12`;
+const sameSpans = (a: number[], b: number[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+interface RowEditorProps {
+  members: { id: string; label: string; icon: ReactNode }[];
+  spans: number[];
+  /** The widget the inspector is showing, if any (outlined in the bar). */
+  current?: string;
+  onCommit: (spans: number[]) => void;
+  onSplit: () => void;
+  onSelect?: (id: string) => void;
+}
+
+/**
+ * The widths of every widget in one grid row, edited together: drag the dividers between
+ * them (or focus one and use the arrow keys), or pick a preset. The total stays 12, so the
+ * rows below never re-pack. While a divider is dragged the widths live here and are committed
+ * once on release, so a drag is one undo step.
+ */
+export function RowEditor({ members, spans, current, onCommit, onSplit, onSelect }: RowEditorProps) {
+  const bar = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ i: number; base: number[] } | null>(null);
+  const [live, setLive] = useState<number[] | null>(null);
+  const shown = live ?? spans;
+
+  const boundaryAt = (clientX: number) => {
+    const rect = bar.current!.getBoundingClientRect();
+    return ((clientX - rect.left) / rect.width) * GRID_COLUMNS;
+  };
+  let edge = 0;
+
+  return (
+    <div className="adm-field">
+      <span className="adm-label">Row widths</span>
+      <div ref={bar} className="adm-rowbar">
+        {members.map((m, i) => {
+          const left = edge;
+          edge += shown[i];
+          return (
+            <button
+              key={m.id}
+              type="button"
+              className={`adm-rowbar-seg${m.id === current ? " is-current" : ""}`}
+              style={{ gridColumn: `${left + 1} / span ${shown[i]}` }}
+              title={onSelect ? `Select ${m.label}` : m.label}
+              onClick={() => onSelect?.(m.id)}
+            >
+              <span aria-hidden>{m.icon}</span>
+              <span className="adm-rowbar-label">{m.label}</span>
+              <span className="adm-rowbar-span">{shown[i]}/12</span>
+            </button>
+          );
+        })}
+        {shown.slice(0, -1).map((_, i) => {
+          const boundary = shown.slice(0, i + 1).reduce((a, b) => a + b, 0);
+          const step = (delta: number) => onCommit(moveDivider(shown, i, boundary + delta));
+          return (
+            <span
+              key={i}
+              className="adm-rowbar-divider"
+              style={{ left: `${(boundary / GRID_COLUMNS) * 100}%` }}
+              role="separator"
+              tabIndex={0}
+              aria-orientation="vertical"
+              aria-label={`Between ${members[i].label} and ${members[i + 1].label}`}
+              aria-valuemin={1}
+              aria-valuemax={GRID_COLUMNS - 1}
+              aria-valuenow={boundary}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.currentTarget.setPointerCapture(e.pointerId);
+                drag.current = { i, base: shown };
+              }}
+              onPointerMove={(e) => {
+                if (!drag.current) return;
+                setLive(moveDivider(drag.current.base, drag.current.i, boundaryAt(e.clientX)));
+              }}
+              onPointerUp={() => {
+                drag.current = null;
+                if (live && !sameSpans(live, spans)) onCommit(live);
+                setLive(null);
+              }}
+              onPointerCancel={() => {
+                drag.current = null;
+                setLive(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowRight") step(1);
+                else if (e.key === "ArrowLeft") step(-1);
+                else return;
+                e.preventDefault();
+              }}
+            />
+          );
+        })}
+      </div>
+      <div className="adm-inline adm-span-presets">
+        {rowPresets(members.length).map((p) => (
+          <button key={p.join("-")} type="button" className="adm-btn is-small" aria-pressed={sameSpans(p, shown)} onClick={() => onCommit(p)}>
+            {p.map(fraction).join(" ")}
+          </button>
+        ))}
+        <button type="button" className="adm-btn is-small" onClick={onSplit} title="Every widget of this row on a full-width row of its own">
+          One per row
+        </button>
+      </div>
+      <span className="adm-hint">Drag the dividers to share out the 12 columns. On phones every widget is full width.</span>
+    </div>
+  );
+}
+

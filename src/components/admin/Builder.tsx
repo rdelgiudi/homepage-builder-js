@@ -7,6 +7,7 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCenter,
+  defaultDropAnimation,
   pointerWithin,
   useDraggable,
   useDroppable,
@@ -14,6 +15,7 @@ import {
   useSensors,
   type CollisionDetection,
   type DragEndEvent,
+  type DragMoveEvent,
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -24,10 +26,12 @@ import SchemaForm from "./SchemaForm";
 import { formSchemas } from "./schemas";
 import { api } from "./api";
 import { useAdmin } from "./store";
-import { SpanControl } from "./LayoutControls";
+import { RowEditor, SpanControl } from "./LayoutControls";
 import { WidgetIcon } from "@/widgets/BrandIcon";
+import { COLUMNS, fitRow, packRows, placeInGrid, removeFromGrid, rowIds, setRowSpans, spanOf, splitRow, type DropTarget, type PlaceResult } from "./grid-layout";
 
-type Selection = { kind: "tab" | "section"; id: string } | null;
+/** A row is selected through any of its widgets' ids (rows have no id of their own). */
+type Selection = { kind: "tab" | "section" | "row"; id: string } | null;
 type Obj = Record<string, unknown>;
 
 // Drag ids are prefixed so one DndContext can tell tabs, sections and palette items apart.
@@ -35,6 +39,33 @@ const TAB = "tab:";
 const SEC = "sec:";
 const NEW = "new:";
 const LIST = "section-list";
+// Grid view: each tile is also a drop target (its own id, so `sec:` still means "the dragged widget").
+const CELL = "cell:";
+const GRID_END = "grid-end";
+/** Id of the stand-in for a palette widget while it is dragged (the real section is made on drop). */
+const NEW_ITEM = "__new__";
+
+/** Where the pointer is during a drag: the activating event's position plus the drag delta. */
+function pointerOf(e: DragMoveEvent): { x: number; y: number } | null {
+  const ev = e.activatorEvent as (Partial<MouseEvent> & Partial<TouchEvent>) | null;
+  const touch = ev?.touches?.[0] ?? ev?.changedTouches?.[0];
+  const x = touch?.clientX ?? ev?.clientX;
+  const y = touch?.clientY ?? ev?.clientY;
+  if (typeof x === "number" && typeof y === "number" && Number.isFinite(x) && Number.isFinite(y)) return { x: x + e.delta.x, y: y + e.delta.y };
+  // Keyboard drags have no pointer: use the middle of the dragged element.
+  const r = e.active.rect.current.translated;
+  return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null;
+}
+
+/** Which side of a tile the pointer is on: outer 30% left/right = beside, otherwise top/bottom half = new row. */
+function sideOf(p: { x: number; y: number }, r: { left: number; top: number; width: number; height: number }): "left" | "right" | "above" | "below" {
+  const rx = (p.x - r.left) / (r.width || 1);
+  if (rx < 0.3) return "left";
+  if (rx > 0.7) return "right";
+  return p.y - r.top < r.height / 2 ? "above" : "below";
+}
+
+type GridHover = { target: DropTarget; result: PlaceResult<Section> };
 
 const PALETTE_GROUPS: [category: string, title: string][] = [
   ["content", "Text and structure"],
@@ -128,9 +159,77 @@ function SectionList({ children, empty }: { children: ReactNode; empty: boolean 
   );
 }
 
+function GridTile({
+  section,
+  span,
+  selected,
+  onSelect,
+  drop,
+}: {
+  section: Section;
+  span: number;
+  selected: boolean;
+  onSelect: () => void;
+  drop: { side: string; bad: boolean } | null;
+}) {
+  const meta = widgetMetaByType[section.type];
+  const drag = useDraggable({ id: SEC + section.id });
+  const target = useDroppable({ id: CELL + section.id });
+  // Pointer dragging only: plain droppables have no keyboard coordinates (the List view is the keyboard route).
+  const { onKeyDown: _keyboardDrag, ...listeners } = drag.listeners ?? {};
+  return (
+    <div
+      ref={(node) => {
+        drag.setNodeRef(node);
+        target.setNodeRef(node);
+      }}
+      style={{ gridColumn: `span ${span}` }}
+      className={`adm-tile${selected ? " is-selected" : ""}${drag.isDragging ? " is-dragging" : ""}${drop?.bad ? " is-bad" : ""}`}
+      data-drop={drop?.side}
+      {...drag.attributes}
+      {...listeners}
+      role="button"
+      tabIndex={0}
+      aria-label={`${meta.label} widget, ${span} of 12 columns`}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+    >
+      <span className="adm-row-icon" aria-hidden>
+        <WidgetIcon type={section.type} fallback={meta.icon} />
+      </span>
+      <span className="adm-tile-label">{meta.label}</span>
+      <span className="adm-tile-span">{span}/12</span>
+    </div>
+  );
+}
+
+function GridEnd({ active, empty }: { active: boolean; empty: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id: GRID_END });
+  return (
+    <div ref={setNodeRef} className={`adm-grid-end${isOver && active ? " is-over" : ""}`}>
+      {empty ? "This tab is empty. Click a widget below, or drag one here." : "Drop here for a new row at the end"}
+    </div>
+  );
+}
+
 interface EnvStatus {
   type: string;
   env: { name: string; set: boolean }[];
+}
+
+/** Status line while dragging in the grid: where the widget would go and the row's new widths. */
+function gridStatus(hover: GridHover, sections: Section[], defaultSpan: number): string {
+  const { target, result } = hover;
+  if (!result.ok) return result.reason;
+  if (target.id === null) return "New full-width row at the end.";
+  const name = widgetMetaByType[sections.find((s) => s.id === target.id)?.type ?? ""]?.label ?? "this widget";
+  if (target.side === "above" || target.side === "below") return `New full-width row ${target.side} ${name}.`;
+  return `Beside ${name}: the row becomes ${result.row.map((s) => spanOf(s, defaultSpan)).join(" / ")} of 12.`;
 }
 
 /**
@@ -142,6 +241,15 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
   const [tabId, setTabId] = useState<string | null>(config.tabs[0]?.id ?? null);
   const [selection, setSelection] = useState<Selection>(null);
   const [dragging, setDragging] = useState<string | null>(null);
+  // Grid tabs show the outline as a grid by default; the list stays available (and keyboard-sortable).
+  const [listView, setListView] = useState(false);
+  const [hover, setHover] = useState<GridHover | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 5000);
+    return () => clearTimeout(t);
+  }, [notice]);
   const [envStatus, setEnvStatus] = useState<EnvStatus[]>([]);
 
   useEffect(() => {
@@ -157,6 +265,10 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
   const bento = config.layout.site === "bento";
   const gridActive = bento || tab?.layout === "grid";
   const defaultSpan = bento ? 6 : 12;
+  const gridView = gridActive && !listView;
+  const isGridTab = (t: Tab) => bento || t.layout === "grid";
+  /** Takes a section out of a tab; in a grid the rest of its row widens to fill it. */
+  const without = (t: Tab, id: string) => (isGridTab(t) ? removeFromGrid(t.sections, id, defaultSpan) : t.sections.filter((s) => s.id !== id));
 
   const selectedTab = selection?.kind === "tab" ? config.tabs.find((t) => t.id === selection.id) ?? null : null;
 
@@ -203,7 +315,7 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
       return {
         ...c,
         tabs: c.tabs.map((t) =>
-          t.id === fromTabId ? { ...t, sections: t.sections.filter((s) => s.id !== sectionId) } : t.id === toTabId ? { ...t, sections: [...t.sections, section] } : t
+          t.id === fromTabId ? { ...t, sections: without(t, sectionId) } : t.id === toTabId ? { ...t, sections: [...t.sections, section] } : t
         ),
       };
     });
@@ -211,12 +323,57 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
     setSelection({ kind: "section", id: sectionId });
   };
 
+  /** The section being dragged (a stand-in for a palette widget), or null for tabs. */
+  const draggedItem = (a: string): Section | null => {
+    if (a.startsWith(SEC)) return tab?.sections.find((s) => SEC + s.id === a) ?? null;
+    if (a.startsWith(NEW)) return { id: NEW_ITEM, type: a.slice(NEW.length) } as Section;
+    return null;
+  };
+
+  // Grid view: work out the drop position and its result while dragging, so the outline can show
+  // where the widget would land, or that there is no room, before it is dropped.
+  const onDragMove = (e: DragMoveEvent) => {
+    if (!gridView || !tab) return;
+    const item = draggedItem(String(e.active.id));
+    const o = e.over ? String(e.over.id) : "";
+    const p = pointerOf(e);
+    let target: DropTarget | null = null;
+    if (item && o === GRID_END) target = { id: null, side: "end" };
+    else if (item && o.startsWith(CELL) && p && e.over) target = { id: o.slice(CELL.length), side: sideOf(p, e.over.rect) };
+    if (!target || target.id === item?.id) {
+      if (hover) setHover(null);
+      return;
+    }
+    if (hover && hover.target.id === target.id && hover.target.side === target.side) return;
+    setHover({ target, result: placeInGrid(tab.sections, item!, target, defaultSpan) });
+  };
+
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     setDragging(null);
+    const gridDrop = hover;
+    setHover(null);
     if (!over || !tab) return;
     const a = String(active.id);
     const o = String(over.id);
     if (a === o) return;
+
+    if (gridView && gridDrop && (o.startsWith(CELL) || o === GRID_END)) {
+      if (!gridDrop.result.ok) {
+        if (gridDrop.result.reason) setNotice(`${gridDrop.result.reason} The widget went back to where it was.`);
+        return;
+      }
+      // The result was worked out against this config; recompute inside the (pure) updater anyway.
+      const item = a.startsWith(NEW) ? newSection(config, tab.id, a.slice(NEW.length)) : draggedItem(a);
+      if (!item) return;
+      update((c) =>
+        mapTab(c, tab.id, (t) => {
+          const r = placeInGrid(t.sections, item, gridDrop.target, defaultSpan);
+          return r.ok ? { ...t, sections: r.items } : t;
+        })
+      );
+      setSelection({ kind: "section", id: item.id });
+      return;
+    }
 
     if (a.startsWith(TAB) && o.startsWith(TAB)) {
       update((c) => {
@@ -259,7 +416,20 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
   // --- outline ---
 
   const outline = (
-    <DndContext sensors={sensors} collisionDetection={collision} onDragStart={(e) => setDragging(String(e.active.id))} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={collision}
+      onDragStart={(e) => {
+        setDragging(String(e.active.id));
+        setNotice(null);
+      }}
+      onDragMove={onDragMove}
+      onDragEnd={onDragEnd}
+      onDragCancel={() => {
+        setDragging(null);
+        setHover(null);
+      }}
+    >
       <div className="adm-panel-head">
         <h2>Tabs</h2>
         <button type="button" className="adm-btn is-small" onClick={addTab}>
@@ -296,7 +466,67 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
         <>
           <div className="adm-panel-head">
             <h2>Widgets in {tab.label || "this tab"}</h2>
+            {gridActive && (
+              <div className="adm-seg is-small" role="group" aria-label="Outline view">
+                <button type="button" aria-pressed={!listView} onClick={() => setListView(false)}>
+                  Grid
+                </button>
+                <button type="button" aria-pressed={listView} onClick={() => setListView(true)} title="A list you can also reorder with the keyboard">
+                  List
+                </button>
+              </div>
+            )}
           </div>
+          {gridView ? (
+            <div className="adm-pad-x">
+              {notice && (
+                <p className="adm-notice is-bad adm-grid-notice" role="status">
+                  {notice}
+                </p>
+              )}
+              {/* One grid per row, packed by packRows (the same wrapping the site's CSS grid does),
+                  so each row can have a handle that selects it for the row editor. */}
+              <div className="adm-grid-rows">
+                {packRows(tab.sections, defaultSpan).map((row) => {
+                  const members = row.map((i) => tab.sections[i]);
+                  const rowSelected = selection?.kind === "row" && members.some((m) => m.id === selection.id);
+                  return (
+                    <div key={members[0].id} className={`adm-grid-row${rowSelected ? " is-selected" : ""}`}>
+                      {members.length > 1 ? (
+                        <button
+                          type="button"
+                          className="adm-row-handle"
+                          aria-pressed={rowSelected}
+                          aria-label={`Row: ${members.map((m) => widgetMetaByType[m.type].label).join(", ")}`}
+                          title="Select this row to set its widths together"
+                          onClick={() => setSelection({ kind: "row", id: members[0].id })}
+                        />
+                      ) : (
+                        <span className="adm-row-handle is-empty" aria-hidden />
+                      )}
+                      <div className="adm-grid-outline">
+                        {members.map((s) => {
+                          const hit = hover && hover.target.id === s.id ? hover : null;
+                          return (
+                            <GridTile
+                              key={s.id}
+                              section={s}
+                              span={spanOf(s, defaultSpan)}
+                              selected={(selection?.kind === "section" && selection.id === s.id) || rowSelected}
+                              onSelect={() => setSelection({ kind: "section", id: s.id })}
+                              drop={hit ? { side: hit.target.side, bad: !hit.result.ok } : null}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <GridEnd active={!!dragging} empty={!tab.sections.length} />
+              <p className="adm-hint adm-grid-help">Drag a widget onto another one&apos;s side to share its row, onto its top or bottom for a new row. Widths adjust by themselves.</p>
+            </div>
+          ) : (
           <SortableContext items={tab.sections.map((s) => SEC + s.id)} strategy={verticalListSortingStrategy}>
             <SectionList empty={!tab.sections.length}>
               {tab.sections.map((s) => {
@@ -321,11 +551,14 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
               })}
             </SectionList>
           </SortableContext>
+          )}
 
           <div className="adm-panel-head">
             <h2>Add a widget</h2>
           </div>
-          <p className="adm-hint adm-pad">Click to add at the end, or drag into the list or onto another tab.</p>
+          <p className="adm-hint adm-pad">
+            {gridView ? "Click to add at the end, or drag beside a widget, above or below it, or onto another tab." : "Click to add at the end, or drag into the list or onto another tab."}
+          </p>
           {PALETTE_GROUPS.map(([category, title]) => (
             <div key={category}>
               <h3 className="adm-palette-title">{title}</h3>
@@ -341,13 +574,22 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
         </>
       )}
 
-      <DragOverlay dropAnimation={null}>
+      {/* A refused grid drop animates back to where the widget came from; anything else lands instantly. */}
+      <DragOverlay dropAnimation={hover && !hover.result.ok ? defaultDropAnimation : null}>
         {overlayLabel && (
           <div className="adm-row is-overlay">
             <span className="adm-row-icon" aria-hidden>
               {overlayLabel.icon}
             </span>
-            <span className="adm-row-title">{overlayLabel.label}</span>
+            <span className="adm-row-text">
+              <span className="adm-row-title">{overlayLabel.label}</span>
+              {/* Grid view: where it would land (or why it can't), right next to the pointer. */}
+              {gridView && hover && tab && (
+                <span className={`adm-overlay-hint${hover.result.ok ? "" : " is-bad"}`} aria-live="polite">
+                  {gridStatus(hover, tab.sections, defaultSpan)}
+                </span>
+              )}
+            </span>
           </div>
         )}
       </DragOverlay>
@@ -362,7 +604,44 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
     </div>
   );
 
-  if (selectedTab) {
+  /** The row editor for the row made of `ids` (all widths edited together, always adding up to 12). */
+  const rowEditor = (ids: string[], current?: string) => {
+    if (!tab) return null;
+    const members = ids.map((id) => tab.sections.find((x) => x.id === id)!);
+    const raw = members.map((m) => spanOf(m, defaultSpan));
+    // A hand-made row may not fill all 12 columns; the editor starts from it scaled to 12.
+    const fills = raw.reduce((a, b) => a + b, 0) === COLUMNS;
+    return (
+      <>
+        <RowEditor
+          members={members.map((m) => ({ id: m.id, label: widgetMetaByType[m.type].label, icon: <WidgetIcon type={m.type} fallback={widgetMetaByType[m.type].icon} size={14} /> }))}
+          spans={fills ? raw : fitRow(raw)}
+          current={current}
+          onCommit={(spans) => update((c) => mapTab(c, tab.id, (t) => ({ ...t, sections: setRowSpans(t.sections, rowIds(t.sections, ids[0], defaultSpan), spans, defaultSpan) })))}
+          onSplit={() => update((c) => mapTab(c, tab.id, (t) => ({ ...t, sections: splitRow(t.sections, ids, defaultSpan) })))}
+          onSelect={(id) => setSelection({ kind: "section", id })}
+        />
+        {!fills && <p className="adm-hint">This row doesn&apos;t fill all 12 columns yet; any change here makes it fill them.</p>}
+      </>
+    );
+  };
+  const selectedRow = selection?.kind === "row" && tab && gridActive ? rowIds(tab.sections, selection.id, defaultSpan) : [];
+
+  if (selectedRow.length) {
+    inspector = (
+      <>
+        <div className="adm-panel-head">
+          <h2>Row</h2>
+        </div>
+        <div className="adm-pad">
+          <p className="adm-hint">
+            {selectedRow.length} widgets side by side. Their widths are set together here, so the row always fills the page width and the rows below stay as they are.
+          </p>
+          {rowEditor(selectedRow)}
+        </div>
+      </>
+    );
+  } else if (selectedTab) {
     inspector = (
       <>
         <div className="adm-panel-head">
@@ -386,13 +665,19 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
     const meta = widgetMetaByType[selectedSection.type];
     const missing = missingEnv(selectedSection.type);
     const remove = () => {
-      update((c) => mapTab(c, tab.id, (t) => ({ ...t, sections: t.sections.filter((s) => s.id !== selectedSection.id) })));
+      update((c) => mapTab(c, tab.id, (t) => ({ ...t, sections: without(t, selectedSection.id) })));
       setSelection(null);
     };
     const duplicate = () => {
       const copy = { ...structuredClone(selectedSection), id: uniqueId(config, `${tab.id}-${selectedSection.type}`) } as Section;
       update((c) =>
         mapTab(c, tab.id, (t) => {
+          // In a grid: beside the original if its row has room, otherwise on a new row below it.
+          if (isGridTab(t)) {
+            const beside = placeInGrid(t.sections, copy, { id: selectedSection.id, side: "right" }, defaultSpan);
+            const placed = beside.ok ? beside : placeInGrid(t.sections, copy, { id: selectedSection.id, side: "below" }, defaultSpan);
+            if (placed.ok) return { ...t, sections: placed.items };
+          }
           const sections = [...t.sections];
           sections.splice(sections.findIndex((s) => s.id === selectedSection.id) + 1, 0, copy);
           return { ...t, sections };
@@ -422,7 +707,14 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
             value={selectedSection as unknown as Obj}
             onChange={(v) => update((c) => mapTab(c, tab.id, (t) => ({ ...t, sections: t.sections.map((s) => (s.id === selectedSection.id ? (v as unknown as Section) : s)) })))}
           />
-          {gridActive && (
+          {!gridActive && (
+            <p className="adm-hint adm-span-hint">
+              Widths apply where widgets can sit side by side. To set this widget&apos;s width, select the tab &ldquo;{tab.label}&rdquo; and set{" "}
+              <strong>Arrange widgets</strong> to <strong>Grid</strong> (or pick the Bento layout on the Site screen).
+            </p>
+          )}
+          {gridActive && rowIds(tab.sections, selectedSection.id, defaultSpan).length > 1 && rowEditor(rowIds(tab.sections, selectedSection.id, defaultSpan), selectedSection.id)}
+          {gridActive && rowIds(tab.sections, selectedSection.id, defaultSpan).length <= 1 && (
             <SpanControl
               value={selectedSection.span}
               defaultSpan={defaultSpan}
@@ -433,7 +725,7 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
                     sections: t.sections.map((s) => {
                       if (s.id !== selectedSection.id) return s;
                       const { span: _old, ...rest } = s;
-                      return (span === undefined ? rest : { ...rest, span }) as Section;
+                      return (span === undefined ? rest : { ...s, span }) as Section;
                     }),
                   }))
                 )

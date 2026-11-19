@@ -721,6 +721,73 @@ textarea.adm-input {
   border-color: var(--a-accent);
 }
 
+/* Row editor: one segment per widget, dividers between them. */
+.adm-rowbar {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0;
+  user-select: none;
+}
+.adm-rowbar-seg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+  margin: 0 3px;
+  padding: 6px 7px;
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  background: var(--a-raised);
+  color: var(--a-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.adm-rowbar-seg.is-current {
+  border-color: var(--a-accent);
+  box-shadow: inset 0 0 0 1px var(--a-accent);
+}
+.adm-rowbar-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.adm-rowbar-span {
+  font-size: 11px;
+  color: var(--a-muted);
+}
+.adm-rowbar-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  margin-left: -7px;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 1;
+}
+.adm-rowbar-divider::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
+  border-radius: 2px;
+  background: var(--a-muted);
+}
+.adm-rowbar-divider:hover::before,
+.adm-rowbar-divider:focus-visible::before {
+  background: var(--a-accent);
+}
+.adm-rowbar-divider:focus-visible {
+  outline: none;
+}
+
 /* ---------- builder outline ---------- */
 
 .adm-rows {
@@ -734,6 +801,180 @@ textarea.adm-input {
 .adm-rows.is-over {
   outline: 1px dashed var(--a-accent);
   outline-offset: -2px;
+}
+
+/* ---------- builder: grid view of a grid tab ----------
+   Same 12-column packing as the site (.section-grid), so tiles share rows exactly like the
+   widgets will. Drop indicators: a bar on the edge the widget would go to (red = no room). */
+
+.adm-pad-x {
+  padding: 0 8px 6px;
+}
+.adm-seg.is-small button {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.adm-grid-rows {
+  display: grid;
+  gap: 6px;
+}
+.adm-grid-row {
+  display: flex;
+  gap: 5px;
+  align-items: stretch;
+}
+.adm-grid-row > .adm-grid-outline {
+  flex: 1;
+  min-width: 0;
+}
+.adm-grid-outline {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 6px;
+}
+/* Selects a whole row for the row editor. Rows of one widget get an empty spacer instead. */
+.adm-row-handle {
+  flex: 0 0 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: var(--a-line);
+  cursor: pointer;
+}
+.adm-row-handle.is-empty {
+  background: transparent;
+  cursor: default;
+}
+.adm-row-handle:not(.is-empty):hover,
+.adm-row-handle[aria-pressed="true"] {
+  background: var(--a-accent);
+}
+.adm-row-handle:focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: 2px;
+}
+.adm-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 7px 8px;
+  border: 1px solid var(--a-line);
+  border-radius: var(--a-radius);
+  background: var(--a-raised);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.adm-tile:hover {
+  border-color: var(--a-muted);
+}
+.adm-tile.is-selected {
+  border-color: var(--a-accent);
+  box-shadow: inset 0 0 0 1px var(--a-accent);
+}
+.adm-tile.is-dragging {
+  opacity: 0.35;
+}
+.adm-tile:focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: 2px;
+}
+.adm-tile-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+.adm-tile-span {
+  font-size: 11px;
+  color: var(--a-muted);
+}
+.adm-tile[data-drop]::after {
+  content: "";
+  position: absolute;
+  border-radius: 2px;
+  background: var(--a-accent);
+  pointer-events: none;
+}
+.adm-tile.is-bad[data-drop]::after {
+  background: var(--a-bad);
+}
+.adm-tile.is-bad {
+  border-color: var(--a-bad);
+}
+.adm-tile[data-drop="left"]::after,
+.adm-tile[data-drop="right"]::after {
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+}
+.adm-tile[data-drop="left"]::after {
+  left: -5px;
+}
+.adm-tile[data-drop="right"]::after {
+  right: -5px;
+}
+.adm-tile[data-drop="above"]::after,
+.adm-tile[data-drop="below"]::after {
+  left: 2px;
+  right: 2px;
+  height: 3px;
+}
+.adm-tile[data-drop="above"]::after {
+  top: -5px;
+}
+.adm-tile[data-drop="below"]::after {
+  bottom: -5px;
+}
+.adm-grid-end {
+  margin-top: 6px;
+  padding: 10px;
+  border: 1px dashed var(--a-line);
+  border-radius: var(--a-radius);
+  color: var(--a-muted);
+  font-size: 12px;
+  text-align: center;
+}
+.adm-grid-end.is-over {
+  border-color: var(--a-accent);
+  color: var(--a-text);
+}
+.adm-grid-help {
+  margin: 6px 2px 0;
+}
+/* Floating, so showing or clearing it never shifts the tiles under the pointer mid-drag. */
+.adm-grid-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 1000;
+  transform: translateX(-50%);
+  max-width: min(480px, calc(100vw - 32px));
+  margin: 0;
+  padding: 9px 14px;
+  border: 1px solid var(--a-bad);
+  border-radius: var(--a-radius);
+  background: var(--a-raised);
+  box-shadow: 0 10px 24px rgb(0 0 0 / 0.45);
+  font-size: 12.5px;
+}
+.adm-overlay-hint {
+  display: block;
+  max-width: 260px;
+  font-size: 11.5px;
+  color: var(--a-live);
+  white-space: normal;
+}
+.adm-overlay-hint.is-bad {
+  color: var(--a-bad);
+}
+.adm-span-hint {
+  margin-top: 14px;
 }
 .adm-row {
   display: flex;

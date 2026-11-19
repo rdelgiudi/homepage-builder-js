@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { HomepageConfig } from "@/lib/schema/config";
 import { api, ApiError, type ConfigIssue } from "./api";
+import { sameConfig } from "./same";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -42,7 +43,8 @@ export function useAdmin(): AdminStore {
   return store;
 }
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+/** Key order doesn't count (see same.ts): re-setting a key moves it, which isn't a change. */
+const same = sameConfig;
 const SAVE_DELAY_MS = 500;
 const MAX_UNDO = 50;
 
