@@ -1,0 +1,906 @@
+{
+  "version": 2,
+  "name": "Lorem Ipsum",
+  "tagline": "Widget showcase: every widget type with placeholder content",
+  "favicon": "",
+  "titleGradient": [
+    "#60a5fa",
+    "#a78bfa",
+    "#f472b6",
+    "#a78bfa",
+    "#60a5fa"
+  ],
+  "taglineGradient": [],
+  "layout": {
+    "site": "tabs"
+  },
+  "background": {
+    "base": {
+      "type": "solid",
+      "light": "#f3f4f6",
+      "dark": "#111827"
+    },
+    "effect": {
+      "type": "stars"
+    }
+  },
+  "counters": {
+    "viewers": true,
+    "visitors": true
+  },
+  "effects": {
+    "gradientBorders": true,
+    "tabTransitions": true,
+    "customScrollbar": true,
+    "progressGradient": true,
+    "progressGradientColors": [
+      "#60a5fa",
+      "#a78bfa",
+      "#f472b6",
+      "#a78bfa",
+      "#60a5fa"
+    ],
+    "progressAnimation": true,
+    "progressSparkles": true,
+    "widgetFrame": false,
+    "widgetFrameWidth": 2,
+    "mouseTrail": false,
+    "faviconAnimation": true,
+    "reactionFlyer": true
+  },
+  "tabs": [
+    {
+      "id": "start",
+      "label": "Start",
+      "icon": "👋",
+      "layout": "grid",
+      "sections": [
+        {
+          "id": "start-profile",
+          "type": "profile",
+          "span": 5,
+          "avatar": "https://api.dicebear.com/9.x/shapes/svg?seed=Lorem",
+          "avatarShape": "circle",
+          "name": "Lorem Ipsum",
+          "pronouns": "they/them",
+          "location": "Somewhere, Earth",
+          "bio": "Dolor sit amet, consectetur adipiscing elit.\nThis is the widget showcase: every widget type with placeholder content.",
+          "layout": "centered",
+          "card": true,
+          "style": "icons",
+          "colors": "brand",
+          "size": "md",
+          "socials": [
+            {
+              "url": "https://github.com/vercel/next.js"
+            },
+            {
+              "url": "https://mastodon.social/@Mastodon"
+            },
+            {
+              "url": "https://bsky.app/profile/bsky.app"
+            },
+            {
+              "url": "https://www.youtube.com/@NASA"
+            },
+            {
+              "url": "hello@example.com"
+            }
+          ]
+        },
+        {
+          "id": "start-notice",
+          "type": "notice",
+          "span": 7,
+          "tone": "info",
+          "icon": "🧪",
+          "title": "Widget showcase",
+          "message": "Every widget in this config uses placeholder content or a well-known public account. Widgets that need keys (Discord, Steam, Overwatch, Twitch) say what is missing until you set them in .env.",
+          "linkText": "README",
+          "linkUrl": "https://github.com/",
+          "timezone": "UTC",
+          "dismissible": true
+        },
+        {
+          "id": "start-header",
+          "type": "header",
+          "title": "Lorem ipsum dolor sit amet",
+          "icon": "✨"
+        },
+        {
+          "id": "start-text",
+          "type": "text",
+          "content": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+          "icon": "💬"
+        },
+        {
+          "id": "start-stats",
+          "type": "stats",
+          "text": "By the numbers",
+          "icon": "📊",
+          "columns": 3,
+          "style": "cards",
+          "gradient": true,
+          "countUp": true,
+          "items": [
+            {
+              "value": "1,234",
+              "label": "lorem ipsum"
+            },
+            {
+              "value": "42",
+              "label": "dolor sit amet"
+            },
+            {
+              "value": "99%",
+              "label": "consectetur"
+            }
+          ]
+        },
+        {
+          "id": "start-now",
+          "type": "now",
+          "span": 6,
+          "text": "Now",
+          "icon": "📍",
+          "updated": "2026-11-01",
+          "items": [
+            {
+              "icon": "🛠️",
+              "label": "Working on",
+              "text": "Lorem ipsum dolor"
+            },
+            {
+              "icon": "📚",
+              "label": "Reading",
+              "text": "Sit amet, consectetur"
+            },
+            {
+              "icon": "🎮",
+              "label": "Playing",
+              "text": "Adipiscing elit",
+              "url": "https://example.com"
+            }
+          ]
+        },
+        {
+          "id": "start-quote",
+          "type": "quote",
+          "span": 6,
+          "text": "Quote",
+          "icon": "❝",
+          "quotes": [
+            {
+              "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+              "author": "Cicero, roughly"
+            },
+            {
+              "text": "Sed ut perspiciatis unde omnis iste natus error sit voluptatem.",
+              "author": "Also Cicero"
+            }
+          ]
+        },
+        {
+          "id": "start-socials",
+          "type": "socials",
+          "text": "Social links",
+          "icon": "🔗",
+          "style": "buttons",
+          "colors": "brand",
+          "size": "md",
+          "items": [
+            {
+              "url": "https://github.com/vercel"
+            },
+            {
+              "url": "https://www.twitch.tv/twitchdev"
+            },
+            {
+              "url": "https://www.reddit.com/r/nextjs/"
+            },
+            {
+              "url": "https://example.com/feed.xml"
+            }
+          ]
+        },
+        {
+          "id": "start-links",
+          "type": "links",
+          "text": "Link cards",
+          "icon": "🌐",
+          "items": [
+            {
+              "label": "Primary link",
+              "url": "https://example.com",
+              "style": "primary"
+            },
+            {
+              "label": "Secondary link",
+              "url": "https://example.org",
+              "style": "secondary"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "content",
+      "label": "Content",
+      "icon": "📝",
+      "layout": "stack",
+      "sections": [
+        {
+          "id": "content-markdown",
+          "type": "markdown",
+          "text": "Markdown file",
+          "icon": "📄",
+          "file": "showcase-about.md"
+        },
+        {
+          "id": "content-posts",
+          "type": "posts",
+          "text": "Blog posts",
+          "icon": "✍️",
+          "limit": 5,
+          "layout": "cards",
+          "showSummary": true,
+          "showReadingTime": true
+        },
+        {
+          "id": "content-divider-dots",
+          "type": "divider",
+          "style": "dots",
+          "size": "medium"
+        },
+        {
+          "id": "content-projects",
+          "type": "projects",
+          "text": "Projects",
+          "icon": "🧩",
+          "layout": "cards",
+          "columns": 2,
+          "items": [
+            {
+              "title": "Lorem project",
+              "description": "Dolor sit amet, consectetur adipiscing elit.",
+              "image": "https://picsum.photos/seed/lorem-project/800/500",
+              "url": "https://example.com",
+              "source": "https://github.com/",
+              "tags": [
+                "TypeScript",
+                "Next.js"
+              ],
+              "status": "active",
+              "year": "2026"
+            },
+            {
+              "title": "Ipsum tool",
+              "description": "Sed do eiusmod tempor incididunt ut labore.",
+              "image": "https://picsum.photos/seed/ipsum-tool/800/500",
+              "url": "https://example.org",
+              "tags": [
+                "Rust"
+              ],
+              "status": "finished",
+              "year": "2023–2025"
+            }
+          ]
+        },
+        {
+          "id": "content-timeline",
+          "type": "timeline",
+          "text": "Timeline",
+          "icon": "🗓️",
+          "items": [
+            {
+              "date": "2026",
+              "title": "Lorem ipsum",
+              "text": "Dolor sit amet, consectetur adipiscing elit."
+            },
+            {
+              "date": "2024",
+              "title": "Consectetur",
+              "text": "Sed do eiusmod tempor."
+            },
+            {
+              "date": "2020",
+              "title": "Adipiscing elit"
+            }
+          ]
+        },
+        {
+          "id": "content-skills",
+          "type": "skills",
+          "text": "Skills",
+          "icon": "🧠",
+          "items": [
+            {
+              "label": "Lorem",
+              "icon": "⚛️",
+              "level": 5
+            },
+            {
+              "label": "Ipsum",
+              "icon": "🦀",
+              "level": 3
+            },
+            {
+              "label": "Dolor",
+              "level": 4
+            },
+            {
+              "label": "Sit amet"
+            }
+          ]
+        },
+        {
+          "id": "content-faq",
+          "type": "faq",
+          "text": "FAQ",
+          "icon": "❓",
+          "openFirst": true,
+          "items": [
+            {
+              "question": "Lorem ipsum dolor sit amet?",
+              "answer": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+            },
+            {
+              "question": "Consectetur adipiscing elit?",
+              "answer": "Ut enim ad minim veniam, quis nostrud exercitation."
+            }
+          ]
+        },
+        {
+          "id": "content-divider-line",
+          "type": "divider",
+          "style": "line",
+          "size": "small"
+        },
+        {
+          "id": "content-image",
+          "type": "image",
+          "text": "Image gallery",
+          "icon": "🖼️",
+          "columns": 3,
+          "shape": "square",
+          "images": [
+            {
+              "src": "https://picsum.photos/seed/showcase-1/600/600",
+              "alt": "Placeholder photo 1",
+              "caption": "Lorem 1"
+            },
+            {
+              "src": "https://picsum.photos/seed/showcase-2/600/600",
+              "alt": "Placeholder photo 2",
+              "caption": "Lorem 2"
+            },
+            {
+              "src": "https://picsum.photos/seed/showcase-3/600/600",
+              "alt": "Placeholder photo 3",
+              "caption": "Lorem 3"
+            },
+            {
+              "src": "https://picsum.photos/seed/showcase-4/600/600",
+              "alt": "Placeholder photo 4",
+              "caption": "Lorem 4"
+            },
+            {
+              "src": "https://picsum.photos/seed/showcase-5/600/600",
+              "alt": "Placeholder photo 5",
+              "caption": "Lorem 5"
+            },
+            {
+              "src": "https://picsum.photos/seed/showcase-6/600/600",
+              "alt": "Placeholder photo 6",
+              "caption": "Lorem 6"
+            }
+          ]
+        },
+        {
+          "id": "content-embed",
+          "type": "embed",
+          "text": "Embedded video",
+          "icon": "▶️",
+          "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
+        }
+      ]
+    },
+    {
+      "id": "live",
+      "label": "Live data",
+      "icon": "📡",
+      "layout": "grid",
+      "sections": [
+        {
+          "id": "live-clock",
+          "type": "clock",
+          "span": 4,
+          "text": "Clock",
+          "icon": "🕐",
+          "timezone": "Asia/Tokyo",
+          "place": "Tokyo",
+          "hour12": false,
+          "showDate": true,
+          "showDifference": true
+        },
+        {
+          "id": "live-countdown",
+          "type": "countdown",
+          "span": 4,
+          "text": "Countdown",
+          "icon": "⏳",
+          "target": "2027-01-01T00:00",
+          "timezone": "UTC",
+          "label": "New Year 2027",
+          "doneText": "Happy New Year!"
+        },
+        {
+          "id": "live-weather",
+          "type": "weather",
+          "span": 4,
+          "text": "Weather",
+          "icon": "⛅",
+          "place": "Berlin",
+          "latitude": 52.52,
+          "longitude": 13.405,
+          "units": "celsius",
+          "showForecast": true
+        },
+        {
+          "id": "live-schedule",
+          "type": "schedule",
+          "span": 6,
+          "text": "Schedule",
+          "icon": "📅",
+          "timezone": "Europe/Berlin",
+          "note": "Lorem ipsum: times may change.",
+          "items": [
+            {
+              "label": "Lorem stream",
+              "icon": "🎥",
+              "days": [
+                "tue",
+                "thu"
+              ],
+              "time": "20:00",
+              "duration": 120,
+              "url": "https://www.twitch.tv/twitchdev"
+            },
+            {
+              "label": "Ipsum game night",
+              "icon": "🎲",
+              "days": [
+                "sat"
+              ],
+              "time": "18:30",
+              "duration": 180
+            }
+          ]
+        },
+        {
+          "id": "live-status",
+          "type": "status",
+          "span": 6,
+          "text": "Service status",
+          "icon": "🟢",
+          "showLatency": true,
+          "linked": true,
+          "services": [
+            {
+              "label": "Example",
+              "url": "https://example.com"
+            },
+            {
+              "label": "GitHub",
+              "url": "https://github.com"
+            },
+            {
+              "label": "Wikipedia",
+              "url": "https://www.wikipedia.org"
+            }
+          ]
+        },
+        {
+          "id": "live-rss",
+          "type": "rss",
+          "span": 6,
+          "text": "RSS feed",
+          "icon": "📰",
+          "url": "https://github.blog/feed/",
+          "limit": 5,
+          "showDates": true
+        },
+        {
+          "id": "live-github",
+          "type": "github",
+          "span": 6,
+          "text": "GitHub projects",
+          "icon": "",
+          "repos": [
+            {
+              "owner": "vercel",
+              "repo": "next.js",
+              "note": "Lorem ipsum dolor sit amet"
+            },
+            {
+              "owner": "tailwindlabs",
+              "repo": "tailwindcss"
+            }
+          ]
+        },
+        {
+          "id": "live-github-activity",
+          "type": "github-activity",
+          "text": "GitHub activity",
+          "icon": "",
+          "username": "torvalds"
+        },
+        {
+          "id": "live-mastodon",
+          "type": "mastodon",
+          "span": 6,
+          "text": "Mastodon",
+          "icon": "",
+          "instance": "mastodon.social",
+          "account": "Mastodon",
+          "limit": 3
+        },
+        {
+          "id": "live-bluesky",
+          "type": "bluesky",
+          "span": 6,
+          "text": "Bluesky",
+          "icon": "",
+          "handle": "bsky.app",
+          "limit": 3
+        },
+        {
+          "id": "live-youtube",
+          "type": "youtube",
+          "text": "YouTube",
+          "icon": "",
+          "channel": "@NASA",
+          "limit": 4,
+          "hideShorts": true,
+          "layout": "grid"
+        },
+        {
+          "id": "live-twitch",
+          "type": "twitch",
+          "span": 6,
+          "text": "Twitch",
+          "icon": "",
+          "username": "twitchdev",
+          "hideOffline": false
+        },
+        {
+          "id": "live-music",
+          "type": "music",
+          "span": 6,
+          "text": "Recently played",
+          "icon": "🎧",
+          "service": "listenbrainz",
+          "username": "rob",
+          "limit": 5,
+          "showCovers": true
+        },
+        {
+          "id": "live-media-anime",
+          "type": "media",
+          "span": 6,
+          "text": "Watching",
+          "icon": "📺",
+          "service": "anilist",
+          "username": "Mio",
+          "kind": "anime",
+          "list": "finished",
+          "limit": 6,
+          "layout": "covers",
+          "columns": 3,
+          "showRatings": true
+        },
+        {
+          "id": "live-media-books",
+          "type": "media",
+          "span": 6,
+          "text": "Reading",
+          "icon": "📚",
+          "service": "openlibrary",
+          "username": "mekBot",
+          "list": "current",
+          "limit": 6,
+          "layout": "covers",
+          "columns": 3,
+          "showRatings": true
+        },
+        {
+          "id": "live-media-films",
+          "type": "media",
+          "text": "Films",
+          "icon": "🎬",
+          "service": "letterboxd",
+          "username": "dave",
+          "limit": 6,
+          "layout": "list",
+          "showRatings": true
+        }
+      ]
+    },
+    {
+      "id": "gaming",
+      "label": "Gaming",
+      "icon": "🎮",
+      "layout": "stack",
+      "sections": [
+        {
+          "id": "gaming-steam",
+          "type": "steam",
+          "text": "Steam",
+          "icon": "",
+          "showRecent": true,
+          "showTop": true
+        },
+        {
+          "id": "gaming-steam-rare",
+          "type": "steam-rare",
+          "text": "Rarest achievements",
+          "icon": "🏆",
+          "limit": 6,
+          "scanGames": 40,
+          "layout": "grid",
+          "columns": 3,
+          "header": "profile"
+        },
+        {
+          "id": "gaming-overwatch",
+          "type": "overwatch",
+          "text": "Overwatch",
+          "icon": "🎯"
+        },
+        {
+          "id": "gaming-play-with-me",
+          "type": "play-with-me",
+          "text": "Play with me",
+          "icon": "🤝",
+          "availability": "auto",
+          "note": "Lorem ipsum: up for co-op most evenings.",
+          "games": [
+            "Lorem Online",
+            "Ipsum Party"
+          ],
+          "showSteam": true,
+          "showDiscord": true,
+          "joinLink": false
+        },
+        {
+          "id": "gaming-play-history",
+          "type": "play-history",
+          "text": "Play history",
+          "icon": "📈",
+          "months": 6,
+          "timezone": "UTC",
+          "showGames": true,
+          "showRecent": true
+        },
+        {
+          "id": "gaming-shelf",
+          "type": "game-shelf",
+          "text": "Game shelf",
+          "icon": "🗂️",
+          "layout": "covers",
+          "columns": 5,
+          "groupBy": "status",
+          "groupStyle": "line",
+          "items": [
+            {
+              "title": "Hollow Knight",
+              "appid": 367520,
+              "status": "favourite",
+              "rating": 5,
+              "note": "Lorem ipsum dolor sit amet."
+            },
+            {
+              "title": "Hades",
+              "appid": 1145360,
+              "status": "finished",
+              "rating": 5
+            },
+            {
+              "title": "Celeste",
+              "appid": 504230,
+              "status": "finished",
+              "rating": 4
+            },
+            {
+              "title": "Stardew Valley",
+              "appid": 413150,
+              "status": "playing",
+              "rating": 4,
+              "note": "Consectetur adipiscing."
+            },
+            {
+              "title": "Portal 2",
+              "appid": 620,
+              "status": "favourite",
+              "rating": 5
+            },
+            {
+              "title": "Terraria",
+              "appid": 105600,
+              "status": "backlog"
+            }
+          ]
+        },
+        {
+          "id": "gaming-speedrun",
+          "type": "speedrun",
+          "text": "Speedruns",
+          "icon": "⏱️",
+          "username": "Niftski",
+          "sort": "place",
+          "limit": 5,
+          "levels": false
+        },
+        {
+          "id": "gaming-tetrio",
+          "type": "tetrio",
+          "text": "TETR.IO",
+          "icon": "🧱",
+          "username": "osk",
+          "showRecords": true
+        },
+        {
+          "id": "gaming-chess",
+          "type": "chess",
+          "text": "Chess",
+          "icon": "♟️",
+          "site": "lichess",
+          "username": "thibault"
+        },
+        {
+          "id": "gaming-game-server",
+          "type": "game-server",
+          "text": "Game servers",
+          "icon": "🖥️",
+          "showPlayers": true,
+          "showAddress": true,
+          "servers": [
+            {
+              "label": "Minecraft (Java)",
+              "protocol": "minecraft",
+              "address": "mc.hypixel.net"
+            },
+            {
+              "label": "Lorem Source server (offline demo)",
+              "protocol": "source",
+              "address": "203.0.113.10:27015"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "community",
+      "label": "Community",
+      "icon": "💬",
+      "layout": "stack",
+      "sections": [
+        {
+          "id": "community-discord-user",
+          "type": "discord-user",
+          "text": "Discord status",
+          "icon": ""
+        },
+        {
+          "id": "community-discord-server",
+          "type": "discord-server",
+          "text": "Discord server",
+          "icon": ""
+        },
+        {
+          "id": "community-reactions",
+          "type": "reactions",
+          "text": "Leave a reaction",
+          "icon": "😊"
+        },
+        {
+          "id": "community-poll",
+          "type": "poll",
+          "text": "Poll",
+          "icon": "🗳️",
+          "question": "Lorem ipsum dolor sit amet?",
+          "options": [
+            "Lorem",
+            "Ipsum",
+            "Dolor"
+          ],
+          "results": "after"
+        },
+        {
+          "id": "community-comments",
+          "type": "comments",
+          "text": "Guestbook",
+          "icon": "📖",
+          "limit": 50
+        },
+        {
+          "id": "community-contact",
+          "type": "contact",
+          "text": "Contact",
+          "icon": "✉️",
+          "intro": "Lorem ipsum: messages land in the admin Inbox.",
+          "askEmail": "optional",
+          "buttonText": "Send message",
+          "successText": "Thanks! Your message is on its way."
+        },
+        {
+          "id": "community-game-suggest",
+          "type": "game-suggest",
+          "text": "Suggest a game",
+          "icon": "🎲",
+          "intro": "What should I play next? Search Steam and tell me why.",
+          "askName": true,
+          "buttonText": "Suggest",
+          "successText": "Thanks! I'll take a look.",
+          "showList": true
+        },
+        {
+          "id": "community-support",
+          "type": "support",
+          "text": "Support",
+          "icon": "💖",
+          "items": [
+            {
+              "platform": "kofi",
+              "username": "lorem-ipsum"
+            },
+            {
+              "platform": "github",
+              "username": "lorem-ipsum"
+            },
+            {
+              "platform": "liberapay",
+              "username": "lorem-ipsum"
+            }
+          ]
+        },
+        {
+          "id": "community-buttons",
+          "type": "buttons",
+          "text": "Buttons & webring",
+          "icon": "🔘",
+          "pixelated": true,
+          "items": [
+            {
+              "image": "https://placehold.co/88x31/1d4ed8/ffffff/png?text=Lorem&font=roboto",
+              "label": "Lorem",
+              "url": "https://example.com"
+            },
+            {
+              "image": "https://placehold.co/88x31/7c3aed/ffffff/png?text=Ipsum&font=roboto",
+              "label": "Ipsum",
+              "url": "https://example.org"
+            },
+            {
+              "image": "https://placehold.co/88x31/db2777/ffffff/png?text=Dolor&font=roboto",
+              "label": "Dolor",
+              "url": "https://example.net"
+            }
+          ],
+          "ringName": "Lorem Webring",
+          "ringHome": "https://example.com",
+          "ringPrev": "https://example.org",
+          "ringNext": "https://example.net",
+          "ringRandom": "https://example.com/random"
+        },
+        {
+          "id": "community-meme",
+          "type": "meme",
+          "text": "Random meme",
+          "icon": "",
+          "popular": false
+        }
+      ]
+    }
+  ]
+}

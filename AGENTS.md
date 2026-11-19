@@ -104,7 +104,8 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   ├── instrumentation.ts           # Next startup hook: recordEnvReport()
 │   ├── config/
 │   │   ├── homepage.json            # ALL site config (gitignored — copy from the example)
-│   │   └── homepage.example.json
+│   │   ├── homepage.example.json
+│   │   └── homepage.showcase.json   # Every widget type with placeholder content (dev/testing); unit-tested to cover all types
 │   ├── content/                     # Runtime markdown, *.md (gitignored, not bundled)
 │   ├── hooks/
 │   │   └── useWebSocket.ts          # Singleton WebSocket hook (rAF-coalesced per type; supports `coalesce: false` for event streams like reaction flyers)
@@ -791,6 +792,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - **What tests can import:** `.ts` and `.js` only — Node can't run JSX, so nothing reachable from a test may import a `.tsx` file. Logic worth testing that lives in a component goes into a `.ts` file next to it (e.g. `widgets/embed/player.ts`, `parseFeed` / `parseContributions` in `lib/widget-sources.ts`). No TypeScript-only runtime syntax either (enums, parameter properties, namespaces).
 - **No SQLite in unit tests:** `db.ts` loads better-sqlite3 with `require()`, which doesn't exist in the ES-module scope Node uses for `.ts` files. Code that touches the database is covered by the integration tests instead (or takes its inputs as parameters, like `initialStatus(name, body, settings)`).
 - The `MODULE_TYPELESS_PACKAGE_JSON` warning is silenced in the scripts. Don't add `"type": "module"` to `package.json` to get rid of it — that would turn `websocket-server.js` and the other CommonJS files into ES modules and break them.
+- `src/config/homepage.showcase.json` must contain **every widget type** and pass `strictParseConfig` (`tests/unit/config.test.ts`): a new widget fails the tests until a section of it is added there. Its markdown files are `src/content/showcase-*.md`, committed through a `.gitignore` exception (exceptions must come *after* `/src/content/*`). Live widgets use well-known public accounts (torvalds, @NASA, bsky.app, Niftski…); anything needing keys shows its "not set up" state.
 - `tests/fixtures/homepage.v1.json` is the original v1 example (from before config v2). Keep it as is: it is what proves old configs still load.
 - **Integration tests** (`tests/integration/server.ts`; `admin.test.ts`, `widgets.test.ts`) start the built `websocket-server.js` in production mode in a temp folder with symlinks to `.next`, `node_modules` etc., their own `homepage.json`, content and `DATA_DIR`, on a free port. Every integration env var is set to an empty string so the real `.env` (dotenv never overrides a set variable) can't log the Discord bot in. Node's `fetch` keeps no cookies and sends no `Origin`; the `Client` helper does both. Limits to keep in mind when adding tests: 8 failed sign-ins per server start, one comment per visitor per 5s, one poll vote per visitor per second, one contact message per visitor per 30s (30 per 10 min in total), one game suggestion per visitor per 20s (30 per 10 min). Valid suggestions and searches need Steam, so the tests only cover the paths that don't reach it.
 - Tests are type-checked by `tsc` and by `next build` (tsconfig includes `**/*.ts`), so **a type error in a test fails the production and Docker build**. Use `@/` imports, not `.ts` extensions.

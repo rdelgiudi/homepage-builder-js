@@ -41,6 +41,8 @@ cp src/config/homepage.example.json src/config/homepage.json
 npm run dev
 ```
 
+To see every widget at once instead, start from the showcase: `cp src/config/homepage.showcase.json src/config/homepage.json`. It has all widget types with placeholder ("lorem ipsum") content, live widgets pointing at well-known public accounts, and sample markdown files (`src/content/showcase-*.md`). Widgets that need keys (Discord, Steam, Overwatch, Twitch) say what is missing until you set them in `.env`.
+
 Open [http://localhost:3000](http://localhost:3000) to view your homepage. Without `homepage.json` the site starts with an empty default config. `homepage.json` and `src/content/*.md` are gitignored, so your own content stays out of the repository. To use the admin panel locally, set `ADMIN_PASSWORD` (or `ADMIN_PASSWORD_HASH`, see [Admin panel](#admin-panel)) in `.env` and open `/admin`.
 
 ### Checks
@@ -548,7 +550,7 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 │   │   ├── widget-sources.ts        # Fetchers for weather, rss, mastodon, bluesky, chess, github-activity
 │   │   └── …                        # comments, reactions, uploads, background, markdown, visitor helpers
 │   ├── hooks/useWebSocket.ts        # Shared WebSocket connection, per-type subscriptions
-│   ├── config/                      # homepage.json (yours, gitignored) + homepage.example.json
+│   ├── config/                      # homepage.json (yours, gitignored) + homepage.example.json + homepage.showcase.json (every widget)
 │   └── content/                     # Markdown files for markdown widgets (gitignored)
 ├── tests/                           # Unit and integration tests (node --test)
 ├── scripts/admin-hash.js            # npm run admin:hash

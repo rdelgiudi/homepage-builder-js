@@ -153,3 +153,24 @@ describe("widget registry", () => {
     for (const meta of widgetMetas) assert.ok(categories.has(meta.category), `${meta.type}: ${meta.category}`);
   });
 });
+
+describe("showcase config (src/config/homepage.showcase.json)", () => {
+  const showcase = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "../../src/config/homepage.showcase.json"), "utf-8"));
+
+  it("passes the strict check the admin panel uses for publishing", () => {
+    const res = strictParseConfig(showcase);
+    assert.deepEqual(res.issues, []);
+    assert.deepEqual(parseConfig(showcase).warnings, []);
+  });
+
+  it("shows every widget type, so a new widget gets added to it", () => {
+    const used = new Set(showcase.tabs.flatMap((t: { sections: { type: string }[] }) => t.sections.map((s) => s.type)));
+    const missing = widgetMetas.map((m) => m.type).filter((t) => !used.has(t));
+    assert.deepEqual(missing, []);
+  });
+
+  it("its markdown files exist", () => {
+    const files = showcase.tabs.flatMap((t: { sections: { type: string; file?: string }[] }) => t.sections.filter((s) => s.type === "markdown").map((s) => s.file));
+    for (const f of files) assert.ok(fs.existsSync(path.join(import.meta.dirname, "../../src/content", f)), f);
+  });
+});
