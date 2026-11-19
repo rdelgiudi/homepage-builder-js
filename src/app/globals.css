@@ -654,3 +654,32 @@ html.dark.custom-scrollbar * {
 .reaction-count-pop {
   animation: reaction-count-pop 0.5s ease-out;
 }
+
+/* ===== Countdown widget =====
+   Sized against the widget's own width (container query), since in a grid column it can be
+   much narrower than the window. Numbers scale with it; labels shorten below ~300px. */
+.countdown {
+  container-type: inline-size;
+}
+.countdown-units {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(0.25rem, 3cqi, 1rem);
+  max-width: 26rem;
+  margin-inline: auto;
+}
+.countdown-value {
+  font-size: clamp(1.25rem, 11.5cqi, 1.875rem);
+  line-height: 1.2;
+}
+.countdown-short {
+  display: none;
+}
+@container (max-width: 300px) {
+  .countdown-long {
+    display: none;
+  }
+  .countdown-short {
+    display: inline;
+  }
+}
