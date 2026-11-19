@@ -36,7 +36,9 @@
 
 # Keys the site's widgets read their data with. Shared so the admin panel's preview can
 # show the same live data as the real site.
-x-preview-env: &preview-env
+x-shared-env: &shared-env
+  # Must be the same in both containers so visitor ids hash the same way.
+  VISITOR_SALT: ${VISITOR_SALT:-}
   DISCORD_SERVER_ID: ${DISCORD_SERVER_ID:-}
   DISCORD_USER_ID: ${DISCORD_USER_ID:-}
   DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
@@ -46,7 +48,6 @@ x-preview-env: &preview-env
   TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
   TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
   LASTFM_API_KEY: ${LASTFM_API_KEY:-}
-
 
 services:
   homepage:
@@ -60,11 +61,9 @@ services:
       - ./src/config:/app/src/config:ro
       - ./src/content:/app/src/content:ro
     environment:
-      <<: *preview-env
+      <<: *shared-env
       HOST: 0.0.0.0
       APP_ROLE: public
-      # Must be the same in both containers so visitor ids hash the same way.
-      VISITOR_SALT: ${VISITOR_SALT:-}
       # Optional ntfy notifications for new messages, comments and game suggestions.
       # Only here: visitors' posts are handled by this container.
       NTFY_URL: ${NTFY_URL:-}
@@ -86,14 +85,12 @@ services:
       - ./src/config:/app/src/config
       - ./src/content:/app/src/content
     environment:
-      <<: *preview-env
+      <<: *shared-env
       HOST: 0.0.0.0
       # Admin panel on, play-history recorder off (the public container records).
       APP_ROLE: admin
       # Generate with: docker compose run --rm homepage-admin node scripts/admin-hash.js
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:?set ADMIN_PASSWORD_HASH in .env}
-      # Must be the same in both containers so visitor ids hash the same way.
-      VISITOR_SALT: ${VISITOR_SALT:-}
     # labels:
     #   - traefik.enable=true
     #   - traefik.http.routers.homepage-admin.rule=Host(`example.com`) && (PathPrefix(`/admin`) || PathPrefix(`/api/admin`))
