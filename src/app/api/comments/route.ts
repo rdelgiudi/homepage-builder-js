@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { COOKIE_NAME, COOKIE_MAX_AGE, generateVisitorId, hashVisitorId, getVisitorIdFromCookie } from "@/lib/visitor";
 import { isBlocked } from "@/lib/admin/store";
 import { BODY_MAX, NAME_MAX, commentsDb, initialStatus, sanitize } from "@/lib/comments";
+import { commentNotice, notifyAdmin } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +107,7 @@ export async function POST(request: Request) {
       .get(info.lastInsertRowid) as PublicRow;
 
     rateLimit.set(hashedId, Date.now());
+    notifyAdmin(commentNotice({ name: cleanName, body: cleanBody, pending: status === "pending" }));
 
     const response = NextResponse.json({ comment: toPublic(row) }, { status: 201 });
     response.cookies.set(COOKIE_NAME, visitorId, {

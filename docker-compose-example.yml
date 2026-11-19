@@ -53,6 +53,12 @@ services:
       - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID:-}
       - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET:-}
       - LASTFM_API_KEY=${LASTFM_API_KEY:-}
+      # Optional ntfy notifications for new messages, comments and game suggestions (sent from this container).
+      - NTFY_URL=${NTFY_URL:-}
+      - NTFY_TOPIC=${NTFY_TOPIC:-}
+      - NTFY_TOKEN=${NTFY_TOKEN:-}
+      - NTFY_CLICK=${NTFY_CLICK:-}
+      - NTFY_EVENTS=${NTFY_EVENTS:-}
       - VISITOR_SALT=${VISITOR_SALT:-}
     # labels:
     #   - traefik.enable=true

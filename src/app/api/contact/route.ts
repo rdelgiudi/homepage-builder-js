@@ -3,6 +3,7 @@ import { COOKIE_NAME, COOKIE_MAX_AGE, generateVisitorId, hashVisitorId, getVisit
 import { isBlocked } from "@/lib/admin/store";
 import { BODY_MAX, cleanText, EMAIL_MAX, isEmail, messagesDb, NAME_MAX } from "@/lib/messages";
 import { findSection, WidgetError } from "@/lib/widget-data";
+import { messageNotice, notifyAdmin } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -53,9 +54,11 @@ export async function POST(request: Request) {
     if (section.askEmail === "required" && !email) return error("Please add your email address so I can reply.", 400);
     if (email && section.askEmail !== "hidden" && !isEmail(email)) return error("That email address doesn't look right.", 400);
 
+    const storedEmail = section.askEmail !== "hidden" && email ? email : null;
     messagesDb()
       .prepare("INSERT INTO messages (section_id, name, email, body, created_at, visitor_hash) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(section.id, name, section.askEmail !== "hidden" && email ? email : null, body, now, hashedId);
+      .run(section.id, name, storedEmail, body, now, hashedId);
+    notifyAdmin(messageNotice({ name, email: storedEmail, body }));
     lastByVisitor.set(hashedId, now);
     recent.push(now);
     return ok();

@@ -120,6 +120,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   ├── visitor.ts               # visitor_id cookie + hashing helpers (shared by visitors/comments/reactions/poll)
 │   │   ├── comments.ts              # comments table + moderation columns, moderation settings, initialStatus()
 │   │   ├── messages.ts              # messages table (contact form), cleanText() (keeps newlines), isEmail(), messageCounts()
+│   │   ├── notify.ts                # Optional ntfy pushes (messages, comments, game suggestions): notices + buildNtfyRequest() (pure, unit-tested), notifyAdmin()
 │   │   ├── url.ts                   # httpUrl() — pure, client-safe (re-exported by widget-data.ts)
 │   │   ├── reactions.ts             # DEFAULT_EMOJIS constant shared by API + widget
 │   │   ├── reaction-bus.ts          # broadcastReaction() — pushes a reaction to all WS clients via globalThis.__wssBroadcast
@@ -188,6 +189,9 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 | `OVERWATCH_BATTLE_TAG` | Overwatch battle tag (e.g. `User-12345`) |
 | `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` | Twitch app credentials for the `twitch` widget (client-credentials token, cached until it expires) |
 | `LASTFM_API_KEY` | Only for the `music` widget with `service: "lastfm"` (ListenBrainz needs no key) |
+| `NTFY_TOPIC` | Optional: ntfy topic that gets a push for each new contact message, guestbook comment and game suggestion. Unset = off. Set on the public instance (it serves the visitor POSTs). |
+| `NTFY_URL` / `NTFY_TOKEN` / `NTFY_CLICK` | ntfy server (default `https://ntfy.sh`), access token for a protected topic (Bearer), link opened when the notification is tapped (e.g. `https://example.com/admin`) |
+| `NTFY_EVENTS` | Comma list of `message`, `comment`, `suggestion` to send; empty = all |
 | `VISITOR_SALT` | Salt for visitor ID hashing |
 | `DATA_DIR` | Directory for runtime-written state (default: `<cwd>/data`) |
 | `ADMIN_PASSWORD_HASH` | Enables the admin panel at `/admin`. scrypt hash from `npm run admin:hash`. |
@@ -380,6 +384,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - Abuse limits: one message per visitor hash per 30s, **plus** a global cap (30 per 10 min across everyone — a fresh cookie is a fresh visitor, so the per-visitor limit alone doesn't stop a flood), `isBlocked()` (the same `blocked_visitors` table as comments — blocking from either screen blocks both), and a honeypot field `website` that is answered with 201 but never stored.
 - Use `cleanText()` from `messages.ts`, not `comments.ts`'s `sanitize()`: `sanitize` strips `\n`, which a message needs.
 - The admin nav's Inbox badge is polled every 30s together with the comments badge (`messages?counts=1`). Only deletions and blocks are audited (`message.*`); marking read is not.
+- **ntfy notifications** (`src/lib/notify.ts`): see "Admin notifications (ntfy)".
 - Message text is rendered as React text everywhere (the widget never shows messages back; the Inbox uses `white-space: pre-wrap`).
 
 ### New data widgets (youtube, twitch, music, status)
@@ -415,6 +420,13 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - Tables (`src/lib/game-suggestions.ts`): `game_suggestions` (one row per visitor per game, `UNIQUE(appid, visitor_hash)`; suggesting again replaces the note and marks it unread, answered with `again: true`) and `suggested_games` (title + owner status `open | planned | playing | played | dismissed`).
 - `GET /api/game-suggestions?id=` is the public top 10 (only when the section has `showList`); dismissed games never appear, and only `appid/title/status/count` leave the server.
 - Admin: the **Suggestions** screen groups by game; status, read/unread and delete act on the game, block/delete on one suggestion. Its nav badge is polled every 30 s with the comments/inbox badges. Deletes and blocks are audited (`suggestion.*`).
+
+### Admin notifications (ntfy)
+- `notifyAdmin(notice)` posts to ntfy fire-and-forget (5 s timeout, failures logged as `[Notify]`, never affect the response). Called by `/api/contact` (`messageNotice`), `/api/comments` (`commentNotice`, title says "awaits approval" when held) and `/api/game-suggestions` (`suggestionNotice`, Steam's title, "again" for a repeat) — each only **after the row is stored**, never for honeypot, blocked or rate-limited requests.
+- JSON publish (POST to the server root, `topic` in the body), not the `Title:` header style — header values must be ASCII and visitor names often aren't. Text is cut to 400 characters.
+- A process-wide cap of 30 pushes per 10 min across all kinds, because the guestbook has no global rate limit (a fresh cookie is a fresh visitor). Over the cap, pushes are dropped and logged once.
+- Env-only (`NTFY_TOPIC`, `NTFY_URL`, `NTFY_TOKEN`, `NTFY_CLICK`, `NTFY_EVENTS`), not `homepage.json`: the topic is effectively a secret on public ntfy.sh, and `homepage.json` sections are serialized into the page. The admin Integrations screen checks `NTFY_TOPIC` in the *admin* process, so in the two-container setup it can read "not set" while the public container sends fine.
+- Integration tests blank all `NTFY_*` vars so a developer's `.env` can't push from test runs.
 
 ### Social links (`socials`, `profile`)
 - `src/widgets/socials/platforms.ts` lists ~60 platforms with Simple Icons path data (`simple-icons` package, CC0; imported by name so only those icons are bundled, about 24 kB gzipped). Brands Simple Icons doesn't ship (LinkedIn, Xbox, Nexus Mods) get a short text `glyph` in their colour.

@@ -17,6 +17,7 @@ export const GET = withAdmin(async () => {
       .map((m) => ({ type: m.type, label: m.label, icon: m.icon, env: m.requiresEnv!.map((name) => ({ name, set: isSet(name) })) })),
     general: [
       { name: "ADMIN_PASSWORD_HASH", set: isSet("ADMIN_PASSWORD_HASH"), note: "The admin password is stored as plain text in ADMIN_PASSWORD. Run `npm run admin:hash` to replace it with a hash." },
+      { name: "NTFY_TOPIC", set: isSet("NTFY_TOPIC"), note: "Optional: set it (plus NTFY_URL / NTFY_TOKEN) to get an ntfy push for new contact messages, comments and game suggestions (NTFY_EVENTS picks which). In the two-container setup it is read by the public container, so this row may say \"not set\" here even when it works." },
       { name: "VISITOR_SALT", set: isSet("VISITOR_SALT"), note: "Without it, visitor ids are hashed with a public default salt." },
     ],
     storage: [

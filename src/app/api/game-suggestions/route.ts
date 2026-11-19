@@ -4,6 +4,7 @@ import { isBlocked } from "@/lib/admin/store";
 import { cleanText } from "@/lib/messages";
 import { NAME_MAX, NOTE_MAX, steamApp, suggestionsDb, topSuggested } from "@/lib/game-suggestions";
 import { findSection, WidgetError } from "@/lib/widget-data";
+import { notifyAdmin, suggestionNotice } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
       ).run(section.id, app.appid, name || null, note || null, now, hashedId);
       db.prepare("INSERT INTO suggested_games (appid, title, status, updated_at) VALUES (?, ?, 'open', ?) ON CONFLICT (appid) DO UPDATE SET title = excluded.title").run(app.appid, app.title, now);
     })();
+    notifyAdmin(suggestionNotice({ title: app.title, name: name || null, note: note || null, again }));
     return ok(again);
   } catch (err) {
     if (err instanceof WidgetError) return error(err.message, err.status);
