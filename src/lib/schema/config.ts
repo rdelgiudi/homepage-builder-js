@@ -3,6 +3,7 @@
  * Types are inferred from these schemas; defaults live here and nowhere else.
  */
 import { z } from "zod";
+import { MAX_PAGE_DEPTH, PAGE_SLUG, isReservedSlug } from "./page-address";
 import { SectionSchema } from "@/widgets/meta";
 
 export const CONFIG_VERSION = 2;
@@ -182,14 +183,8 @@ export const PageSettingsSchema = z.object({
 export const PAGE_SETTING_GROUPS = ["header", "titleColors", "layout", "counters", "background", "effects"] as const;
 export type PageSettingGroup = (typeof PAGE_SETTING_GROUPS)[number];
 
-/** One path segment: lowercase letters, digits and dashes. */
-export const PAGE_SLUG = /^[a-z0-9][a-z0-9-]{0,47}$/;
-/**
- * Addresses a page can't have. Anything starting with `admin` or `api` because the
- * recommended reverse proxy routes by path *prefix* (`/adminfoo` would reach the admin
- * container), and the site's own top-level routes.
- */
-export const isReservedSlug = (slug: string) => /^(admin|api)/.test(slug) || ["posts", "overlay", "ws"].includes(slug);
+// Page address rules live in a zod-free module: lib/pages.ts (in the site's client bundle) uses them too.
+export { MAX_PAGE_DEPTH, PAGE_SEGMENT, PAGE_SLUG, isReservedSlug } from "./page-address";
 
 /**
  * An extra page of the site at `/<slug>`, with its own tabs and widgets. The homepage is the
@@ -199,9 +194,9 @@ export const PageSchema = z.object({
   id: z.string().min(1),
   slug: z
     .string()
-    .regex(PAGE_SLUG, "Use lowercase letters, numbers and dashes, starting with a letter or number")
+    .regex(PAGE_SLUG, `Use lowercase letters, numbers and dashes, starting with a letter or number; at most ${MAX_PAGE_DEPTH} levels ("about/colophon")`)
     .refine((s) => !isReservedSlug(s), "This address is taken by the site itself (anything starting with admin or api, and posts, overlay, ws)")
-    .meta({ title: "Address", description: "The page is at /<address>. Lowercase letters, numbers and dashes" }),
+    .meta({ title: "Address", description: "The page is at /<address>, e.g. about or about/colophon (under another page). Lowercase letters, numbers and dashes" }),
   title: z.string().min(1).meta({ title: "Title", description: "Shown in the browser tab and in the editor's site map" }),
   description: z.string().optional().meta({ title: "Description", ui: "textarea", description: "For search engines and link previews. Empty = the site's tagline" }),
   tabs: z.array(TabSchema).default([]),

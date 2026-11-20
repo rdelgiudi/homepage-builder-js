@@ -1160,9 +1160,9 @@
     },
     {
       "id": "page-colophon",
-      "slug": "colophon",
+      "slug": "about/colophon",
       "title": "Colophon",
-      "description": "Only linked from a markdown file on the About page; its own background, layout, title colors and counters.",
+      "description": "Under About (/about/colophon), only linked from a markdown file there; its own background, layout, title colors and counters.",
       "tabs": [
         {
           "id": "colophon-main",
@@ -1173,7 +1173,7 @@
             {
               "id": "colophon-text",
               "type": "text",
-              "content": "Visitors reach this page only through a link in the markdown file on the About page, and that still counts: it isn't flagged as unreachable. It also looks different: an animated gradient with an aurora behind a see-through header, the narrow Link in bio layout, warm title colors and no counters. The name and tagline still come from the site.",
+              "content": "This page sits under About, at /about/colophon, and visitors reach it only through a link in the markdown file on the About page, and that still counts: it isn't flagged as unreachable. It also looks different: an animated gradient with an aurora behind a see-through header, the narrow Link in bio layout, warm title colors and no counters. The name and tagline still come from the site.",
               "icon": "📜"
             },
             {

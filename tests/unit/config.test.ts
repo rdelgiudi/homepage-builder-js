@@ -222,7 +222,8 @@ describe("showcase config (src/config/homepage.showcase.json)", () => {
     assert.deepEqual(map.unreachable.map((p) => p.slug), []);
     assert.deepEqual(map.broken.map((l) => l.href), []);
     // One page is linked only from a markdown file: that counts.
-    assert.equal(map.parent.get("colophon"), "about");
-    assert.ok(map.links.some((l) => l.to === "colophon" && l.file === "showcase-pages.md"));
+    // The colophon is nested under About (/about/colophon) and linked only from that markdown file.
+    assert.equal(map.parent.get("about/colophon"), "about");
+    assert.ok(map.links.some((l) => l.to === "about/colophon" && l.file === "showcase-pages.md"));
   });
 });

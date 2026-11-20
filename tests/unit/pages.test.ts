@@ -61,7 +61,12 @@ describe("pages: links", () => {
     assert.equal(linkTarget("/?tab=about", "x"), "");
     assert.equal(linkTarget("/page-2/", ""), "page-2");
     assert.equal(linkTarget("/Page-2#top", ""), "page-2");
-    assert.equal(linkTarget("page-3", "page-2"), "page-3"); // relative
+    assert.equal(linkTarget("page-3", "page-2"), "page-3"); // relative, like a browser: a sibling at the top level
+    assert.equal(linkTarget("/about/colophon#x", ""), "about/colophon");
+    assert.equal(linkTarget("colophon", "about/team"), "about/colophon"); // relative from a nested page
+    assert.equal(linkTarget("../", "about/team"), "");
+    assert.equal(linkTarget("/a/b/c/d", ""), null, "deeper than any page");
+    assert.equal(linkTarget("/docs/cv.pdf", ""), null, "a file");
     assert.equal(linkTarget("https://my.site/page-2", "", ["my.site"]), "page-2");
     assert.equal(linkTarget("//my.site/page-2", "", ["my.site"]), "page-2");
     for (const other of ["https://example.com/page-2", "mailto:me@x.y", "/posts/hello", "/api/uploads/x.webp", "/admin", "#top", "?tab=x", "", "example.com/x", "/cv.pdf", "/logo.png", "notes.md"]) {
@@ -112,10 +117,12 @@ describe("pages: config", () => {
   });
 
   it("strict parsing refuses reserved or repeated addresses and ids repeated across pages", () => {
-    for (const slug of ["admin", "admin-stuff", "api", "apiary", "posts", "overlay", "ws", "Caps", "-x", "a/b"]) {
+    for (const slug of ["admin", "admin-stuff", "api", "apiary", "posts", "overlay", "ws", "Caps", "-x", "a//b", "/a", "a/", "a/b/c/d", "posts/x", "admin/x", "a/B", "a/-b"]) {
       assert.equal(strictParseConfig({ version: 2, tabs: [], pages: [{ id: "p", slug, title: "x" }] }).config, null, slug);
     }
-    assert.ok(strictParseConfig({ version: 2, tabs: [], pages: [{ id: "p", slug: "postscript", title: "x" }] }).config);
+    for (const ok of ["postscript", "about/colophon", "a/b/c", "x/posts"]) {
+      assert.ok(strictParseConfig({ version: 2, tabs: [], pages: [{ id: "p", slug: ok, title: "x" }] }).config, ok);
+    }
     const twice = strictParseConfig({ version: 2, tabs: [], pages: [{ id: "a", slug: "x", title: "A" }, { id: "b", slug: "x", title: "B" }] });
     assert.match(twice.issues[0]?.message ?? "", /already uses the address/);
     const dupId = strictParseConfig({ version: 2, tabs: [{ id: "t", label: "T" }], pages: [{ id: "p", slug: "x", title: "X", tabs: [{ id: "t", label: "T" }] }] });
@@ -189,10 +196,10 @@ describe("pages: the showcase's own settings", () => {
     const fs = await import("node:fs");
     const raw = JSON.parse(fs.readFileSync(new URL("../../src/config/homepage.showcase.json", import.meta.url), "utf-8"));
     const config = strictParseConfig(raw).config!;
-    const colophon = config.pages.find((p) => p.slug === "colophon")!;
+    const colophon = config.pages.find((p) => p.slug === "about/colophon")!;
     const view = pageView(config, colophon.id);
     assert.equal(view.background.base.type, "gradient");
-    assert.deepEqual(view.background.base.gradientLight, raw.pages.find((p: { slug: string }) => p.slug === "colophon").settings.background.base.gradientLight);
+    assert.deepEqual(view.background.base.gradientLight, raw.pages.find((p: { slug: string }) => p.slug === "about/colophon").settings.background.base.gradientLight);
     assert.equal(pageView(config, "").background.base.type, config.background.base.type, "the homepage keeps the site's");
   });
 });
@@ -211,5 +218,21 @@ describe("pages: own name, tagline and title colors", () => {
     assert.deepEqual(pageView(config, "").titleGradient, ["#f00", "#00f"]);
     assert.deepEqual(pageView(config, "p-page-2").titleGradient, [], "page 2 keeps the site's colors");
     assert.ok(strictParseConfig(config).config);
+  });
+});
+
+describe("pages: nested addresses", () => {
+  it("moveAddress moves the pages under a page along, and links to all of them follow", async () => {
+    const { moveAddress, parentAddress } = await import("@/lib/pages");
+    const config = site({ "": ["/about", "/about/colophon?tab=x"], about: ["/about/colophon"] }, ["about", "about/colophon", "aboutus"]);
+    const { config: next, moved } = moveAddress(config, "p-about", "info", ["my.site"]);
+    assert.deepEqual(moved, [{ from: "about", to: "info" }, { from: "about/colophon", to: "info/colophon" }]);
+    assert.deepEqual(next.pages.map((p) => p.slug), ["info", "info/colophon", "aboutus"], "aboutus only shares the prefix: untouched");
+    const urls = (slug: string) => siteMap(next).links.filter((l) => l.from === slug).map((l) => l.href);
+    assert.deepEqual(urls(""), ["/info", "/info/colophon?tab=x"]);
+    assert.deepEqual(urls("info"), ["/info/colophon"]);
+    assert.deepEqual(siteMap(next).unreachable.map((p) => p.slug), ["aboutus"], "the moved pages stay reachable");
+    assert.equal(parentAddress("info/colophon"), "info");
+    assert.equal(parentAddress("info"), "");
   });
 });

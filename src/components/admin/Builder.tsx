@@ -31,7 +31,7 @@ import { WidgetIcon } from "@/widgets/BrandIcon";
 import { COLUMNS, fitRow, packRows, placeInGrid, removeFromGrid, rowIds, setRowSpans, spanOf, splitRow, type DropTarget, type PlaceResult } from "./grid-layout";
 import { arrangeOf, gridOptions, ignoredTabSettings, isGridTab as isGridTabIn, pinnedTabId } from "@/lib/layouts";
 import { PREVIEW_DROP, type PreviewDropState } from "./PreviewPane";
-import { HOME, allIds, allSections, findPage, findPageBySlug, pageOf, pageView, pagePath, retargetLinks, sitePages, withPageTabs, type PageLink } from "@/lib/pages";
+import { HOME, allIds, allSections, findPage, findPageBySlug, moveAddress, pageOf, pageView, pagePath, sitePages, withPageTabs, type PageLink } from "@/lib/pages";
 import { PAGE_DROP, PageInspector, PagesOutline } from "./PagesPanel";
 import { useSiteMap } from "./useSiteMap";
 import { PREVIEW_MOVE, SECTION_DRAG, pickTarget, placeInList, previewCandidates, sideFor, type Point, type PreviewHit } from "./preview-drop";
@@ -736,7 +736,14 @@ export function useBuilder(): {
     const target = site.pages.find((p) => p.id === id);
     if (!target) return;
     const widgets = target.tabs.reduce((n, t) => n + t.sections.length, 0);
-    if (!window.confirm(`Delete the page "${target.title}" (${pagePath(target.slug)})${widgets ? ` and its ${widgets} widget${widgets === 1 ? "" : "s"}` : ""}? Links to it will point nowhere.`)) return;
+    const under = site.pages.filter((p) => p.slug.startsWith(`${target.slug}/`));
+    if (
+      !window.confirm(
+        `Delete the page "${target.title}" (${pagePath(target.slug)})${widgets ? ` and its ${widgets} widget${widgets === 1 ? "" : "s"}` : ""}? Links to it will point nowhere.` +
+          (under.length ? ` The ${under.length === 1 ? "page" : "pages"} under it (${under.map((p) => pagePath(p.slug)).join(", ")}) stay where they are.` : "")
+      )
+    )
+      return;
     updateSite((c) => ({ ...c, pages: c.pages.filter((p) => p.id !== id) }));
     openPage(HOME);
   };
@@ -746,11 +753,12 @@ export function useBuilder(): {
 
   /** New address: links in widgets follow (draft); returns the markdown files that still link to the old one. */
   const changeAddress = (id: string, slug: string): string[] => {
-    const old = site.pages.find((p) => p.id === id)?.slug;
-    if (old === undefined) return [];
     const host = window.location.host.toLowerCase();
-    updateSite((c) => retargetLinks({ ...c, pages: c.pages.map((p) => (p.id === id ? { ...p, slug } : p)) }, old, slug, [host]));
-    return [...new Set(map.links.filter((l) => l.to === old && l.file).map((l) => l.file!))];
+    // The pages under it move along (moveAddress); worked out first for the markdown file list.
+    const { moved } = moveAddress(site, id, slug, [host]);
+    updateSite((c) => moveAddress(c, id, slug, [host]).config);
+    const old = new Set(moved.map((m) => m.from));
+    return [...new Set(map.links.filter((l) => old.has(l.to) && l.file).map((l) => l.file!))];
   };
 
   /**

@@ -10,6 +10,12 @@ const config = {
   homeSettings: { counters: { viewers: false, visitors: false } },
   pages: [
     {
+      id: "page-deeper",
+      slug: "more/deeper",
+      title: "Deeper",
+      tabs: [{ id: "deeper-main", label: "Main", sections: [{ id: "deeper-text", type: "text", content: "A page under More" }] }],
+    },
+    {
       id: "page-more",
       slug: "more",
       title: "More things",
@@ -71,6 +77,14 @@ describe("pages", () => {
     assert.match(more, /site-fixed-bottom fixed bottom-4 left-4[^>]*><div class="flex flex-col/);
   });
 
+  it("serves a page nested under another at /more/deeper, and its draft in the preview", async () => {
+    const html = rendered(await (await fetch(server.url + "/more/deeper")).text());
+    assert.match(html, /A page under More/);
+    assert.match(html, /<title>Deeper · /);
+    assert.doesNotMatch(rendered(await (await fetch(server.url + "/more/deeper/nope/x")).text()), /A page under More/, "deeper than any page");
+    assert.match((await admin.json("/admin/preview/more/deeper")).text, /A page under More/);
+  });
+
   it("finds a page whatever the case of its address", async () => {
     assert.match(rendered(await (await fetch(server.url + "/More")).text()), /Only on the second page/);
   });
@@ -90,7 +104,7 @@ describe("pages", () => {
 
   it("previews a page of the draft, only with a session", async () => {
     const draft = structuredClone(config);
-    draft.pages[0].tabs[0].sections[0].items = [{ label: "Draft-only skill" }];
+    (draft.pages.find((p) => p.slug === "more")!.tabs[0].sections[0] as { items?: unknown[] }).items = [{ label: "Draft-only skill" }];
     assert.equal((await admin.json("/api/admin/config", { method: "PUT", json: { config: draft } })).status, 200);
     const preview = (await admin.json("/admin/preview/more")).text;
     assert.match(preview, /Draft-only skill/);
@@ -100,7 +114,7 @@ describe("pages", () => {
   });
 
   it("refuses a draft with a reserved or repeated address", async () => {
-    for (const slug of ["admin-area", "api", "posts"]) {
+    for (const slug of ["admin-area", "api", "posts", "posts/x", "admin/x", "a/b/c/d"]) {
       const bad = structuredClone(config);
       bad.pages[0].slug = slug;
       const res = await admin.json("/api/admin/config", { method: "PUT", json: { config: bad } });

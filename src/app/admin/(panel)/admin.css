@@ -1770,3 +1770,34 @@ textarea.adm-input {
   line-height: 18px;
   letter-spacing: 0.02em;
 }
+
+/* Page settings: the address = "Under" + its own level. */
+.adm-label.adm-sub {
+  margin-top: 4px;
+  color: var(--a-muted);
+  font-weight: 400;
+}
+.adm-address-prefix {
+  flex: none;
+  max-width: 65%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, monospace;
+  font-size: 12.5px;
+}
+#adm-page-address {
+  min-width: 7ch;
+}
+.adm-unreachable-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.adm-unreachable-name {
+  font-weight: 600;
+  text-align: left;
+}
+.adm-unreachable-name code {
+  font-weight: 400;
+}

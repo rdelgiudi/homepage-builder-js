@@ -7,6 +7,7 @@
  * homepage by following links (the editor warns about those).
  */
 import type { HomepageConfig, PageSettingGroup, PageSettings, Tab } from "@/lib/schema/config";
+import { MAX_PAGE_DEPTH } from "@/lib/schema/page-address";
 
 export interface SitePage {
   /** "" for the homepage. */
@@ -135,41 +136,34 @@ export function pageOf(config: HomepageConfig, id: string): SitePage | undefined
 const SITE_ROUTES = new Set(["posts", "overlay", "admin", "api", "ws"]);
 
 /**
- * Which page an address leads to: a page slug ("" = the homepage), or null when it leads
- * somewhere else (another site, a blog post, a file, mailto:…). `from` is the slug of the
- * page the link is on (for relative links); `ownHosts` are the site's own host names, so a
- * full `https://my.site/page` counts too.
+ * Which page an address leads to: a page address ("" = the homepage, "about/colophon" for a page
+ * under another), or null when it leads somewhere else (another site, a blog post, a file,
+ * mailto:…). `from` is the address of the page the link is on: relative links resolve like a
+ * browser does (`colophon` on /about/x → about/colophon). `ownHosts` = the site's own host
+ * names, so a full `https://my.site/page` counts too.
  */
 export function linkTarget(href: string, from: string, ownHosts: readonly string[] = []): string | null {
   const raw = href.trim();
   if (!raw || raw.startsWith("#") || raw.startsWith("?")) return null; // the same page
-  let path: string;
-  if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith("//")) {
-    let url: URL;
-    try {
+  let url: URL;
+  try {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith("//")) {
       url = new URL(raw.startsWith("//") ? `https:${raw}` : raw);
-    } catch {
-      return null;
+      if (!/^https?:$/.test(url.protocol) || !ownHosts.includes(url.host.toLowerCase())) return null;
+    } else {
+      url = new URL(raw, `http://site.invalid${pagePath(from)}`);
     }
-    if (!/^https?:$/.test(url.protocol) || !ownHosts.includes(url.host.toLowerCase())) return null;
-    path = url.pathname;
-  } else if (raw.startsWith("/")) {
-    path = raw;
-  } else if (/^[a-z0-9][a-z0-9-]*\/?(?:[?#].*)?$/i.test(raw)) {
-    // A relative link ("page-3") from a page at /<from>: pages are siblings at the top level.
-    path = `/${raw}`;
-  } else {
+  } catch {
     return null;
   }
-  const clean = path.split(/[?#]/)[0].replace(/\/+$/, "");
+  const clean = url.pathname.replace(/\/+$/, "");
   if (clean === "") return "";
   const parts = clean.slice(1).split("/");
-  if (parts.length !== 1) return null; // /posts/…, deeper paths: not a page
-  // Only page-address-shaped names: /cv.pdf or /logo.png are files, not missing pages.
-  if (!/^[a-z0-9][a-z0-9-]*$/i.test(parts[0])) return null;
-  // Lower case: the site finds /Page-2 too (addresses are lowercase-only).
-  const slug = parts[0].toLowerCase();
-  return SITE_ROUTES.has(slug) ? null : slug;
+  if (parts.length > MAX_PAGE_DEPTH) return null;
+  // Only address-shaped levels: /cv.pdf or /docs/logo.png are files, not missing pages.
+  if (!parts.every((p) => /^[a-z0-9][a-z0-9-]*$/i.test(p))) return null;
+  // Lower case: the site finds /About/Colophon too (addresses are lowercase-only).
+  return SITE_ROUTES.has(parts[0].toLowerCase()) ? null : parts.join("/").toLowerCase();
 }
 
 /** Addresses in a markdown text: inline links, reference definitions, HTML hrefs and autolinks. */
@@ -294,4 +288,23 @@ export function retargetLinks(config: HomepageConfig, from: string, to: string, 
     return value;
   };
   return mapSections(config, (s) => fix(s, "") as Section);
+}
+
+/** The address a page sits under ("about" for "about/colophon"; "" = the top level). */
+export const parentAddress = (slug: string) => (slug.includes("/") ? slug.slice(0, slug.lastIndexOf("/")) : "");
+
+/**
+ * Changes a page's address. Pages under it (`<old>/…`) move along, keeping their own last
+ * level; link fields that led to any of them follow (retargetLinks). Returns every address
+ * that changed, so the panel can name markdown files that still use the old ones.
+ */
+export function moveAddress(config: HomepageConfig, id: string, to: string, ownHosts: readonly string[] = []): { config: HomepageConfig; moved: { from: string; to: string }[] } {
+  const page = config.pages.find((p) => p.id === id);
+  if (!page || page.slug === to) return { config, moved: [] };
+  const from = page.slug;
+  const moved = config.pages.filter((p) => p.slug === from || p.slug.startsWith(`${from}/`)).map((p) => ({ from: p.slug, to: to + p.slug.slice(from.length) }));
+  const newSlug = new Map(moved.map((m) => [m.from, m.to]));
+  let next: HomepageConfig = { ...config, pages: config.pages.map((p) => (newSlug.has(p.slug) ? { ...p, slug: newSlug.get(p.slug)! } : p)) };
+  for (const m of moved) next = retargetLinks(next, m.from, m.to, ownHosts);
+  return { config: next, moved };
 }

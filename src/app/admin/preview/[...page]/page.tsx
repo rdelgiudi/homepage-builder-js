@@ -7,10 +7,10 @@ import { getDraftConfig } from "@/lib/admin/publish";
 import { pageView } from "@/lib/pages";
 
 /** A page other than the homepage, rendered from the draft for the admin preview (see ../page.tsx). */
-export default async function PreviewExtraPage({ params }: { params: Promise<{ page: string }> }) {
+export default async function PreviewExtraPage({ params }: { params: Promise<{ page: string[] }> }) {
   if (!(await isAdminSession())) redirect("/admin/login");
   const config = getDraftConfig() ?? getConfig();
-  const slug = (await params).page.toLowerCase();
+  const slug = (await params).page.join("/").toLowerCase();
   const page = config.pages.find((p) => p.slug === slug);
   if (!page) {
     // Not notFound(): the panel opens a new page in the preview before its draft is saved (500 ms

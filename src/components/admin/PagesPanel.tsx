@@ -2,8 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { PAGE_SLUG, isReservedSlug, type HomepageConfig, type Page } from "@/lib/schema/config";
-import { HOME, pagePath, type PageLink, type SiteMap, type SitePage } from "@/lib/pages";
+import { MAX_PAGE_DEPTH, PAGE_SEGMENT, PAGE_SLUG, isReservedSlug, type HomepageConfig, type Page } from "@/lib/schema/config";
+import { HOME, pagePath, parentAddress, type PageLink, type SiteMap, type SitePage } from "@/lib/pages";
 import { widgetMetaByType } from "@/widgets/meta";
 import SchemaForm from "./SchemaForm";
 import { formSchemas } from "./schemas";
@@ -77,16 +77,27 @@ interface OutlineProps {
 }
 
 /**
- * The site's pages as a tree that follows the links: each page sits under the page it is first
- * reached from. Pages that can't be reached from the homepage are listed apart, with a warning
- * and a one-click fix; links to pages that don't exist are listed below.
+ * The site's pages as a tree that follows their addresses (/about/colophon under /about). Pages
+ * that can't be reached from the homepage by following links are marked in place and explained
+ * below, with a one-click fix; links to pages that don't exist are listed after that.
  */
 export function PagesOutline({ map, currentId, settingsId, onOpen, onSettings, onAdd, onLinkFromHome, onShowLink }: OutlineProps) {
   const row = (page: SitePage, depth: number, warn = false): ReactNode => (
     <PageRow key={page.id || "home"} page={page} depth={depth} warn={warn} current={page.id === currentId} settings={settingsId === page.id} onOpen={onOpen} onSettings={onSettings} />
   );
+  // The tree follows addresses: /about/colophon sits under /about, wherever it is linked from. A
+  // page whose parent address has no page sits under the nearest page above it (or the top).
+  const slugs = new Set(map.pages.map((p) => p.slug));
+  const holder = (slug: string) => {
+    let up = parentAddress(slug);
+    while (up && !slugs.has(up)) up = parentAddress(up);
+    return up;
+  };
+  const unreachable = new Set(map.unreachable.map((p) => p.slug));
   const tree = (slug: string, depth: number): ReactNode[] =>
-    map.pages.filter((p) => p.slug !== HOME && map.parent.get(p.slug) === slug).flatMap((p) => [row(p, depth), ...tree(p.slug, depth + 1)]);
+    map.pages
+      .filter((p) => p.slug !== HOME && holder(p.slug) === slug)
+      .flatMap((p) => [row(p, depth, unreachable.has(p.slug)), ...tree(p.slug, depth + 1)]);
 
   return (
     <>
@@ -106,14 +117,17 @@ export function PagesOutline({ map, currentId, settingsId, onOpen, onSettings, o
             <strong>
               {map.unreachable.length === 1 ? "1 page can't" : `${map.unreachable.length} pages can't`} be reached from the homepage.
             </strong>{" "}
-            Visitors only get there by typing the address. Link {map.unreachable.length === 1 ? "it" : "them"} from the homepage or from a page that is linked.
+            Visitors only get there by typing the address (being under another page doesn&apos;t link it). Link {map.unreachable.length === 1 ? "it" : "them"} from the homepage or from a page that is
+            linked.
           </p>
-          <ul className="adm-rows">
+          <ul className="adm-unreachable-list">
             {map.unreachable.map((p) => {
               const from = map.links.filter((l) => l.to === p.slug && l.from !== p.slug);
               return (
                 <li key={p.id} className="adm-unreachable">
-                  <ul className="adm-rows">{row(p, 0, true)}</ul>
+                  <button type="button" className="adm-link adm-unreachable-name" onClick={() => onOpen(p.id)}>
+                    ⚠️ {p.title} <code>{pagePath(p.slug)}</code>
+                  </button>
                   <p className="adm-hint">
                     {from.length ? <>Linked only from {[...new Set(from.map((l) => pageName(map, l.from)))].join(", ")}, which can&apos;t be reached either.</> : <>No page links here.</>}{" "}
                     <button type="button" className="adm-link" onClick={() => onLinkFromHome(p.id)}>
@@ -162,11 +176,14 @@ interface InspectorProps {
 export function PageInspector({ site, map, pageId, onEdit, onAddress, onDelete, onLinkFromHome, onShowLink }: InspectorProps) {
   const page = site.pages.find((p) => p.id === pageId);
   const slug = page?.slug ?? HOME;
-  const [address, setAddress] = useState(slug);
+  // The address is "under" (another page's address, "" = top level) + "/" + this page's own level.
+  const [under, setUnder] = useState(parentAddress(slug));
+  const [segment, setSegment] = useState(slug.slice(slug.lastIndexOf("/") + 1));
   const [error, setError] = useState<string | null>(null);
   const [leftover, setLeftover] = useState<string[]>([]);
 
-  const incoming = map.links.filter((l) => l.to === slug && l.from !== slug);
+  // One entry per place (a markdown file can link here more than once).
+  const incoming = [...new Map(map.links.filter((l) => l.to === slug && l.from !== slug).map((l) => [`${l.from}|${l.sectionId}|${l.file ?? ""}`, l])).values()];
   const outgoing = map.links.filter((l) => l.from === slug && l.to !== slug);
   const reachable = map.reachable.has(slug);
 
@@ -219,12 +236,23 @@ export function PageInspector({ site, map, pageId, onEdit, onAddress, onDelete, 
     );
   }
 
+  const own = segment.trim().toLowerCase();
+  const next = under ? `${under}/${own}` : own;
+  // Pages under this one move along when its address changes.
+  const inside = (s: string) => s === page.slug || s.startsWith(`${page.slug}/`);
+  const descendants = site.pages.filter((p) => p.id !== page.id && inside(p.slug));
+  // It can go under any page except itself and the pages under it, while the result stays shallow enough.
+  const deepest = Math.max(0, ...descendants.map((p) => p.slug.split("/").length - page.slug.split("/").length));
+  const parents = site.pages.filter((p) => !inside(p.slug) && p.slug.split("/").length + 1 + deepest <= MAX_PAGE_DEPTH);
   const changeAddress = () => {
-    const next = address.trim().toLowerCase();
     if (next === page.slug) return setError(null);
-    if (!PAGE_SLUG.test(next)) return setError("Use lowercase letters, numbers and dashes, starting with a letter or number.");
+    if (!PAGE_SEGMENT.test(own)) return setError("Use lowercase letters, numbers and dashes, starting with a letter or number.");
+    if (!PAGE_SLUG.test(next) || next.split("/").length + deepest > MAX_PAGE_DEPTH) return setError(`That goes more than ${MAX_PAGE_DEPTH} levels deep.`);
     if (isReservedSlug(next)) return setError("The site uses this address itself (anything starting with admin or api, and posts, overlay, ws).");
-    if (site.pages.some((p) => p.id !== page.id && p.slug === next)) return setError(`Another page is already at /${next}.`);
+    // Every address that changes (this page and the ones under it) must still be free.
+    const others = new Set(site.pages.filter((p) => !inside(p.slug)).map((p) => p.slug));
+    const clash = [page, ...descendants].map((p) => next + p.slug.slice(page.slug.length)).find((s) => others.has(s));
+    if (clash) return setError(`Another page is already at /${clash}.`);
     setError(null);
     setLeftover(onAddress(next));
   };
@@ -251,17 +279,42 @@ export function PageInspector({ site, map, pageId, onEdit, onAddress, onDelete, 
             changeAddress();
           }}
         >
-          <label className="adm-label" htmlFor="adm-page-address">
-            Address
+          <span className="adm-label">Address</span>
+          <label className="adm-label adm-sub" htmlFor="adm-page-under">
+            Under
+          </label>
+          <select id="adm-page-under" className="adm-input" value={under} onChange={(e) => setUnder(e.target.value)}>
+            <option value="">Nothing: a top-level page</option>
+            {under && !parents.some((p) => p.slug === under) && <option value={under}>/{under} (no page there)</option>}
+            {parents.map((p) => (
+              <option key={p.id} value={p.slug}>
+                {p.title} ({pagePath(p.slug)})
+              </option>
+            ))}
+          </select>
+          <label className="adm-label adm-sub" htmlFor="adm-page-address">
+            Its own part of the address
           </label>
           <div className="adm-inline">
-            <span className="adm-muted">/</span>
-            <input id="adm-page-address" className="adm-input" value={address} onChange={(e) => setAddress(e.target.value)} spellCheck={false} />
-            <button type="submit" className="adm-btn is-small" disabled={address.trim().toLowerCase() === page.slug}>
+            <span className="adm-muted adm-address-prefix">/{under ? `${under}/` : ""}</span>
+            <input id="adm-page-address" className="adm-input" value={segment} onChange={(e) => setSegment(e.target.value)} spellCheck={false} />
+            <button type="submit" className="adm-btn is-small" disabled={next === page.slug}>
               Change
             </button>
           </div>
-          <span className="adm-hint">Links to the old address in widgets are updated in the draft. The page moves when you publish.</span>
+          <span className="adm-hint">
+            {next !== page.slug && own ? (
+              <>
+                New address: <code>{pagePath(next)}</code>.{" "}
+              </>
+            ) : null}
+            {descendants.length > 0 && (
+              <>
+                {descendants.map((p) => p.title).join(", ")} {descendants.length === 1 ? "is" : "are"} under this page and move{descendants.length === 1 ? "s" : ""} along.{" "}
+              </>
+            )}
+            Links to the old addresses in widgets are updated in the draft. The page moves when you publish.
+          </span>
           {error && <span className="adm-bad">{error}</span>}
           {leftover.length > 0 && (
             <span className="adm-notice is-warn">

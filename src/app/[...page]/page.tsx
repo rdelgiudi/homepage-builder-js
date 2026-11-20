@@ -6,12 +6,13 @@ import { pageView } from "@/lib/pages";
 
 export const dynamic = "force-dynamic";
 
-type Props = { params: Promise<{ page: string }> };
+/** `/about` or `/about/colophon`: every level of the address. */
+type Props = { params: Promise<{ page: string[] }> };
 
 /** A page of the site other than the homepage (`config.pages`, see lib/pages.ts). */
 const findPage = async (params: Props["params"]) => {
   // Addresses are lowercase-only, so /Page-2 finds /page-2 (the editor's site map counts it).
-  const slug = (await params).page.toLowerCase();
+  const slug = (await params).page.join("/").toLowerCase();
   return getConfig().pages.find((p) => p.slug === slug);
 };
 
