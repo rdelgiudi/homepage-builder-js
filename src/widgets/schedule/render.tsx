@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { httpUrl } from "@/lib/url";
+import { linkHref, opens } from "@/lib/url";
 import { Card, Notice } from "../common";
 import { Icon } from "../shared";
 import type { WidgetView } from "../types";
@@ -79,7 +79,7 @@ function Schedule({ section }: { section: ScheduleSection }) {
         <ul className="divide-y divide-gray-200 dark:divide-gray-700">
           {list.map((o, i) => {
             const slot = slots[o.slot];
-            const url = httpUrl(slot.url);
+            const url = linkHref(slot.url);
             const highlight = o.live || i === nextIndex;
             return (
               <li key={`${o.slot}-${o.start}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
@@ -94,7 +94,7 @@ function Schedule({ section }: { section: ScheduleSection }) {
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                   {slot.icon && <Icon icon={slot.icon} width={20} height={20} className="shrink-0" />}
                   {url ? (
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="truncate text-gray-900 dark:text-white hover:underline">
+                    <a href={url} {...opens(url)} className="truncate text-gray-900 dark:text-white hover:underline">
                       {slot.label}
                     </a>
                   ) : (

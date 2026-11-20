@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+import type { Tab } from "@/lib/schema/config";
 import type { JsonSchema } from "./schemas";
 import { api, uploadFile } from "./api";
 import { resolveSocials, type SocialPlatformKey } from "@/widgets/socials/platforms";
@@ -451,15 +452,22 @@ function ObjectList({ node, items, onChange, label }: { node: JsonSchema; items:
 
 let contentFiles: Promise<string[]> | null = null;
 
+/**
+ * The tabs a `ui: "tab"` field chooses from. Unset = the homepage's; the Header & layout screen sets it to
+ * a page's tabs while that page's own layout is edited (its profile column is one of its tabs).
+ */
+export const TabChoices = createContext<Tab[] | null>(null);
+
 /** One of the config's tabs, by id (e.g. the profile layout's column). Empty = none. */
 function TabSelect({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
   const { config } = useAdmin();
-  const missing = value && !config.tabs.some((t) => t.id === value);
+  const tabs = useContext(TabChoices) ?? config.tabs;
+  const missing = value && !tabs.some((t) => t.id === value);
   return (
     <select className="adm-input" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">None</option>
       {missing && <option value={value}>{value} (deleted)</option>}
-      {config.tabs.map((t) => (
+      {tabs.map((t) => (
         <option key={t.id} value={t.id}>
           {t.label}
         </option>

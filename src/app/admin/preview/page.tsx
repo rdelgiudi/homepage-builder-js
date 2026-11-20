@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import SitePage from "@/components/SitePage";
 import { getConfig } from "@/lib/config";
+import { HOME, pageView } from "@/lib/pages";
 import { isAdminSession } from "@/lib/admin/auth";
 import { getDraftConfig } from "@/lib/admin/publish";
 
@@ -11,5 +12,5 @@ import { getDraftConfig } from "@/lib/admin/publish";
  */
 export default async function PreviewPage() {
   if (!(await isAdminSession())) redirect("/admin/login");
-  return <SitePage config={getDraftConfig() ?? getConfig()} preview />;
+  return <SitePage config={pageView(getDraftConfig() ?? getConfig(), HOME)} preview />;
 }

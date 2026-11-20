@@ -30,12 +30,11 @@ next-env.d.ts
 .idea/
 .vscode/
 
-# Local config files (use .example.json files as templates)
+# Your site's config (src/config/homepage.showcase.json is a starting point to copy)
 src/config/homepage.json
 
 # Markdown files (exceptions must come after the ignore rule, or they don't apply)
 /src/content/*
-!/src/content/about-example.md
 !/src/content/showcase-*.md
 
 # Runtime data (database, uploads)

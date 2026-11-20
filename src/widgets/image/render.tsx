@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { linkHref, opens } from "@/lib/url";
 import { safeUrl } from "@/lib/background";
 import { Notice } from "../common";
 import type { WidgetView } from "../types";
@@ -21,7 +22,7 @@ export const view: WidgetView<ImageSection> = {
       <div className={`grid gap-3 ${columns > 1 ? "grid-cols-2" : "grid-cols-1"} md:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))]`} style={{ "--cols": columns } as CSSProperties}>
         {images.map((image, i) => (
           <figure key={i} className="min-w-0">
-            <a href={safeUrl(image.link) ?? image.src} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg">
+            <a href={linkHref(image.link) ?? image.src} {...opens(linkHref(image.link) ?? image.src)} className="block overflow-hidden rounded-lg">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={image.src} alt={image.alt ?? ""} loading="lazy" className={`w-full ${SHAPE[section.shape]} transition-transform duration-300 hover:scale-105`} />
             </a>

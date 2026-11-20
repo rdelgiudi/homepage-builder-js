@@ -5,16 +5,17 @@ import { api } from "./api";
 import { AdminProvider, useAdmin } from "./store";
 import { useBuilder } from "./Builder";
 import PreviewPane from "./PreviewPane";
-import { BackgroundScreen, EffectsScreen, SiteScreen } from "./ConfigScreens";
+import { BackgroundScreen, EffectsScreen, HeaderLayoutScreen, ScopeBar, type ScreenProps, type SettingsScope } from "./ConfigScreens";
 import ContentScreen from "./ContentScreen";
 import CommentsScreen from "./CommentsScreen";
 import InboxScreen from "./InboxScreen";
 import SuggestionsScreen from "./SuggestionsScreen";
 import { HistoryScreen, IntegrationsScreen } from "./OtherScreens";
+import { useSiteMap } from "./useSiteMap";
 
 const SCREENS = [
   { id: "builder", label: "Builder" },
-  { id: "site", label: "Site" },
+  { id: "header-layout", label: "Header & layout" },
   { id: "background", label: "Background" },
   { id: "effects", label: "Effects" },
   { id: "content", label: "Content" },
@@ -27,7 +28,7 @@ const SCREENS = [
 type ScreenId = (typeof SCREENS)[number]["id"];
 
 /** Screens that edit the draft and therefore show the live preview. */
-const DRAFT_SCREENS: ScreenId[] = ["builder", "site", "background", "effects"];
+const DRAFT_SCREENS: ScreenId[] = ["builder", "header-layout", "background", "effects"];
 
 const isScreen = (s: string): s is ScreenId => SCREENS.some((x) => x.id === s);
 
@@ -124,11 +125,28 @@ function Shell() {
   const [unread, setUnread] = useState(0);
   const [suggested, setSuggested] = useState(0);
   const panels = usePanelWidths();
+  // Pages nobody can reach from the homepage, and links to pages that don't exist (lib/pages.ts).
+  const map = useSiteMap(admin.config);
+  const stranded = map.unreachable.map((p) => `${p.title} (/${p.slug})`);
+  // Header & layout / Background / Effects edit the whole site, or the own settings of the page the builder
+  // (and so the preview) shows. Choosing another page there opens it in the builder too.
+  const [scopeKind, setScopeKind] = useState<"site" | "page">("site");
+  const scope: SettingsScope = scopeKind === "page" ? { kind: "page", ...builder.page } : { kind: "site" };
+  const screenProps: ScreenProps = {
+    scope,
+    shown: builder.page,
+    onScope: (next) => {
+      if (next === "site") return setScopeKind("site");
+      setScopeKind("page");
+      if (next.pageId !== builder.page.id) builder.openPage(next.pageId);
+    },
+  };
 
   // The screen lives in the URL hash so a reload stays put.
   useEffect(() => {
     const fromHash = () => {
-      const h = window.location.hash.slice(1);
+      // `#site` = the old name of the Header & layout screen (bookmarks).
+      const h = window.location.hash.slice(1) === "site" ? "header-layout" : window.location.hash.slice(1);
       if (isScreen(h)) setScreen(h);
     };
     fromHash();
@@ -183,7 +201,10 @@ function Shell() {
         <button type="button" className="adm-btn" disabled={!admin.hasDraft || admin.busy} onClick={() => window.confirm("Discard the draft and go back to what is live?") && admin.discard()}>
           Discard draft
         </button>
-        <button type="button" className="adm-btn is-primary" disabled={!admin.hasDraft || admin.busy || admin.issues.length > 0 || !admin.writable} onClick={admin.publish}>
+        <button type="button" className="adm-btn is-primary" disabled={!admin.hasDraft || admin.busy || admin.issues.length > 0 || !admin.writable} onClick={() => {
+            if (stranded.length && !window.confirm(`${stranded.join(", ")} can't be reached from the homepage: no link leads there. Publish anyway?`)) return;
+            admin.publish();
+          }}>
           {admin.busy ? "Publishing…" : "Publish"}
         </button>
         <button type="button" className="adm-btn is-ghost" onClick={signOut}>
@@ -202,7 +223,7 @@ function Shell() {
         ))}
       </nav>
 
-      {(admin.error || admin.issues.length > 0 || admin.problems.length > 0 || !admin.writable) && (
+      {(admin.error || admin.issues.length > 0 || admin.problems.length > 0 || !admin.writable || stranded.length > 0 || map.broken.length > 0) && (
         <div className="adm-banners">
           {admin.error && (
             <p className="adm-notice is-bad">
@@ -223,6 +244,25 @@ function Shell() {
                 ))}
               </ul>
             </div>
+          )}
+          {(stranded.length > 0 || map.broken.length > 0) && (
+            <p className="adm-notice is-warn">
+              {stranded.length > 0 && (
+                <>
+                  {stranded.length === 1 ? `The page ${stranded[0]} can't` : `The pages ${stranded.join(", ")} can't`} be reached from the homepage: no link leads there.{" "}
+                </>
+              )}
+              {map.broken.length > 0 && (
+                <>
+                  {map.broken.length === 1 ? "1 link points" : `${map.broken.length} links point`} to a page that doesn&apos;t exist.{" "}
+                </>
+              )}
+              {screen !== "builder" && (
+                <button type="button" className="adm-link" onClick={() => go("builder")}>
+                  Show in the builder
+                </button>
+              )}
+            </p>
           )}
           {!admin.writable && <p className="adm-notice is-warn">homepage.json is read-only, so publishing is turned off. In Docker, mount src/config without :ro.</p>}
           {admin.problems.length > 0 && (
@@ -247,14 +287,15 @@ function Shell() {
             <>
               <aside className="adm-panel">
                 {screen === "builder" && builder.outline}
-                {screen === "site" && <SiteScreen />}
-                {screen === "background" && <BackgroundScreen />}
-                {screen === "effects" && <EffectsScreen />}
+                {screen !== "builder" && <ScopeBar {...screenProps} />}
+                {screen === "header-layout" && <HeaderLayoutScreen {...screenProps} />}
+                {screen === "background" && <BackgroundScreen {...screenProps} />}
+                {screen === "effects" && <EffectsScreen {...screenProps} />}
               </aside>
               <Resizer side="left" width={panels.widths.left} label="Resize the left panel" onResize={(w) => panels.set("left", w, screen === "builder")} />
               {/* Keep the preview at this position on every draft screen so the iframe is never remounted
                   (which is also why the drag-and-drop context wraps all four screens, not just the builder). */}
-              <PreviewPane tabSlug={builder.tabSlug} drop={builder.previewDrop} editable={screen === "builder"} />
+              <PreviewPane target={builder.previewTarget} drop={builder.previewDrop} editable={screen === "builder"} />
               {screen === "builder" && (
                 <>
                   <Resizer side="right" width={panels.widths.right} label="Resize the settings panel" onResize={(w) => panels.set("right", w, true)} />

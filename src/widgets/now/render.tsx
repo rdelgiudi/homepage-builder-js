@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
-import { httpUrl } from "@/lib/url";
+import { linkHref, opens } from "@/lib/url";
 import { Card, Notice } from "../common";
 import { Icon } from "../shared";
 import type { WidgetView } from "../types";
@@ -33,7 +33,7 @@ function Now({ section }: { section: NowSection }) {
       {/* Label column = the longest label (all rows line up), capped at 60% so the text always keeps room; the text wraps. */}
       <dl className="grid grid-cols-[fit-content(60%)_minmax(0,1fr)] items-baseline gap-x-4 gap-y-2.5">
         {items.map((item, i) => {
-          const url = httpUrl(item.url);
+          const url = linkHref(item.url);
           return (
             <Fragment key={i}>
               <dt className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
@@ -42,7 +42,7 @@ function Now({ section }: { section: NowSection }) {
               </dt>
               <dd className="min-w-0 break-words text-gray-900 dark:text-white">
                 {url ? (
-                  <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                  <a href={url} {...opens(url)} className="hover:underline">
                     {item.text || url}
                   </a>
                 ) : (

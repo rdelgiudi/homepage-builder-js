@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getConfig } from "@/lib/config";
+import { allSections } from "@/lib/pages";
 import { widgetContextFor } from "@/lib/widget-context";
 import OverlayView from "@/components/OverlayView";
 
@@ -17,7 +18,7 @@ export default async function OverlayPage({ params, searchParams }: { params: Pr
   const query = await searchParams;
   // The published config only — never findSection(), which falls back to the admin draft and
   // would show unpublished widgets to anyone who knows an id.
-  const section = getConfig().tabs.flatMap((t) => t.sections).find((s) => s.id === id);
+  const section = allSections(getConfig()).find((s) => s.id === id);
   if (!section) notFound();
 
   // `?title=0`: drop the title row. The keys have to go, not be blanked: renderSection draws

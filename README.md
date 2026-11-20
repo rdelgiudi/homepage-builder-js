@@ -39,12 +39,12 @@ On screens narrower than 768px (`md` breakpoint), the horizontal tab bar is repl
 
 ```bash
 npm install
-cp .env.example .env                                         # fill in only the integrations you use
-cp src/config/homepage.example.json src/config/homepage.json
+cp .env.example .env                                           # fill in only the integrations you use
+cp src/config/homepage.showcase.json src/config/homepage.json  # a starting point to edit (or start empty)
 npm run dev
 ```
 
-To see every widget at once instead, start from the showcase: `cp src/config/homepage.showcase.json src/config/homepage.json`. It has all widget types with placeholder ("lorem ipsum") content, live widgets pointing at well-known public accounts, and sample markdown files (`src/content/showcase-*.md`). Widgets that need keys (Discord, Steam, Overwatch, Twitch) say what is missing until you set them in `.env`.
+The showcase config has every widget type with placeholder ("lorem ipsum") content, live widgets pointing at well-known public accounts, sample markdown files (`src/content/showcase-*.md`), and a few extra pages linked from its homepage: `/about` looks like the homepage (site-wide settings), while `/projects` and `/colophon` have their own name, colors, layout, background, effects or counters. Widgets that need keys (Discord, Steam, Overwatch, Twitch) say what is missing until you set them in `.env`. Remove what you don't need in the admin panel, or skip the copy and build the site from scratch there.
 
 Open [http://localhost:3000](http://localhost:3000) to view your homepage. Without `homepage.json` the site starts with an empty default config. `homepage.json` and `src/content/*.md` are gitignored, so your own content stays out of the repository. To use the admin panel locally, set `ADMIN_PASSWORD` (or `ADMIN_PASSWORD_HASH`, see [Admin panel](#admin-panel)) in `.env` and open `/admin`.
 
@@ -558,7 +558,7 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 │   │   ├── widget-sources.ts        # Fetchers for weather, rss, mastodon, bluesky, chess, github-activity
 │   │   └── …                        # comments, reactions, uploads, background, markdown, visitor helpers
 │   ├── hooks/useWebSocket.ts        # Shared WebSocket connection, per-type subscriptions
-│   ├── config/                      # homepage.json (yours, gitignored) + homepage.example.json + homepage.showcase.json (every widget)
+│   ├── config/                      # homepage.json (yours, gitignored) + homepage.showcase.json (every widget, example pages)
 │   └── content/                     # Markdown files for markdown widgets (gitignored)
 ├── tests/                           # Unit and integration tests (node --test)
 ├── scripts/admin-hash.js            # npm run admin:hash
@@ -581,7 +581,7 @@ The hash (salted scrypt) means the password itself is not stored anywhere — so
 | Screen | What it does |
 |---|---|
 | **Builder** | Tabs and their widgets. Drag rows to reorder, drag a widget onto a tab to move it, click or drag from the palette to add. Selecting a row opens its settings on the right. |
-| **Site / Background / Effects** | Every other option in `homepage.json`, as forms. |
+| **Header & layout / Background / Effects** | Every other option in `homepage.json`, as forms: for the whole site, or one page's own (the scope switch at the top). |
 | **Content** | Create, edit and delete the markdown files in `src/content/`, with a rendered preview. |
 | **Comments** | Approve, reject, edit, delete; block a visitor; choose whether new comments publish right away or wait for approval; hold comments containing certain words. |
 | **Integrations** | Which environment variables are set (never their values) and whether config, content and data are writable. |

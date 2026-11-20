@@ -1,5 +1,5 @@
 import { safeUrl } from "@/lib/background";
-import { httpUrl } from "@/lib/url";
+import { httpUrl, linkHref, opens } from "@/lib/url";
 import { Notice } from "../common";
 import { alignClass } from "../shared";
 import type { WidgetView } from "../types";
@@ -20,7 +20,7 @@ export const view: WidgetView<ButtonsSection> = {
   render: (section) => {
     const buttons = section.items.flatMap((item) => {
       const src = safeUrl(item.image);
-      return src ? [{ ...item, src, href: httpUrl(item.url) }] : [];
+      return src ? [{ ...item, src, href: linkHref(item.url) }] : [];
     });
     const ring = { home: httpUrl(section.ringHome), prev: httpUrl(section.ringPrev), next: httpUrl(section.ringNext), random: httpUrl(section.ringRandom) };
     const hasRing = !!(section.ringName || ring.home || ring.prev || ring.next || ring.random);
@@ -45,7 +45,7 @@ export const view: WidgetView<ButtonsSection> = {
                 />
               );
               return b.href ? (
-                <a key={i} href={b.href} target="_blank" rel="noopener noreferrer" className="block transition-transform duration-150 hover:-translate-y-0.5">
+                <a key={i} href={b.href} {...opens(b.href)} className="block transition-transform duration-150 hover:-translate-y-0.5">
                   {img}
                 </a>
               ) : (

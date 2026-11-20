@@ -31,10 +31,13 @@ import { WidgetIcon } from "@/widgets/BrandIcon";
 import { COLUMNS, fitRow, packRows, placeInGrid, removeFromGrid, rowIds, setRowSpans, spanOf, splitRow, type DropTarget, type PlaceResult } from "./grid-layout";
 import { arrangeOf, gridOptions, ignoredTabSettings, isGridTab as isGridTabIn, pinnedTabId } from "@/lib/layouts";
 import { PREVIEW_DROP, type PreviewDropState } from "./PreviewPane";
+import { HOME, allIds, allSections, findPage, findPageBySlug, pageOf, pageView, pagePath, retargetLinks, sitePages, withPageTabs, type PageLink } from "@/lib/pages";
+import { PAGE_DROP, PageInspector, PagesOutline } from "./PagesPanel";
+import { useSiteMap } from "./useSiteMap";
 import { PREVIEW_MOVE, SECTION_DRAG, pickTarget, placeInList, previewCandidates, sideFor, type Point, type PreviewHit } from "./preview-drop";
 
 /** A row is selected through any of its widgets' ids (rows have no id of their own). */
-type Selection = { kind: "tab" | "section" | "row"; id: string } | null;
+type Selection = { kind: "tab" | "section" | "row" | "page"; id: string } | null;
 type Obj = Record<string, unknown>;
 
 // Drag ids are prefixed so one DndContext can tell tabs, sections and palette items apart.
@@ -88,13 +91,15 @@ const PALETTE_GROUPS: [category: string, title: string][] = [
   ["community", "Visitors"],
 ];
 
+/** An id nobody uses yet anywhere on the site (pass the whole config, not a page view). */
 function uniqueId(config: HomepageConfig, wanted: string): string {
-  const used = new Set(config.tabs.flatMap((t) => [t.id, ...t.sections.map((s) => s.id)]));
+  const used = allIds(config);
   let id = wanted;
   for (let n = 2; used.has(id); n++) id = `${wanted}-${n}`;
   return id;
 }
 
+/** A fresh widget with its defaults (`config` = the whole site, for a unique id). */
 function newSection(config: HomepageConfig, tabId: string, type: string): Section {
   const meta = widgetMetaByType[type];
   return { ...structuredClone(meta.defaults), id: uniqueId(config, `${tabId}-${type}`), type } as Section;
@@ -304,8 +309,23 @@ export function useBuilder(): {
   /** Wraps the whole work area (outline, preview, inspector) in the drag-and-drop context. */
   dnd: (children: ReactNode) => ReactNode;
   previewDrop: PreviewDropState;
+  /** The page and tab the preview should show (slugs). */
+  previewTarget: { page: string; tab: string };
+  /** The page the builder (and so the preview) shows; the Site/Background/Effects screens edit its own settings. */
+  page: { id: string; title: string; slug: string };
+  openPage: (id: string) => void;
 } {
-  const { config, published, update } = useAdmin();
+  const { config: site, published, update: updateSite } = useAdmin();
+  // The builder edits one page at a time. Everything below works on `config` = that page's
+  // view (its tabs as `tabs`, see lib/pages.ts) and `update` writes the tabs back, so the tab,
+  // widget, grid and drop logic is the same for every page. New ids are checked against `site`.
+  const [pageIdState, setPageId] = useState<string>(HOME);
+  const page = findPage(site, pageIdState) ?? findPage(site, HOME)!; // a deleted page falls back to home
+  const pageId = page.id;
+  const config = pageView(site, pageId);
+  // Synchronous on purpose: grouping typing into undo steps reads the event being handled.
+  const update = (fn: (c: HomepageConfig) => HomepageConfig) => updateSite((c) => withPageTabs(c, pageId, fn(pageView(c, pageId)).tabs));
+  const map = useSiteMap(site);
   const [tabId, setTabId] = useState<string | null>(config.tabs[0]?.id ?? null);
   const [selection, setSelection] = useState<Selection>(null);
   const [dragging, setDragging] = useState<string | null>(null);
@@ -361,7 +381,7 @@ export function useBuilder(): {
   // --- edits ---
 
   const addTab = () => {
-    const id = uniqueId(config, "new-tab");
+    const id = uniqueId(site, "new-tab");
     update((c) => ({ ...c, tabs: [...c.tabs, { id, label: "New tab", layout: "stack", sections: [] }] }));
     setTabId(id);
     setSelection({ kind: "tab", id });
@@ -375,7 +395,7 @@ export function useBuilder(): {
   };
 
   const addSection = (type: string, toTabId: string, index?: number) => {
-    const section = newSection(config, toTabId, type);
+    const section = newSection(site, toTabId, type);
     update((c) =>
       mapTab(c, toTabId, (t) => {
         const sections = [...t.sections];
@@ -387,20 +407,47 @@ export function useBuilder(): {
     setSelection({ kind: "section", id: section.id });
   };
 
-  const moveSection = (sectionId: string, fromTabId: string, toTabId: string) => {
-    if (fromTabId === toTabId) return;
-    update((c) => {
-      const section = c.tabs.find((t) => t.id === fromTabId)?.sections.find((s) => s.id === sectionId);
-      if (!section) return c;
-      return {
-        ...c,
-        tabs: c.tabs.map((t) =>
-          t.id === fromTabId ? { ...t, sections: without(t, sectionId) } : t.id === toTabId ? { ...t, sections: [...t.sections, section] } : t
-        ),
-      };
+  /**
+   * Moves a widget to the end of a tab on any page (ids are unique across the site, so the tab id
+   * says which page). One undo step; a grid row it leaves closes up. Opens the target page and tab.
+   */
+  const moveSection = (sectionId: string, toTabId: string) => {
+    const toPage = pageOf(site, toTabId);
+    if (!toPage) return;
+    updateSite((c) => {
+      const fromPage = pageOf(c, sectionId);
+      const fromTab = fromPage?.tabs.find((t) => t.sections.some((s) => s.id === sectionId));
+      const section = fromTab?.sections.find((s) => s.id === sectionId);
+      if (!fromPage || !fromTab || !section || fromTab.id === toTabId) return c;
+      // Grid rules of the page it leaves (the profile column is always a stack).
+      const fromView = pageView(c, fromPage.id); // its own layout, if it has one
+      const grid = gridOptions(fromView.layout);
+      const leavesGrid = isGridTabIn(grid, fromTab, pinnedTabId(fromView));
+      const rest = leavesGrid ? removeFromGrid(fromTab.sections, sectionId, grid.defaultSpan) : fromTab.sections.filter((s) => s.id !== sectionId);
+      const out = withPageTabs(c, fromPage.id, fromPage.tabs.map((t) => (t.id === fromTab.id ? { ...t, sections: rest } : t)));
+      const target = pageOf(out, toTabId);
+      if (!target) return c;
+      return withPageTabs(out, target.id, target.tabs.map((t) => (t.id === toTabId ? { ...t, sections: [...t.sections, section] } : t)));
     });
+    setPageId(toPage.id);
     setTabId(toTabId);
     setSelection({ kind: "section", id: sectionId });
+  };
+
+  /** A widget (or a palette item) dropped on a page in the Pages tree: to the end of that page's first tab. */
+  const dropOnPage = (dragged: string, targetId: string) => {
+    const target = findPage(site, targetId);
+    if (!target) return;
+    const view = pageView(site, targetId);
+    const pinned = pinnedTabId(view);
+    const first = view.tabs.find((t) => t.id !== pinned) ?? view.tabs[0];
+    if (!first) return setNotice(`${target.title} has no tab yet: add one first.`);
+    if (dragged.startsWith(SEC)) return moveSection(dragged.slice(SEC.length), first.id);
+    const item = newSection(site, first.id, dragged.slice(NEW.length));
+    updateSite((c) => withPageTabs(c, targetId, pageView(c, targetId).tabs.map((t) => (t.id === first.id ? { ...t, sections: [...t.sections, item] } : t))));
+    setPageId(targetId);
+    setTabId(first.id);
+    setSelection({ kind: "section", id: item.id });
   };
 
   /**
@@ -572,14 +619,14 @@ export function useBuilder(): {
         return;
       }
       const target = config.tabs.find((t) => t.id === hit.tabId);
-      const item = !target ? null : a.startsWith(NEW) ? newSection(config, target.id, a.slice(NEW.length)) : draggedItem(a);
+      const item = !target ? null : a.startsWith(NEW) ? newSection(site, target.id, a.slice(NEW.length)) : draggedItem(a);
       if (!target || !item) return;
       update((c) => {
         const r = placeFromPreview(c, item, hit);
         return r.ok ? r.config : c;
       });
       // The preview already shows that tab; sending it there again would scroll the one-page layout away.
-      if (target.id !== pinnedId) shownSlug.current = slugify(target.label);
+      if (target.id !== pinnedId) shownSlug.current = `${page.slug}|${slugify(target.label)}`;
       setTabId(target.id);
       setSelection({ kind: "section", id: item.id });
       setPlacing({ box: hit.box, side: hit.side, label: a.startsWith(NEW) ? "Adding…" : "Moving…" });
@@ -592,7 +639,7 @@ export function useBuilder(): {
         return;
       }
       // The result was worked out against this config; recompute inside the (pure) updater anyway.
-      const item = a.startsWith(NEW) ? newSection(config, tab.id, a.slice(NEW.length)) : draggedItem(a);
+      const item = a.startsWith(NEW) ? newSection(site, tab.id, a.slice(NEW.length)) : draggedItem(a);
       if (!item) return;
       update((c) =>
         moveInto(c, item, tab.id, (sections) => {
@@ -601,6 +648,11 @@ export function useBuilder(): {
         })
       );
       setSelection({ kind: "section", id: item.id });
+      return;
+    }
+
+    if (o.startsWith(PAGE_DROP)) {
+      if (a.startsWith(SEC) || a.startsWith(NEW)) dropOnPage(a, o.slice(PAGE_DROP.length));
       return;
     }
 
@@ -629,9 +681,9 @@ export function useBuilder(): {
         update((c) => moveInto(c, item, tab.id, (sections) => placeInList(sections, item, o.slice(SEC.length), "above")));
         setSelection({ kind: "section", id });
       } else if (o.startsWith(TAB)) {
-        moveSection(id, fromTab.id, o.slice(TAB.length));
+        moveSection(id, o.slice(TAB.length));
       } else if (o === LIST) {
-        moveSection(id, fromTab.id, tab.id);
+        moveSection(id, tab.id);
       }
     } else if (a.startsWith(NEW)) {
       const type = a.slice(NEW.length);
@@ -653,12 +705,113 @@ export function useBuilder(): {
     return t ? { icon: t.icon ?? "", label: t.label } : null;
   })();
 
+  // --- pages ---
+
+  /** Opens a page in the builder; the preview follows. `settings` also shows its settings. */
+  const openPage = (id: string, settings = false) => {
+    if (id !== pageId) {
+      setPageId(id);
+      setTabId(pageView(site, id).tabs[0]?.id ?? null);
+    }
+    setSelection(settings ? { kind: "page", id } : null);
+  };
+
+  const addPage = () => {
+    const taken = new Set(site.pages.map((p) => p.slug));
+    let slug = "new-page";
+    for (let n = 2; taken.has(slug); n++) slug = `new-page-${n}`;
+    const id = uniqueId(site, `page-${slug}`);
+    const firstTab = uniqueId(site, `${slug}-main`);
+    // A title nobody else has, so warnings and the site map can tell new pages apart.
+    const titles = new Set(site.pages.map((p) => p.title));
+    let title = "New page";
+    for (let n = 2; titles.has(title); n++) title = `New page ${n}`;
+    updateSite((c) => ({ ...c, pages: [...c.pages, { id, slug, title, tabs: [{ id: firstTab, label: "Main", layout: "stack", sections: [] }] }] }));
+    setPageId(id);
+    setTabId(firstTab);
+    setSelection({ kind: "page", id });
+  };
+
+  const deletePage = (id: string) => {
+    const target = site.pages.find((p) => p.id === id);
+    if (!target) return;
+    const widgets = target.tabs.reduce((n, t) => n + t.sections.length, 0);
+    if (!window.confirm(`Delete the page "${target.title}" (${pagePath(target.slug)})${widgets ? ` and its ${widgets} widget${widgets === 1 ? "" : "s"}` : ""}? Links to it will point nowhere.`)) return;
+    updateSite((c) => ({ ...c, pages: c.pages.filter((p) => p.id !== id) }));
+    openPage(HOME);
+  };
+
+  const editPage = (id: string, fn: (p: HomepageConfig["pages"][number]) => HomepageConfig["pages"][number]) =>
+    updateSite((c) => ({ ...c, pages: c.pages.map((p) => (p.id === id ? fn(p) : p)) }));
+
+  /** New address: links in widgets follow (draft); returns the markdown files that still link to the old one. */
+  const changeAddress = (id: string, slug: string): string[] => {
+    const old = site.pages.find((p) => p.id === id)?.slug;
+    if (old === undefined) return [];
+    const host = window.location.host.toLowerCase();
+    updateSite((c) => retargetLinks({ ...c, pages: c.pages.map((p) => (p.id === id ? { ...p, slug } : p)) }, old, slug, [host]));
+    return [...new Set(map.links.filter((l) => l.to === old && l.file).map((l) => l.file!))];
+  };
+
+  /**
+   * The one-click fix for a page nobody can reach: a link to it on the homepage's first tab, in
+   * the Links widget there (or a new one). Opens it so the link can be moved or restyled.
+   */
+  const linkFromHome = (id: string) => {
+    const target = site.pages.find((p) => p.id === id);
+    if (!target) return;
+    const item = { label: target.title, url: pagePath(target.slug) };
+    const home = site.tabs[0];
+    const existing = home?.sections.find((x) => x.type === "links");
+    let homeTab = home?.id;
+    let selectId: string;
+    if (!home) {
+      homeTab = uniqueId(site, "main");
+      selectId = uniqueId(site, "main-links");
+      updateSite((c) => ({ ...c, tabs: [{ id: homeTab!, label: "Main", layout: "stack", sections: [{ id: selectId, type: "links", items: [item] } as Section] }] }));
+    } else if (existing) {
+      selectId = existing.id;
+      updateSite((c) =>
+        withPageTabs(
+          c,
+          HOME,
+          c.tabs.map((t) => (t.id === home.id ? { ...t, sections: t.sections.map((x) => (x.id === existing.id ? ({ ...x, items: [...(x as { items: unknown[] }).items, item] } as Section) : x)) } : t))
+        )
+      );
+    } else {
+      selectId = uniqueId(site, `${home.id}-links`);
+      updateSite((c) => withPageTabs(c, HOME, c.tabs.map((t) => (t.id === home.id ? { ...t, sections: [...t.sections, { id: selectId, type: "links", items: [item] } as Section] } : t))));
+    }
+    setPageId(HOME);
+    setTabId(homeTab ?? null);
+    setSelection({ kind: "section", id: selectId });
+  };
+
+  /** Opens the page and widget a link is in. */
+  const showLink = (link: PageLink) => {
+    const from = findPageBySlug(site, link.from) ?? pageOf(site, link.sectionId);
+    if (!from) return;
+    setPageId(from.id);
+    setTabId(link.tabId);
+    setSelection({ kind: "section", id: link.sectionId });
+  };
+
   // --- outline ---
 
   const outline = (
     <>
+      <PagesOutline
+        map={map}
+        currentId={pageId}
+        settingsId={selection?.kind === "page" ? selection.id : null}
+        onOpen={(id) => openPage(id)}
+        onSettings={(id) => openPage(id, true)}
+        onAdd={addPage}
+        onLinkFromHome={linkFromHome}
+        onShowLink={showLink}
+      />
       <div className="adm-panel-head">
-        <h2>Tabs</h2>
+        <h2>{site.pages.length ? `Tabs on ${page.title}` : "Tabs"}</h2>
         <button type="button" className="adm-btn is-small" onClick={addTab}>
           Add tab
         </button>
@@ -683,7 +836,7 @@ export function useBuilder(): {
                 <span className="adm-row-title">{t.label || "Untitled"}</span>
               </span>
               {t.id === pinnedId && (
-                <span className="adm-badge" title="Shown as the column beside the other tabs (Site screen → Layout)">
+                <span className="adm-badge" title="Shown as the column beside the other tabs (Header & layout → Layout)">
                   column
                 </span>
               )}
@@ -878,7 +1031,21 @@ export function useBuilder(): {
   };
   const selectedRow = selection?.kind === "row" && tab && gridActive ? rowIds(tab.sections, selection.id, defaultSpan) : [];
 
-  if (selectedRow.length) {
+  if (selection?.kind === "page") {
+    inspector = (
+      <PageInspector
+        key={selection.id}
+        site={site}
+        map={map}
+        pageId={selection.id}
+        onEdit={(fn) => editPage(selection.id, fn)}
+        onAddress={(slug) => changeAddress(selection.id, slug)}
+        onDelete={() => deletePage(selection.id)}
+        onLinkFromHome={() => linkFromHome(selection.id)}
+        onShowLink={showLink}
+      />
+    );
+  } else if (selectedRow.length) {
     inspector = (
       <>
         <div className="adm-panel-head">
@@ -927,7 +1094,7 @@ export function useBuilder(): {
       setSelection(null);
     };
     const duplicate = () => {
-      const copy = { ...structuredClone(selectedSection), id: uniqueId(config, `${tab.id}-${selectedSection.type}`) } as Section;
+      const copy = { ...structuredClone(selectedSection), id: uniqueId(site, `${tab.id}-${selectedSection.type}`) } as Section;
       update((c) =>
         mapTab(c, tab.id, (t) => {
           // In a grid: beside the original if its row has room, otherwise on a new row below it.
@@ -976,7 +1143,7 @@ export function useBuilder(): {
               ) : (
                 <>
                   Widths apply where widgets can sit side by side. To set this widget&apos;s width, select the tab &ldquo;{tab.label}&rdquo; and set{" "}
-                  <strong>Arrange widgets</strong> to <strong>Grid</strong> (or pick the Bento layout on the Site screen).
+                  <strong>Arrange widgets</strong> to <strong>Grid</strong> (or pick the Bento layout on Header & layout).
                 </>
               )}
             </p>
@@ -1000,17 +1167,28 @@ export function useBuilder(): {
               }
             />
           )}
-          <OverlayLink id={selectedSection.id} live={published.tabs.some((t) => t.sections.some((x) => x.id === selectedSection.id))} />
-          {config.tabs.length > 1 && (
+          <OverlayLink id={selectedSection.id} live={allSections(published).some((x) => x.id === selectedSection.id)} />
+          {sitePages(site).reduce((n, p) => n + p.tabs.length, 0) > 1 && (
             <label className="adm-field">
-              <span className="adm-label">Move to tab</span>
-              <select className="adm-input" value={tab.id} onChange={(e) => moveSection(selectedSection.id, tab.id, e.target.value)}>
-                {config.tabs.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
+              <span className="adm-label">{site.pages.length ? "Move to page / tab" : "Move to tab"}</span>
+              <select className="adm-input" value={tab.id} onChange={(e) => moveSection(selectedSection.id, e.target.value)}>
+                {site.pages.length
+                  ? sitePages(site).map((p) => (
+                      <optgroup key={p.id || "home"} label={`${p.title} (${pagePath(p.slug)})`}>
+                        {p.tabs.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
+                  : config.tabs.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
               </select>
+              {site.pages.length > 0 && <span className="adm-hint">Or drag the widget onto a page in the Pages list.</span>}
             </label>
           )}
           <div className="adm-actions">
@@ -1032,22 +1210,37 @@ export function useBuilder(): {
     inspector,
     dnd,
     tabSlug: tab && tab.id !== pinnedId ? slugify(tab.label) : "",
+    previewTarget: { page: page.slug, tab: tab && tab.id !== pinnedId ? slugify(tab.label) : "" },
+    page: { id: page.id, title: page.title, slug: page.slug },
+    openPage: (id: string) => openPage(id),
     previewDrop: {
       onSelect: (id: string) => {
         const t = tabOfSection(config, id);
         if (!t) return;
         // The preview already shows it (see shownSlug); the one-page preview must not jump.
-        if (t.id !== pinnedId) shownSlug.current = slugify(t.label);
+        if (t.id !== pinnedId) shownSlug.current = `${page.slug}|${slugify(t.label)}`;
         setTabId(t.id);
         setSelection({ kind: "section", id });
       },
       selectedId: selection?.kind === "section" ? selection.id : null,
-      onTabShown: (slug: string) => {
-        const t = config.tabs.find((x) => x.id !== pinnedId && slugify(x.label) === slug);
+      onTabShown: ({ page: shownPage, tab: slug }) => {
         // The preview shows it already: record that, so opening it here sends nothing back.
-        shownSlug.current = slug;
+        shownSlug.current = `${shownPage}|${slug}`;
         // Mid-drag (one page scrolling under an edge auto-scroll) the outline must stay put.
-        if (!t || t.id === tab?.id || dragging) return;
+        if (dragging) return;
+        const other = findPageBySlug(site, shownPage);
+        if (!other) return;
+        const view = pageView(site, other.id);
+        const pinned = pinnedTabId(view);
+        const t = (slug ? view.tabs.find((x) => x.id !== pinned && slugify(x.label) === slug) : undefined) ?? (other.id !== pageId ? view.tabs.find((x) => x.id !== pinned) : undefined);
+        if (other.id !== pageId) {
+          // A link to another page was followed in the preview: edit that page.
+          setPageId(other.id);
+          setTabId(t?.id ?? null);
+          setSelection(null);
+          return;
+        }
+        if (!t || t.id === tab?.id) return;
         setTabId(t.id);
         // Keep the selection only if it still belongs to the open tab.
         setSelection((sel) => (sel && (sel.kind === "tab" ? sel.id === t.id : t.sections.some((s) => s.id === sel.id)) ? sel : null));

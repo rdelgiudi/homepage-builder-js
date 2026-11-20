@@ -50,6 +50,7 @@ export function SiteShell({
   hideHeaderFromMd = false,
   tabBackgrounds = false,
   bottomNav = false,
+  homeHref,
   children,
 }: {
   config: HomepageConfig;
@@ -61,6 +62,8 @@ export function SiteShell({
   tabBackgrounds?: boolean;
   /** Phones show the tab bar at the bottom: lift the counters, theme switch and page end above it. */
   bottomNav?: boolean;
+  /** Not on the homepage: the site name links back to it. */
+  homeHref?: string;
   children: React.ReactNode;
 }) {
   const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, background, effects, counters, tabs } = config;
@@ -93,7 +96,7 @@ export function SiteShell({
       <EffectsController particles={background.effect} palette={titleGradient} customScrollbar={effects.customScrollbar} mouseTrail={effects.mouseTrail} mouseTrailColors={effects.mouseTrailColors} reactionFlyer={effects.reactionFlyer} />
       <div className={`bg-header pt-6 md:pt-8 pb-3 md:pb-4${hideHeaderFromMd ? " md:hidden" : ""}`}>
         <div className={`w-full ${width} mx-auto px-4 md:px-8`}>
-          <SiteHeader name={name} tagline={tagline} titleGradient={titleGradient} taglineGradient={taglineGradient} />
+          <SiteHeader name={name} tagline={tagline} titleGradient={titleGradient} taglineGradient={taglineGradient} homeHref={homeHref} />
         </div>
       </div>
 
@@ -111,12 +114,14 @@ export function SiteShell({
 
 /**
  * The whole site, rendered from `config`. Used by `/` (the published config) and by
- * `/admin/preview` (the admin panel's draft, `preview` = true).
+ * `/admin/preview` (the admin panel's draft, `preview` = true). For another page, `config`
+ * is that page's view (`pageView()` in lib/pages.ts: its tabs, everything else shared) and
+ * `onPage` is set, which makes the site name link back to the homepage.
  */
-export default function SitePage({ config, preview }: { config: HomepageConfig; preview: boolean }) {
+export default function SitePage({ config, preview, onPage = false }: { config: HomepageConfig; preview: boolean; onPage?: boolean }) {
   const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, effects, tabs } = config;
   const taglineGradient = rawTaglineGradient.length ? rawTaglineGradient : titleGradient;
-  const header = { name, tagline, titleGradient, taglineGradient };
+  const header = { name, tagline, titleGradient, taglineGradient, homeHref: onPage ? "/" : undefined };
 
   const site = config.layout.site;
   const width = config.layout.fullWidth && (site === "bento" || site === "masonry") ? FULL_WIDTH : PAGE_WIDTH[site];
@@ -133,7 +138,7 @@ export default function SitePage({ config, preview }: { config: HomepageConfig; 
 
   return (
     // The one-page layout shows every tab at once, so there is no "open tab" background to follow.
-    <SiteShell config={config} preview={preview} width={width} hideHeaderFromMd={site === "sidebar"} tabBackgrounds={features.tabBackground} bottomNav={phoneBottomNav}>
+    <SiteShell config={config} preview={preview} width={width} hideHeaderFromMd={site === "sidebar"} tabBackgrounds={features.tabBackground} bottomNav={phoneBottomNav} homeHref={header.homeHref}>
       <Suspense fallback={<TabsFallback />}>
         {site === "onepage" ? (
           <OnePage tabs={tabs} widgetContext={widgetContext} widthClass={width} grid={grid} headings={config.layout.sectionHeadings} />

@@ -4,6 +4,7 @@
  * and cached in memory, so with no visitors there are no outbound requests.
  */
 import { getConfig } from "@/lib/config";
+import { allSections } from "@/lib/pages";
 import { getDraftConfig } from "@/lib/admin/publish";
 import type { Section } from "@/widgets/meta";
 
@@ -94,10 +95,9 @@ export async function getText(url: string, accept = "*/*", headers?: ExtraHeader
 export function findSection<T extends Section["type"]>(id: string | null, type: T): Extract<Section, { type: T }> {
   if (id) {
     for (const config of [getConfig(), getDraftConfig()]) {
-      for (const tab of config?.tabs ?? []) {
-        const section = tab.sections.find((s) => s.id === id && s.type === type);
-        if (section) return section as Extract<Section, { type: T }>;
-      }
+      // Every page, not just the homepage.
+      const section = config ? allSections(config).find((s) => s.id === id && s.type === type) : undefined;
+      if (section) return section as Extract<Section, { type: T }>;
     }
   }
   throw new WidgetError("This widget is not on the site.", 404);

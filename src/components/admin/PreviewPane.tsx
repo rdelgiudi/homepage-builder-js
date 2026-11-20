@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { PREVIEW_REFRESH, PREVIEW_SHOWN, PREVIEW_TAB } from "@/components/ConfigSync";
+import { PREVIEW_READY, PREVIEW_REFRESH, PREVIEW_SHOWN, PREVIEW_TAB } from "@/components/ConfigSync";
 import { widgetMetaByType } from "@/widgets/meta";
 import { useAdmin } from "./store";
+import { allSections } from "@/lib/pages";
 import { PREVIEW_MOVE, type Box } from "./preview-drop";
 
 /** Droppable id of the preview (the builder's DndContext wraps the whole work area). */
@@ -13,7 +14,7 @@ export const PREVIEW_DROP = "preview";
 /** What the builder tells the preview while a widget is dragged over it. */
 export interface PreviewDropState {
   frameRef: RefObject<HTMLIFrameElement | null>;
-  /** The tab slug the preview is known to show; a tab change is posted only when it differs. */
+  /** `<page slug>|<tab slug>` the preview is known to show; a change is posted only when it differs. */
   shownSlug: RefObject<string>;
   /** A widget (palette or outline) is being dragged: the drop layer is up. */
   active: boolean;
@@ -26,7 +27,7 @@ export interface PreviewDropState {
   /** The widget selected in the builder, outlined in the preview. */
   selectedId: string | null;
   /** The preview switched tab itself (its tab bar, a one-page jump or scroll): the builder follows. */
-  onTabShown: (slug: string) => void;
+  onTabShown: (shown: { page: string; tab: string }) => void;
 }
 
 /**
@@ -57,12 +58,12 @@ function MoveHandle({ id, label, box, onSelect }: { id: string; label: string; b
 }
 
 /** The real site, rendered from the draft, in an iframe that follows every saved edit. */
-export default function PreviewPane({ tabSlug, drop, editable }: { tabSlug: string; drop: PreviewDropState; editable: boolean }) {
+export default function PreviewPane({ target, drop, editable }: { target: { page: string; tab: string }; drop: PreviewDropState; editable: boolean }) {
   const { savedTick, hasDraft, config } = useAdmin();
   const { frameRef: frame, shownSlug } = drop;
   const [device, setDevice] = useState<"desktop" | "phone">("desktop");
   // The src is fixed at mount; later tab changes are sent as messages so the page never reloads.
-  const [src] = useState(() => `/admin/preview${tabSlug ? `?tab=${encodeURIComponent(tabSlug)}` : ""}`);
+  const [src] = useState(() => `/admin/preview${target.page ? `/${target.page}` : ""}${target.tab ? `?tab=${encodeURIComponent(target.tab)}` : ""}`);
   const { setNodeRef, isOver } = useDroppable({ id: PREVIEW_DROP });
 
   const post = useCallback(
@@ -75,14 +76,36 @@ export default function PreviewPane({ tabSlug, drop, editable }: { tabSlug: stri
   // The preview reports its own tab switches; only messages from this iframe count.
   const onTabShown = useRef(drop.onTabShown);
   onTabShown.current = drop.onTabShown;
+  /**
+   * The page the panel just sent the preview to. Until it gets there, reports about another
+   * page are from before the navigation (a slow first compile, a tab bar mounting) and must not
+   * be taken for a link the visitor followed, which would switch the builder back.
+   */
+  const goingTo = useRef<{ page: string; until: number } | null>(null);
+  /** What the preview should show now, for re-sending when it (re)starts listening. */
+  const want = useRef(target);
+  want.current = target;
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
       if (e.origin !== window.location.origin || e.source !== frame.current?.contentWindow) return;
-      if (e.data?.type === PREVIEW_SHOWN && typeof e.data.tab === "string") onTabShown.current(e.data.tab);
+      if (e.data?.type === PREVIEW_READY) {
+        // It just loaded: whatever was sent while it was loading never arrived.
+        const { page, tab } = want.current;
+        shownSlug.current = `${page}|${tab}`;
+        goingTo.current = { page, until: Date.now() + 10_000 };
+        frame.current?.contentWindow?.postMessage({ type: PREVIEW_TAB, page, tab }, window.location.origin);
+        return;
+      }
+      if (e.data?.type !== PREVIEW_SHOWN || typeof e.data.tab !== "string") return;
+      const page = typeof e.data.page === "string" ? e.data.page : "";
+      const pending = goingTo.current;
+      if (pending && Date.now() < pending.until && page !== pending.page) return;
+      if (pending && page === pending.page) goingTo.current = null;
+      onTabShown.current({ page, tab: e.data.tab });
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [frame]);
+  }, [frame, shownSlug]);
 
   useEffect(() => {
     if (savedTick > 0) post(PREVIEW_REFRESH);
@@ -91,10 +114,15 @@ export default function PreviewPane({ tabSlug, drop, editable }: { tabSlug: stri
   useEffect(() => {
     // Not when the preview already shows it: after a drop on the one-page layout, re-sending
     // the tab would scroll the preview away from the widget that was just placed.
-    if (!tabSlug || tabSlug === shownSlug.current) return;
-    shownSlug.current = tabSlug;
-    post({ type: PREVIEW_TAB, tab: tabSlug });
-  }, [tabSlug, post, shownSlug]);
+    const key = `${target.page}|${target.tab}`;
+    const shownPage = shownSlug.current.split("|")[0];
+    if (key === shownSlug.current) return;
+    // The profile layout's column tab isn't in the tab bar: on the same page the preview stays put.
+    if (!target.tab && target.page === shownPage && shownSlug.current) return;
+    shownSlug.current = key;
+    if (target.page !== shownPage) goingTo.current = { page: target.page, until: Date.now() + 10_000 };
+    post({ type: PREVIEW_TAB, page: target.page, tab: target.tab });
+  }, [target.page, target.tab, post, shownSlug]);
 
   // A placed widget's marker stays until the refreshed preview has arrived (or gives up).
   const [placing, setPlacing] = useState<PreviewDropState["placing"]>(null);
@@ -171,7 +199,7 @@ export default function PreviewPane({ tabSlug, drop, editable }: { tabSlug: stri
     setHovered(null);
   }, [drop.active, savedTick]);
 
-  const hoveredSection = hovered ? config.tabs.flatMap((t) => t.sections).find((s) => s.id === hovered.id) : undefined;
+  const hoveredSection = hovered ? allSections(config).find((s) => s.id === hovered.id) : undefined;
 
   return (
     <section className="adm-preview" aria-label="Preview">

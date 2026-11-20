@@ -39,20 +39,24 @@ function v1ToV2(v1: Obj): Obj {
 }
 
 /**
- * Gives every tab and section an `id` if it lacks one. Generated ids are derived from
- * the tab label / section type and position, so a hand-written file without ids gets
- * the same ids on every load.
+ * Gives every page, tab and section an `id` if it lacks one. Generated ids are derived from
+ * the page address / tab label / section type and position, so a hand-written file without
+ * ids gets the same ids on every load. Ids are unique across all pages.
  */
 function ensureIds(config: Obj): Obj {
-  if (!Array.isArray(config.tabs)) return config;
+  const pages = Array.isArray(config.pages) ? config.pages : [];
+  const tabLists = [config.tabs, ...pages.map((p) => (isObj(p) ? p.tabs : undefined))].filter(Array.isArray) as unknown[][];
 
   const used = new Set<string>();
-  // Explicit ids win; reserve them first so generated ones never collide with them.
-  for (const tab of config.tabs) {
-    if (!isObj(tab)) continue;
-    if (typeof tab.id === "string" && tab.id) used.add(tab.id);
-    if (Array.isArray(tab.sections)) {
-      for (const s of tab.sections) if (isObj(s) && typeof s.id === "string" && s.id) used.add(s.id);
+  const reserve = (v: unknown) => {
+    if (isObj(v) && typeof v.id === "string" && v.id) used.add(v.id);
+  };
+  // Explicit ids win; reserve them all first so generated ones never collide with them.
+  pages.forEach(reserve);
+  for (const tabs of tabLists) {
+    for (const tab of tabs) {
+      reserve(tab);
+      if (isObj(tab) && Array.isArray(tab.sections)) tab.sections.forEach(reserve);
     }
   }
   const unique = (wanted: string): string => {
@@ -62,19 +66,31 @@ function ensureIds(config: Obj): Obj {
     return id;
   };
 
-  const tabs = config.tabs.map((tab) => {
-    if (!isObj(tab)) return tab;
-    const tabId = typeof tab.id === "string" && tab.id ? tab.id : unique(slugify(String(tab.label ?? "")) || "tab");
-    const sections = Array.isArray(tab.sections)
-      ? tab.sections.map((s) => {
-          if (!isObj(s) || (typeof s.id === "string" && s.id)) return s;
-          return { ...s, id: unique(`${tabId}-${typeof s.type === "string" ? s.type : "section"}`) };
+  const withIds = (tabs: unknown) =>
+    Array.isArray(tabs)
+      ? tabs.map((tab) => {
+          if (!isObj(tab)) return tab;
+          const tabId = typeof tab.id === "string" && tab.id ? tab.id : unique(slugify(String(tab.label ?? "")) || "tab");
+          const sections = Array.isArray(tab.sections)
+            ? tab.sections.map((s) => {
+                if (!isObj(s) || (typeof s.id === "string" && s.id)) return s;
+                return { ...s, id: unique(`${tabId}-${typeof s.type === "string" ? s.type : "section"}`) };
+              })
+            : tab.sections;
+          return { ...tab, id: tabId, sections };
         })
-      : tab.sections;
-    return { ...tab, id: tabId, sections };
-  });
+      : tabs;
 
-  return { ...config, tabs };
+  const out: Obj = { ...config, tabs: withIds(config.tabs) };
+  if (Array.isArray(config.pages)) {
+    out.pages = config.pages.map((page) => {
+      if (!isObj(page)) return page;
+      const id = typeof page.id === "string" && page.id ? page.id : unique(`page-${slugify(String(page.slug ?? page.title ?? "")) || "page"}`);
+      return { ...page, id, tabs: withIds(page.tabs) };
+    });
+  }
+  if (!Array.isArray(config.tabs)) delete out.tabs; // keep "no tabs" as it was (strict parsing reports it)
+  return out;
 }
 
 export function migrateConfig(raw: unknown): Obj {

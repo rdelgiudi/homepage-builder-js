@@ -1,5 +1,5 @@
 import { safeUrl } from "@/lib/background";
-import { httpUrl } from "@/lib/url";
+import { httpUrl, linkHref, opens } from "@/lib/url";
 import { Notice } from "../common";
 import type { WidgetView } from "../types";
 import type { ProjectItem, ProjectsSection } from "./meta";
@@ -53,8 +53,10 @@ function Body({ item, url, source }: { item: ProjectItem; url: string | null; so
         // mt-auto: links line up along the bottom of a row of cards.
         <div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-1 text-sm">
           {url && (
-            <a href={url} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
-              {item.linkLabel || siteName(url)} ↗
+            <a href={url} {...opens(url)} className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
+              {/* ↗ = opens another site in a new tab; a page of this site opens in place. */}
+              {item.linkLabel || siteName(url)}
+              {url.startsWith("/") ? " →" : " ↗"}
             </a>
           )}
           {source && (
@@ -79,7 +81,7 @@ export const view: WidgetView<ProjectsSection> = {
       <ul className={list ? "space-y-3" : `grid grid-cols-1 gap-4 ${COLUMNS[section.columns] ?? COLUMNS[2]}`}>
         {items.map((item, i) => {
           const image = safeUrl(item.image);
-          const url = httpUrl(item.url);
+          const url = linkHref(item.url);
           const source = httpUrl(item.source);
           return (
             <li
@@ -89,7 +91,7 @@ export const view: WidgetView<ProjectsSection> = {
               } ${list ? "flex-col sm:flex-row" : "flex-col"}`}
             >
               {image && (
-                <a href={url ?? image} target="_blank" rel="noopener noreferrer" className={`block shrink-0 overflow-hidden bg-gray-100 dark:bg-gray-800 ${list ? "sm:w-56" : ""}`} tabIndex={-1}>
+                <a href={url ?? image} {...opens(url ?? image)} className={`block shrink-0 overflow-hidden bg-gray-100 dark:bg-gray-800 ${list ? "sm:w-56" : ""}`} tabIndex={-1}>
                   {/* eslint-disable-next-line @next/next/no-img-element -- uploads or any http(s) host */}
                   <img src={image} alt="" loading="lazy" className="aspect-video h-full w-full object-cover transition-transform duration-300 hover:scale-105" />
                 </a>

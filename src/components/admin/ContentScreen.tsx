@@ -4,13 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { HomepageConfig } from "@/lib/schema/config";
 import { api, timeAgo } from "./api";
 import { forgetContentFiles } from "./SchemaForm";
+import { forgetFileLinks } from "./useSiteMap";
 import { useAdmin } from "./store";
+import { allSections, mapSections } from "@/lib/pages";
 import MarkdownEditor from "./MarkdownEditor";
 import { baseName, contentTree, dropTarget, joinPath, parentOf, type TreeFile, type TreeFolder } from "./content-tree";
 
 /** Markdown widgets (in a config) that show one of `names`. */
 const usersOf = (config: HomepageConfig, names: Set<string>) =>
-  config.tabs.flatMap((t) => t.sections).filter((s) => s.type === "markdown" && names.has((s as { file?: string }).file ?? "")).length;
+  allSections(config).filter((s) => s.type === "markdown" && names.has((s as { file?: string }).file ?? "")).length;
 
 /** Drag-and-drop payload type for moving files and folders in the tree. */
 const DRAG_TYPE = "application/x-homepage-content";
@@ -34,7 +36,7 @@ export default function ContentScreen() {
   const [message, setMessage] = useState<{ text: string; bad?: boolean } | null>(null);
 
   const tree = useMemo(() => contentTree(files, folders), [files, folders]);
-  const inUse = useMemo(() => new Set(config.tabs.flatMap((t) => t.sections).flatMap((s) => (s.type === "markdown" ? [(s as { file?: string }).file ?? ""] : []))), [config]);
+  const inUse = useMemo(() => new Set(allSections(config).flatMap((s) => (s.type === "markdown" ? [(s as { file?: string }).file ?? ""] : []))), [config]);
 
   const loadList = useCallback(async () => {
     const data = await api<{ files: TreeFile[]; folders: string[]; writable: boolean }>("content");
@@ -42,6 +44,8 @@ export default function ContentScreen() {
     setFolders(data.folders);
     setWritable(data.writable);
     forgetContentFiles();
+    // Links inside files count for the site map (pages reachable from the homepage).
+    forgetFileLinks();
     return data.files;
   }, []);
 
@@ -133,16 +137,12 @@ export default function ContentScreen() {
       const used = usersOf(config, new Set(map.keys()));
       const live = usersOf(published, new Set(map.keys()));
       if (used) {
-        update((c) => ({
-          ...c,
-          tabs: c.tabs.map((t) => ({
-            ...t,
-            sections: t.sections.map((s) => {
-              const file = s.type === "markdown" ? (s as { file?: string }).file : undefined;
-              return file && map.has(file) ? ({ ...s, file: map.get(file) } as typeof s) : s;
-            }),
-          })),
-        }));
+        update((c) =>
+          mapSections(c, (s) => {
+            const file = s.type === "markdown" ? (s as { file?: string }).file : undefined;
+            return file && map.has(file) ? ({ ...s, file: map.get(file) } as typeof s) : s;
+          })
+        );
       }
       await loadList();
       if (name && map.has(name)) {

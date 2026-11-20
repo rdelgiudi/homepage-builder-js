@@ -1026,6 +1026,20 @@ app.prepare().then(() => {
     handle(req, res);
   });
 
+  // Next.js adds its own 'upgrade' listener to this server on the first request it handles
+  // (it serves dev hot reload through it). For any upgrade whose path matches a route it ends
+  // the socket, and since pages live at /<slug> (src/app/[page]), `/ws` matches one: it closed
+  // every visitor's WebSocket right after we accepted it. So every 'upgrade' listener added by
+  // anyone else is wrapped to never see /ws; Next keeps handling everything else itself.
+  const isOurSocket = (req) => new URL(req.url, 'http://localhost').pathname === '/ws';
+  const addListener = server.on.bind(server);
+  server.on = server.addListener = (event, listener) =>
+    event === 'upgrade' && listener !== onUpgrade
+      ? addListener(event, (req, socket, head) => {
+          if (!isOurSocket(req)) listener(req, socket, head);
+        })
+      : addListener(event, listener);
+
   wss = new WebSocketServer({ noServer: true });
 
   wss.on('connection', (ws, req) => {
@@ -1072,19 +1086,13 @@ app.prepare().then(() => {
     });
   });
 
-  const handleUpgrade = app.getUpgradeHandler();
-
-  server.on('upgrade', (req, socket, head) => {
-    const { pathname } = new URL(req.url, 'http://localhost');
-    if (pathname === '/ws') {
-      wss.handleUpgrade(req, socket, head, (ws) => {
-        wss.emit('connection', ws, req);
-      });
-    } else {
-      console.log(`[${new Date().toISOString()}] [WS] Upgrade for ${pathname} (delegated to Next.js)`);
-      handleUpgrade(req, socket, head);
-    }
-  });
+  server.on('upgrade', onUpgrade);
+  function onUpgrade(req, socket, head) {
+    if (!isOurSocket(req)) return; // Next.js's own listener (see above) takes everything else
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit('connection', ws, req);
+    });
+  }
 
   server.listen(port, () => {
     console.log(`[${new Date().toISOString()}] > Ready on http://${hostname}:${port}`);

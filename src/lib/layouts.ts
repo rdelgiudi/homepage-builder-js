@@ -100,12 +100,12 @@ export function ignoredTabSettings(config: Pick<HomepageConfig, "layout" | "tabs
   const f = LAYOUT_FEATURES[layout.site];
   const out: IgnoredSetting[] = [];
   if (tabId && tabId === pinnedTabId(config)) {
-    out.push({ key: "layout", note: "This tab is the column beside the other tabs (Site screen → Layout), so its widgets are always one per row." });
+    out.push({ key: "layout", note: "This tab is the column beside the other tabs (Header & layout → Layout), so its widgets are always one per row." });
     out.push({ key: "background", note: "The column has no background of its own; the open tab's background is shown behind it." });
     return out;
   }
   if (f.arrange === "grid")
-    out.push({ key: "layout", note: `In the Bento layout every tab is a grid: ${layout.bentoColumns} widgets per row unless a widget has its own width (Site screen → Layout).` });
+    out.push({ key: "layout", note: `In the Bento layout every tab is a grid: ${layout.bentoColumns} widgets per row unless a widget has its own width (Header & layout → Layout).` });
   if (f.arrange === "stack") out.push({ key: "layout", note: "The Link in bio column is too narrow for widgets side by side, so every tab shows its widgets one per row." });
   if (f.arrange === "masonry")
     out.push({ key: "layout", note: `In the Masonry layout widgets flow into up to ${layout.masonryColumns} columns, top to bottom, each as tall as it needs. Widths don't apply.` });
@@ -119,7 +119,7 @@ export function ignoredTabSettings(config: Pick<HomepageConfig, "layout" | "tabs
           : "With one tab the Link in bio layout shows no tab bar, so this tab's label and icon don't appear on the page.",
     });
   if (f.pinnedColumn && !pinnedTabId(config))
-    out.push({ key: null, note: "No tab is shown in the column yet: pick one on the Site screen → Layout (it needs at least one other tab)." });
+    out.push({ key: null, note: "No tab is shown in the column yet: pick one on Header & layout → Layout (it needs at least one other tab)." });
   return out;
 }
 

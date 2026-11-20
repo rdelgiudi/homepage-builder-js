@@ -94,6 +94,7 @@ npm run test:integration  # rebuilds .next: stop the dev server first
 - Element boxes inside the iframe (`frame.$(…).boundingBox()`) are already in page coordinates.
 - The preview shows changes ~1 s after a drop (500 ms autosave + refresh). The driver waits 2.5 s.
 - **A `bash` heredoc containing `$$` (Playwright's `frame.$$eval`) got blocked** by the agent's shell safety check. Write driver scripts with the file-writing tool, not heredocs.
+- **`websocket-server.js` (and `discord-presence.js`, `play-history.js`) are not hot-reloaded** by `next dev`: restart the server after editing them, or you are testing the old code. Check `/ws` with the live counter on `/` ("1 person viewing now") or `grep "Browser client connected" "$RUN/server.log"`.
 - **The dev server edits the real `src/content/`** (only `DATA_DIR` is throwaway). Test content screens inside a throwaway folder (e.g. `zz-run-test`) and delete it with `s.api("/api/admin/content?folder=zz-run-test", { method: "DELETE" })`.
 - **`pkill -f "node websocket-server.js"` kills your own shell**, because the pattern matches the command line running it. Stop servers by port (`lsof -ti:3123 -sTCP:LISTEN | xargs -r kill`).
 - Several `page.getByRole("button", { name: "Rename / move" })` exist on the Content screen (the selected folder's and the file's). Scope locators to `.adm-editor-bar` / `.adm-folder-bar`.

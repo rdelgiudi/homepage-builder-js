@@ -4,6 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { migrateConfig } from "@/lib/schema/migrate";
 import { parseConfig, strictParseConfig } from "@/lib/schema/parse";
+import { allSections, markdownLinks, siteMap } from "@/lib/pages";
+import { PAGE_SETTING_GROUPS } from "@/lib/schema/config";
 import { SectionSchema, widgetMetas } from "@/widgets/meta";
 
 type Obj = Record<string, unknown>;
@@ -173,14 +175,54 @@ describe("showcase config (src/config/homepage.showcase.json)", () => {
     assert.deepEqual(parseConfig(showcase).warnings, []);
   });
 
+  // The homepage's widgets and every page's.
+  const sections = () => allSections(strictParseConfig(showcase).config!);
+
   it("shows every widget type, so a new widget gets added to it", () => {
-    const used = new Set(showcase.tabs.flatMap((t: { sections: { type: string }[] }) => t.sections.map((s) => s.type)));
+    const used = new Set<string>(sections().map((s) => s.type));
     const missing = widgetMetas.map((m) => m.type).filter((t) => !used.has(t));
     assert.deepEqual(missing, []);
   });
 
   it("its markdown files exist", () => {
-    const files = showcase.tabs.flatMap((t: { sections: { type: string; file?: string }[] }) => t.sections.filter((s) => s.type === "markdown").map((s) => s.file));
+    const files = sections().flatMap((s) => (s.type === "markdown" ? [s.file] : []));
     for (const f of files) assert.ok(fs.existsSync(path.join(import.meta.dirname, "../../src/content", f)), f);
+  });
+
+  it("has no key the schema doesn't know (zod would drop it silently)", () => {
+    const parsed = strictParseConfig(showcase).config!;
+    const lost: string[] = [];
+    const walk = (raw: unknown, out: unknown, at: string) => {
+      if (Array.isArray(raw)) return raw.forEach((v, i) => walk(v, (out as unknown[])?.[i], `${at}[${i}]`));
+      if (!raw || typeof raw !== "object") return;
+      for (const [k, v] of Object.entries(raw)) {
+        if (!out || typeof out !== "object" || !(k in out)) lost.push(`${at}.${k}`);
+        else walk(v, (out as Record<string, unknown>)[k], `${at}.${k}`);
+      }
+    };
+    walk(showcase, parsed, "");
+    assert.deepEqual(lost, []);
+  });
+
+  it("shows off a page's own settings: the homepage and About use the site's, the other pages cover every group", () => {
+    const config = strictParseConfig(showcase).config!;
+    assert.equal(config.homeSettings, undefined);
+    assert.equal(config.pages.find((p) => p.slug === "about")?.settings, undefined);
+    const covered = new Set(config.pages.flatMap((p) => Object.keys(p.settings ?? {})));
+    assert.deepEqual([...PAGE_SETTING_GROUPS].filter((g) => !covered.has(g)), []);
+  });
+
+  it("its pages are all reachable from the homepage, and no link points at a missing page", () => {
+    const config = strictParseConfig(showcase).config!;
+    const fileLinks = Object.fromEntries(
+      sections().flatMap((s) => (s.type === "markdown" ? [[s.file, markdownLinks(fs.readFileSync(path.join(import.meta.dirname, "../../src/content", s.file), "utf-8"))]] : []))
+    );
+    const map = siteMap(config, fileLinks);
+    assert.ok(config.pages.length >= 2, "the showcase has example pages");
+    assert.deepEqual(map.unreachable.map((p) => p.slug), []);
+    assert.deepEqual(map.broken.map((l) => l.href), []);
+    // One page is linked only from a markdown file: that counts.
+    assert.equal(map.parent.get("colophon"), "about");
+    assert.ok(map.links.some((l) => l.to === "colophon" && l.file === "showcase-pages.md"));
   });
 });

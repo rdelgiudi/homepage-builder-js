@@ -1667,3 +1667,106 @@ textarea.adm-input {
 .adm-md-error {
   margin: 0;
 }
+
+/* ---------- builder: pages (site map) ---------- */
+
+.adm-pages {
+  margin-bottom: 4px;
+}
+.adm-page-row {
+  padding-right: 4px;
+}
+.adm-page-row .adm-row-sub code {
+  font-size: 11px;
+}
+.adm-page-row.is-warn {
+  border-color: color-mix(in srgb, var(--a-draft) 60%, transparent);
+}
+.adm-page-gear {
+  flex: none;
+  font-size: 17px;
+  line-height: 1;
+}
+.adm-page-gear.is-on {
+  color: var(--a-accent);
+  background: color-mix(in srgb, var(--a-accent) 15%, transparent);
+}
+.adm-pages-warn > .adm-notice,
+.adm-pages-warn .adm-hint {
+  margin: 0 0 6px;
+}
+.adm-unreachable {
+  list-style: none;
+  margin-bottom: 8px;
+}
+.adm-unreachable .adm-hint {
+  padding-left: 8px;
+}
+.adm-broken {
+  margin: 4px 0 10px;
+  padding-left: 18px;
+  font-size: 12.5px;
+}
+.adm-broken li + li {
+  margin-top: 3px;
+}
+.adm-broken .adm-link {
+  text-align: left;
+}
+
+/* ---------- Header & layout / Background / Effects: what is being changed ---------- */
+
+/* The scope switch stays in view while the settings scroll under it. */
+.adm-scope {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--a-line);
+  background: var(--a-panel);
+}
+.adm-scope .adm-seg {
+  justify-self: start;
+}
+.adm-scope.is-page {
+  background: color-mix(in srgb, var(--a-accent) 14%, var(--a-panel));
+  border-bottom-color: color-mix(in srgb, var(--a-accent) 55%, transparent);
+}
+.adm-scope-note {
+  margin: 0;
+  color: var(--a-muted);
+  font-size: 12.5px;
+}
+.adm-scope.is-page .adm-scope-note {
+  color: var(--a-text);
+}
+/* A block that holds one page's own settings. */
+.adm-block.is-page {
+  border-left: 3px solid var(--a-accent);
+  background: color-mix(in srgb, var(--a-accent) 5%, transparent);
+}
+.adm-tag.is-page {
+  border-color: var(--a-accent);
+  color: var(--a-accent);
+}
+.adm-own-actions {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.adm-owners {
+  margin-top: 10px;
+}
+/* "own look": a small label centred in the row (the row button would stretch it to full height). */
+.adm-page-row .adm-tag {
+  flex: none;
+  align-self: center;
+  padding: 0 7px;
+  border-color: color-mix(in srgb, var(--a-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--a-accent) 14%, transparent);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 18px;
+  letter-spacing: 0.02em;
+}

@@ -153,18 +153,77 @@ export const TabSchema = z.object({
   sections: z.array(SectionSchema).default([]),
 });
 
-export const ConfigSchema = z.object({
-  version: z.literal(CONFIG_VERSION),
+/** Name and tagline: the site's (top level) or one page's own (`settings.header`). */
+const headerFields = {
   name: z.string().default("Homepage").meta({ title: "Site name" }),
   tagline: z.string().default("Welcome").meta({ title: "Tagline" }),
-  favicon: z.string().default("").meta({ title: "Favicon URL", description: "Empty = animated gradient ring" }),
+};
+/** Title colors: the site's (top level) or one page's own (`settings.titleColors`). */
+const titleColorFields = {
   titleGradient: GradientSchema.default([]).meta({ title: "Title gradient", ui: "gradient", description: "Empty = solid color" }),
   taglineGradient: GradientSchema.default([]).meta({ title: "Tagline gradient", ui: "gradient", description: "Empty = same as title" }),
+};
+
+/**
+ * Settings one page can have of its own (the homepage too, as `homeSettings`). Each group is
+ * all or nothing: missing = the page uses the site's, present = it replaces the site's for that
+ * page. `header` and `titleColors` are top-level fields on the site (name/tagline, the two
+ * gradients) and nested objects here. The favicon is the same on every page.
+ */
+export const PageSettingsSchema = z.object({
+  header: z.object(headerFields).optional(),
+  titleColors: z.object(titleColorFields).optional(),
+  layout: LayoutSchema.optional(),
+  counters: CountersSchema.optional(),
+  background: BackgroundSchema.optional(),
+  effects: EffectsSchema.optional(),
+});
+/** The setting groups a page can have of its own, in the order the panel shows them. */
+export const PAGE_SETTING_GROUPS = ["header", "titleColors", "layout", "counters", "background", "effects"] as const;
+export type PageSettingGroup = (typeof PAGE_SETTING_GROUPS)[number];
+
+/** One path segment: lowercase letters, digits and dashes. */
+export const PAGE_SLUG = /^[a-z0-9][a-z0-9-]{0,47}$/;
+/**
+ * Addresses a page can't have. Anything starting with `admin` or `api` because the
+ * recommended reverse proxy routes by path *prefix* (`/adminfoo` would reach the admin
+ * container), and the site's own top-level routes.
+ */
+export const isReservedSlug = (slug: string) => /^(admin|api)/.test(slug) || ["posts", "overlay", "ws"].includes(slug);
+
+/**
+ * An extra page of the site at `/<slug>`, with its own tabs and widgets. The homepage is the
+ * top-level `tabs`; name, layout, background and effects are shared by every page.
+ */
+export const PageSchema = z.object({
+  id: z.string().min(1),
+  slug: z
+    .string()
+    .regex(PAGE_SLUG, "Use lowercase letters, numbers and dashes, starting with a letter or number")
+    .refine((s) => !isReservedSlug(s), "This address is taken by the site itself (anything starting with admin or api, and posts, overlay, ws)")
+    .meta({ title: "Address", description: "The page is at /<address>. Lowercase letters, numbers and dashes" }),
+  title: z.string().min(1).meta({ title: "Title", description: "Shown in the browser tab and in the editor's site map" }),
+  description: z.string().optional().meta({ title: "Description", ui: "textarea", description: "For search engines and link previews. Empty = the site's tagline" }),
+  tabs: z.array(TabSchema).default([]),
+  /** This page's own layout / counters / background / effects (see PageSettingsSchema). */
+  settings: PageSettingsSchema.optional(),
+});
+
+export const ConfigSchema = z.object({
+  version: z.literal(CONFIG_VERSION),
+  ...headerFields,
+  favicon: z.string().default("").meta({ title: "Favicon URL", description: "Empty = animated gradient ring" }),
+  ...titleColorFields,
   layout: LayoutSchema.prefault({}),
   background: BackgroundSchema.prefault({}),
   effects: EffectsSchema.prefault({}),
   counters: CountersSchema.prefault({}),
+  /** The homepage's tabs. */
   tabs: z.array(TabSchema).default([]),
+  /** More pages, each at `/<slug>` (see PageSchema). */
+  pages: z.array(PageSchema).default([]),
+  /** The homepage's own settings, where it differs from the site's (see PageSettingsSchema). */
+  homeSettings: PageSettingsSchema.optional(),
 });
 
 export type HomepageConfig = z.infer<typeof ConfigSchema>;
@@ -174,3 +233,5 @@ export type BackgroundBase = z.infer<typeof BackgroundBaseSchema>;
 export type LayoutConfig = z.infer<typeof LayoutSchema>;
 export type CountersConfig = z.infer<typeof CountersSchema>;
 export type Tab = z.infer<typeof TabSchema>;
+export type Page = z.infer<typeof PageSchema>;
+export type PageSettings = z.infer<typeof PageSettingsSchema>;

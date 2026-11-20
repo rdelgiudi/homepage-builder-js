@@ -3,7 +3,7 @@
  * built from these, so every option in homepage.json gets a control without writing one.
  */
 import { z } from "zod";
-import { ConfigSchema, TabSchema } from "@/lib/schema/config";
+import { ConfigSchema, PageSchema, TabSchema } from "@/lib/schema/config";
 import { widgetMetas } from "@/widgets/meta";
 
 export interface JsonSchema {
@@ -35,12 +35,16 @@ const pick = (...keys: string[]): JsonSchema => ({
 });
 
 export const formSchemas = {
-  identity: pick("name", "tagline", "favicon"),
+  /** Name and tagline: the site's, or a page's own (same shape). */
+  header: pick("name", "tagline"),
+  favicon: pick("favicon"),
   gradients: pick("titleGradient", "taglineGradient"),
   layout: config.properties!.layout,
   counters: config.properties!.counters,
   background: config.properties!.background,
   effects: config.properties!.effects,
   tab: toForm(TabSchema.omit({ sections: true })),
+  /** Title and description; the address has its own control (it rewrites links), tabs are the outline, settings are on the Site/Background/Effects screens. */
+  page: toForm(PageSchema.omit({ tabs: true, slug: true, settings: true })),
   widgets: Object.fromEntries(widgetMetas.map((m) => [m.type, toForm(m.schema)])) as Record<string, JsonSchema>,
 };

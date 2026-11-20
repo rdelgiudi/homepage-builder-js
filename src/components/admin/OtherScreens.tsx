@@ -246,6 +246,8 @@ interface Revision {
   id: number;
   createdAt: number;
   name: string;
+  /** The homepage counts as one. */
+  pages?: number;
   tabs: number;
   sections: number;
 }
@@ -289,7 +291,7 @@ export function HistoryScreen({ onLoaded }: { onLoaded: () => void }) {
                 replaced {timeAgo(r.createdAt)}
               </span>
               <div className="adm-muted">
-                {r.name || "Unnamed site"}, {r.tabs} tab{r.tabs === 1 ? "" : "s"}, {r.sections} widget{r.sections === 1 ? "" : "s"}
+                {r.name || "Unnamed site"}, {r.pages && r.pages > 1 ? `${r.pages} pages, ` : ""}{r.tabs} tab{r.tabs === 1 ? "" : "s"}, {r.sections} widget{r.sections === 1 ? "" : "s"}
               </div>
             </div>
             <button type="button" className="adm-btn" onClick={() => load(r)}>

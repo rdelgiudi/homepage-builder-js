@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { httpUrl } from "@/lib/url";
+import { httpUrl, linkHref, opens } from "@/lib/url";
 import { Card, Notice } from "../common";
 import type { WidgetView } from "../types";
 import type { GameShelfSection, ShelfItem } from "./meta";
@@ -29,7 +29,7 @@ function covers(item: ShelfItem, portrait: boolean): string[] {
 }
 
 function link(item: ShelfItem): string | null {
-  return httpUrl(item.url) ?? (item.appid ? `https://store.steampowered.com/app/${item.appid}` : null);
+  return linkHref(item.url) ?? (item.appid ? `https://store.steampowered.com/app/${item.appid}` : null);
 }
 
 /** Tries each candidate in turn; falls back to the title on a plain tile. */
@@ -60,7 +60,7 @@ function Stars({ rating }: { rating: number }) {
 
 function Wrap({ href, className, children }: { href: string | null; className: string; children: React.ReactNode }) {
   return href ? (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+    <a href={href} {...opens(href)} className={className}>
       {children}
     </a>
   ) : (

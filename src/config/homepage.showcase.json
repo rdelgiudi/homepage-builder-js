@@ -167,8 +167,6 @@
           "id": "start-quote",
           "type": "quote",
           "span": 6,
-          "text": "Quote",
-          "icon": "❝",
           "quotes": [
             {
               "text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
@@ -204,6 +202,26 @@
           ]
         },
         {
+          "id": "start-pages",
+          "type": "links",
+          "text": "More pages",
+          "icon": "🗺️",
+          "items": [
+            {
+              "label": "About",
+              "url": "/about",
+              "icon": "👋",
+              "style": "primary"
+            },
+            {
+              "label": "Projects",
+              "url": "/projects",
+              "icon": "🧩",
+              "style": "secondary"
+            }
+          ]
+        },
+        {
           "id": "start-links",
           "type": "links",
           "text": "Link cards",
@@ -232,8 +250,6 @@
         {
           "id": "content-markdown",
           "type": "markdown",
-          "text": "Markdown file",
-          "icon": "📄",
           "file": "showcase-about.md"
         },
         {
@@ -901,6 +917,334 @@
           "popular": false
         }
       ]
+    }
+  ],
+  "pages": [
+    {
+      "id": "page-about",
+      "slug": "about",
+      "title": "About",
+      "description": "A second page that uses the site's settings for everything: same header, colors, layout, background and effects as the homepage.",
+      "tabs": [
+        {
+          "id": "about-main",
+          "label": "About",
+          "icon": "👋",
+          "layout": "stack",
+          "sections": [
+            {
+              "id": "about-header",
+              "type": "header",
+              "title": "Another page, same look",
+              "icon": "🗺️"
+            },
+            {
+              "id": "about-text",
+              "type": "text",
+              "content": "This page lives at /about with its own tabs and widgets, but it has no settings of its own: name, tagline, title colors, layout, background, counters and effects all come from the site, exactly like the homepage. The Projects page and the Colophon each change some of them.",
+              "icon": "💬"
+            },
+            {
+              "id": "about-markdown",
+              "type": "markdown",
+              "file": "showcase-pages.md"
+            },
+            {
+              "id": "about-timeline",
+              "type": "timeline",
+              "text": "Timeline",
+              "icon": "🗓️",
+              "items": [
+                {
+                  "date": "2026",
+                  "title": "Pages",
+                  "text": "The site grew a second page."
+                },
+                {
+                  "date": "2025",
+                  "title": "Lorem ipsum",
+                  "text": "Dolor sit amet."
+                }
+              ]
+            },
+            {
+              "id": "about-links",
+              "type": "links",
+              "text": "Around the site",
+              "icon": "🧭",
+              "items": [
+                {
+                  "label": "Back to the showcase",
+                  "url": "/",
+                  "icon": "🏠",
+                  "style": "primary"
+                },
+                {
+                  "label": "Projects",
+                  "url": "/projects",
+                  "icon": "🧩",
+                  "style": "secondary"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "page-projects",
+      "slug": "projects",
+      "title": "Projects",
+      "description": "A page with its own name, title colors, Bento layout, effects and counters.",
+      "tabs": [
+        {
+          "id": "projects-work",
+          "label": "Work",
+          "icon": "🧩",
+          "layout": "grid",
+          "sections": [
+            {
+              "id": "projects-intro",
+              "type": "notice",
+              "span": 12,
+              "tone": "success",
+              "icon": "🎨",
+              "title": "This page has its own settings",
+              "message": "Its own name and tagline, green title colors, the Bento layout (two widgets per row), gradient frames around widgets, a mouse trail, and only the visitor counter. Background and favicon come from the site. In the admin panel: Header & layout, Effects → One page → Projects."
+            },
+            {
+              "id": "projects-cards",
+              "type": "projects",
+              "text": "Projects",
+              "icon": "🧩",
+              "layout": "cards",
+              "columns": 2,
+              "items": [
+                {
+                  "title": "Lorem project",
+                  "description": "Dolor sit amet, consectetur adipiscing elit.",
+                  "image": "https://picsum.photos/seed/lorem-project/800/500",
+                  "url": "https://example.com",
+                  "tags": [
+                    "TypeScript"
+                  ],
+                  "status": "active",
+                  "year": "2026"
+                },
+                {
+                  "title": "This site",
+                  "description": "Read how its pages fit together.",
+                  "image": "https://picsum.photos/seed/pages-site/800/500",
+                  "url": "/about",
+                  "linkLabel": "About the pages",
+                  "tags": [
+                    "Next.js"
+                  ],
+                  "status": "active",
+                  "year": "2026"
+                }
+              ],
+              "span": 12
+            },
+            {
+              "id": "projects-stats",
+              "type": "stats",
+              "span": 6,
+              "text": "By the numbers",
+              "icon": "📊",
+              "columns": 2,
+              "style": "cards",
+              "gradient": true,
+              "items": [
+                {
+                  "value": "3",
+                  "label": "pages"
+                },
+                {
+                  "value": "52",
+                  "label": "widget types"
+                }
+              ]
+            },
+            {
+              "id": "projects-links",
+              "type": "links",
+              "span": 6,
+              "text": "Around the site",
+              "icon": "🧭",
+              "items": [
+                {
+                  "label": "Back to the showcase",
+                  "url": "/",
+                  "icon": "🏠",
+                  "style": "primary"
+                },
+                {
+                  "label": "About",
+                  "url": "/about",
+                  "icon": "👋",
+                  "style": "secondary"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "projects-faq-tab",
+          "label": "FAQ",
+          "icon": "❓",
+          "layout": "stack",
+          "sections": [
+            {
+              "id": "projects-faq",
+              "type": "faq",
+              "text": "FAQ",
+              "icon": "❓",
+              "openFirst": true,
+              "items": [
+                {
+                  "question": "Can a page have tabs?",
+                  "answer": "Yes: every page has its own tabs, like this one."
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "settings": {
+        "header": {
+          "name": "Lorem Projects",
+          "tagline": "Same site, its own name and look"
+        },
+        "titleColors": {
+          "titleGradient": [
+            "#34d399",
+            "#22d3ee",
+            "#34d399"
+          ],
+          "taglineGradient": [
+            "#22d3ee",
+            "#a7f3d0"
+          ]
+        },
+        "layout": {
+          "site": "bento",
+          "bentoColumns": 2
+        },
+        "counters": {
+          "viewers": false,
+          "visitors": true
+        },
+        "effects": {
+          "gradientBorders": true,
+          "tabTransitions": true,
+          "customScrollbar": true,
+          "progressGradient": true,
+          "progressGradientColors": [
+            "#34d399",
+            "#22d3ee"
+          ],
+          "progressAnimation": true,
+          "progressSparkles": true,
+          "widgetFrame": true,
+          "widgetFrameWidth": 2,
+          "mouseTrail": true,
+          "faviconAnimation": true,
+          "reactionFlyer": true,
+          "mouseTrailColors": [
+            "#34d399",
+            "#22d3ee"
+          ]
+        }
+      }
+    },
+    {
+      "id": "page-colophon",
+      "slug": "colophon",
+      "title": "Colophon",
+      "description": "Only linked from a markdown file on the About page; its own background, layout, title colors and counters.",
+      "tabs": [
+        {
+          "id": "colophon-main",
+          "label": "Colophon",
+          "icon": "📜",
+          "layout": "stack",
+          "sections": [
+            {
+              "id": "colophon-text",
+              "type": "text",
+              "content": "Visitors reach this page only through a link in the markdown file on the About page, and that still counts: it isn't flagged as unreachable. It also looks different: an animated gradient with an aurora behind a see-through header, the narrow Link in bio layout, warm title colors and no counters. The name and tagline still come from the site.",
+              "icon": "📜"
+            },
+            {
+              "id": "colophon-links",
+              "type": "links",
+              "text": "Around the site",
+              "icon": "🧭",
+              "items": [
+                {
+                  "label": "Back to the showcase",
+                  "url": "/",
+                  "icon": "🏠",
+                  "style": "primary"
+                },
+                {
+                  "label": "About",
+                  "url": "/about",
+                  "icon": "👋",
+                  "style": "secondary"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "settings": {
+        "titleColors": {
+          "titleGradient": [
+            "#fb7185",
+            "#f59e0b",
+            "#fb7185"
+          ],
+          "taglineGradient": [
+            "#fda4af",
+            "#fcd34d"
+          ]
+        },
+        "layout": {
+          "site": "linkinbio"
+        },
+        "counters": {
+          "viewers": false,
+          "visitors": false
+        },
+        "background": {
+          "base": {
+            "type": "gradient",
+            "gradientLight": [
+              "#fff1f2",
+              "#ffedd5"
+            ],
+            "gradientDark": [
+              "#1e1b4b",
+              "#4c0519",
+              "#3b0764"
+            ],
+            "angle": 160,
+            "animated": true
+          },
+          "effect": {
+            "type": "aurora",
+            "density": 1,
+            "speed": 0.8
+          },
+          "surface": {
+            "header": 70,
+            "cards": 80,
+            "blur": 8
+          }
+        }
+      }
     }
   ]
 }

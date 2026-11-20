@@ -53,7 +53,9 @@ function enabled() {
     const { mtimeMs } = fs.statSync(configFile);
     if (mtimeMs !== enabledCache.mtimeMs) {
       const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-      const value = (config.tabs || []).some((t) => (t.sections || []).some((s) => s && s.type === 'play-history'));
+      // The homepage's tabs and every page's (config.pages[].tabs).
+      const tabs = [...(config.tabs || []), ...(config.pages || []).flatMap((p) => (p && p.tabs) || [])];
+      const value = tabs.some((t) => ((t && t.sections) || []).some((s) => s && s.type === 'play-history'));
       if (value !== enabledCache.value) log(value ? 'Widget found in the config; recording game sessions' : 'No play-history widget in the config; not recording');
       enabledCache = { mtimeMs, value };
     }

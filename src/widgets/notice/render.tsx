@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { httpUrl } from "@/lib/url";
+import { linkHref, opens } from "@/lib/url";
 import { zonedTimeToMs } from "../time";
 import { Icon } from "../shared";
 import type { WidgetView } from "../types";
@@ -63,7 +63,7 @@ function Notice({ section }: { section: NoticeSection }) {
   if (expired || dismissed || (!section.message.trim() && !section.title?.trim())) return null;
 
   const tone = TONES[section.tone];
-  const link = httpUrl(section.linkUrl);
+  const link = linkHref(section.linkUrl);
   return (
     <div role="status" className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-left ${tone.box}`}>
       <Icon icon={section.icon || tone.icon} className="text-xl leading-6 shrink-0" width={22} height={22} />
@@ -75,7 +75,7 @@ function Notice({ section }: { section: NoticeSection }) {
             {link && (
               <>
                 {" "}
-                <a href={link} target="_blank" rel="noopener noreferrer" className="font-medium underline underline-offset-2 hover:opacity-80">
+                <a href={link} {...opens(link)} className="font-medium underline underline-offset-2 hover:opacity-80">
                   {section.linkText || "More"}
                 </a>
               </>
@@ -83,7 +83,7 @@ function Notice({ section }: { section: NoticeSection }) {
           </p>
         )}
         {!section.message && link && (
-          <a href={link} target="_blank" rel="noopener noreferrer" className="text-sm font-medium underline underline-offset-2 hover:opacity-80">
+          <a href={link} {...opens(link)} className="text-sm font-medium underline underline-offset-2 hover:opacity-80">
             {section.linkText || "More"}
           </a>
         )}

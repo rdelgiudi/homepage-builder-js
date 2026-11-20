@@ -16,6 +16,6 @@ export const POST = withAdmin(async () => {
 
   publishConfig(result.config, "Replaced by publish");
   clearDraft();
-  audit("config.publish", null, `${result.config.tabs.length} tabs`);
+  audit("config.publish", null, `${result.config.pages.length + 1} page${result.config.pages.length ? "s" : ""}, ${result.config.tabs.length} tabs on the homepage`);
   return NextResponse.json({ ok: true, published: result.config });
 });

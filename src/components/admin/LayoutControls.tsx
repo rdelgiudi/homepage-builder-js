@@ -1,9 +1,8 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { SITE_LAYOUTS, type SiteLayout } from "@/lib/schema/config";
+import { SITE_LAYOUTS, type LayoutConfig, type SiteLayout } from "@/lib/schema/config";
 import { GRID_COLUMNS } from "@/widgets/fields";
-import { useAdmin } from "./store";
 import { moveDivider, rowPresets } from "./grid-layout";
 
 // --- site layout picker ---
@@ -99,13 +98,13 @@ function Thumb({ layout }: { layout: SiteLayout }) {
   }
 }
 
-export function LayoutPicker() {
-  const { config, update } = useAdmin();
-  const current = config.layout.site;
+/** Picks the site layout of `value` (the site's layout, or one page's own). */
+export function LayoutPicker({ value, onChange }: { value: LayoutConfig; onChange: (layout: LayoutConfig) => void }) {
+  const current = value.site;
   return (
     <div className="adm-layouts" role="radiogroup" aria-label="Site layout">
       {SITE_LAYOUTS.map((id) => (
-        <button key={id} type="button" role="radio" aria-checked={id === current} className="adm-layout" onClick={() => update((c) => ({ ...c, layout: { ...c.layout, site: id } }))}>
+        <button key={id} type="button" role="radio" aria-checked={id === current} className="adm-layout" onClick={() => onChange({ ...value, site: id })}>
           <Thumb layout={id} />
           <span className="adm-label">{LAYOUTS[id].name}</span>
           <span className="adm-hint">{LAYOUTS[id].text}</span>

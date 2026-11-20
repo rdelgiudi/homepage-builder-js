@@ -7,12 +7,14 @@ export const dynamic = "force-dynamic";
 
 function summarize(content: string) {
   try {
-    const raw = JSON.parse(content) as { name?: unknown; tabs?: unknown };
-    const tabs = Array.isArray(raw.tabs) ? raw.tabs : [];
+    const raw = JSON.parse(content) as { name?: unknown; tabs?: unknown; pages?: unknown };
+    const pages = Array.isArray(raw.pages) ? raw.pages : [];
+    // The homepage's tabs plus every page's.
+    const tabs = [raw.tabs, ...pages.map((p) => (p as { tabs?: unknown })?.tabs)].flatMap((list) => (Array.isArray(list) ? list : []));
     const sections = tabs.reduce((n: number, t) => n + (Array.isArray((t as { sections?: unknown })?.sections) ? (t as { sections: unknown[] }).sections.length : 0), 0);
-    return { name: typeof raw.name === "string" ? raw.name : "", tabs: tabs.length, sections };
+    return { name: typeof raw.name === "string" ? raw.name : "", pages: pages.length + 1, tabs: tabs.length, sections };
   } catch {
-    return { name: "", tabs: 0, sections: 0 };
+    return { name: "", pages: 1, tabs: 0, sections: 0 };
   }
 }
 

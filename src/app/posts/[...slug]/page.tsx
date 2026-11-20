@@ -5,6 +5,7 @@ import { SiteShell } from "@/components/SitePage";
 import { getConfig } from "@/lib/config";
 import { slugify } from "@/lib/schema/migrate";
 import { getPost } from "@/lib/posts";
+import { pagePath, sitePages } from "@/lib/pages";
 import { postDateLabel } from "@/widgets/posts/date";
 
 export const dynamic = "force-dynamic";
@@ -24,11 +25,12 @@ export default async function PostPage({ params }: Props) {
   const post = getPost(await slugOf(params));
   if (!post) notFound();
   const config = getConfig();
-  // "Back" returns to the tab that lists the posts.
-  const tab = config.tabs.find((t) => t.sections.some((s) => s.type === "posts"));
-  const back = tab && tab !== config.tabs[0] ? `/?tab=${slugify(tab.label)}` : "/";
+  // "Back" returns to the page and tab that list the posts.
+  const page = sitePages(config).find((p) => p.tabs.some((t) => t.sections.some((s) => s.type === "posts")));
+  const tab = page?.tabs.find((t) => t.sections.some((s) => s.type === "posts"));
+  const back = page && tab ? `${pagePath(page.slug)}${tab !== page.tabs[0] ? `?tab=${slugify(tab.label)}` : ""}` : "/";
   return (
-    <SiteShell config={config} preview={false} width="max-w-[870px]">
+    <SiteShell config={config} preview={false} width="max-w-[870px]" homeHref="/">
       <Link href={back} className="mt-4 inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
         ← Back
       </Link>
