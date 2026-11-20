@@ -33,13 +33,24 @@ const linksOf = (file: string) => {
  * reached from the homepage. Links inside the markdown files that Markdown widgets show count
  * too; those files are read through the admin API. Full addresses on this host count as well.
  */
-export function useSiteMap(config: HomepageConfig): SiteMap {
+export interface CheckedSiteMap extends SiteMap {
+  /**
+   * The links inside markdown files are still being read. Until then nothing is reported as
+   * unreachable or broken: a page linked only from a markdown file would otherwise be flagged
+   * for a moment and then unflagged, which looks like a real problem that fixed itself.
+   */
+  checking: boolean;
+}
+
+export function useSiteMap(config: HomepageConfig): CheckedSiteMap {
   const files = useMemo(
     () => [...new Set(allSections(config).flatMap((s) => (s.type === "markdown" && (s as { file?: string }).file ? [(s as { file: string }).file] : [])))].sort(),
     [config]
   );
   const key = files.join("\n");
   const [fileLinks, setFileLinks] = useState<Record<string, string[]>>({});
+  /** The set of files `fileLinks` was read for. A re-read after a save keeps the old answer meanwhile. */
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   useEffect(() => {
     const bump = () => setVersion((v) => v + 1);
@@ -50,7 +61,11 @@ export function useSiteMap(config: HomepageConfig): SiteMap {
   }, []);
   useEffect(() => {
     let live = true;
-    Promise.all(files.map(async (f) => [f, await linksOf(f)] as const)).then((entries) => live && setFileLinks(Object.fromEntries(entries)));
+    Promise.all(files.map(async (f) => [f, await linksOf(f)] as const)).then((entries) => {
+      if (!live) return;
+      setFileLinks(Object.fromEntries(entries));
+      setLoadedFor(key);
+    });
     return () => {
       live = false;
     };
@@ -58,5 +73,12 @@ export function useSiteMap(config: HomepageConfig): SiteMap {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, version]);
   const host = typeof window === "undefined" ? "" : window.location.host.toLowerCase();
-  return useMemo(() => siteMap(config, fileLinks, host ? [host] : []), [config, fileLinks, host]);
+  // No markdown files: nothing to wait for.
+  const checking = files.length > 0 && loadedFor !== key;
+  return useMemo(() => {
+    const map = siteMap(config, fileLinks, host ? [host] : []);
+    if (!checking) return { ...map, checking };
+    // Still reading files: report nothing yet (every page counts as reachable meanwhile).
+    return { ...map, unreachable: [], broken: [], reachable: new Set(map.pages.map((p) => p.slug)), checking };
+  }, [config, fileLinks, host, checking]);
 }

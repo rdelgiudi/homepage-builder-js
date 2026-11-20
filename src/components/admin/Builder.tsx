@@ -810,6 +810,7 @@ export function useBuilder(): {
     <>
       <PagesOutline
         map={map}
+        checking={map.checking}
         currentId={pageId}
         settingsId={selection?.kind === "page" ? selection.id : null}
         onOpen={(id) => openPage(id)}

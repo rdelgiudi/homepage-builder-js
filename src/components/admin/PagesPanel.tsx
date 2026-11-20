@@ -65,6 +65,8 @@ function PageRow({ page, depth, warn, current, settings, onOpen, onSettings }: {
 
 interface OutlineProps {
   map: SiteMap;
+  /** Links in markdown files are still being read: warnings wait for that (useSiteMap). */
+  checking?: boolean;
   /** The page the builder edits. */
   currentId: string;
   /** The page whose settings are open in the inspector. */
@@ -81,7 +83,7 @@ interface OutlineProps {
  * that can't be reached from the homepage by following links are marked in place and explained
  * below, with a one-click fix; links to pages that don't exist are listed after that.
  */
-export function PagesOutline({ map, currentId, settingsId, onOpen, onSettings, onAdd, onLinkFromHome, onShowLink }: OutlineProps) {
+export function PagesOutline({ map, checking = false, currentId, settingsId, onOpen, onSettings, onAdd, onLinkFromHome, onShowLink }: OutlineProps) {
   const row = (page: SitePage, depth: number, warn = false): ReactNode => (
     <PageRow key={page.id || "home"} page={page} depth={depth} warn={warn} current={page.id === currentId} settings={settingsId === page.id} onOpen={onOpen} onSettings={onSettings} />
   );
@@ -111,6 +113,11 @@ export function PagesOutline({ map, currentId, settingsId, onOpen, onSettings, o
         {row(map.pages[0], 0)}
         {tree(HOME, 1)}
       </ul>
+      {checking && map.pages.length > 1 && (
+        <p className="adm-hint adm-pad adm-checking" role="status">
+          Checking links…
+        </p>
+      )}
       {map.unreachable.length > 0 && (
         <div className="adm-pad adm-pages-warn" role="status">
           <p className="adm-notice is-warn">

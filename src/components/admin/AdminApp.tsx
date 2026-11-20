@@ -202,6 +202,8 @@ function Shell() {
           Discard draft
         </button>
         <button type="button" className="adm-btn is-primary" disabled={!admin.hasDraft || admin.busy || admin.issues.length > 0 || !admin.writable} onClick={() => {
+            // Still reading markdown files: wait for the full check rather than publish unchecked.
+            if (map.checking) return window.alert("Still checking the links between your pages. Try again in a moment.");
             if (stranded.length && !window.confirm(`${stranded.join(", ")} can't be reached from the homepage: no link leads there. Publish anyway?`)) return;
             admin.publish();
           }}>

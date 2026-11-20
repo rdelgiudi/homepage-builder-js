@@ -60,9 +60,22 @@ export default function MemeWidget({ enableGradientBorders, widgetFrameEnabled, 
     }
   }
 
+  // The latest fetchMeme, for the effect below: it reads the current state when it runs without
+  // every change of `meme` or `refreshing` re-running that effect (which would load meme after
+  // meme). React 19.2's useEffectEvent does the same, but the hooks lint plugin that
+  // eslint-config-next 15 ships (5.2) doesn't recognise it yet.
+  const fetchMemeRef = useRef(fetchMeme);
   useEffect(() => {
-    fetchMeme();
-  }, []);
+    fetchMemeRef.current = fetchMeme;
+  });
+
+  // The first meme, and a fresh one whenever the mode changes (popular / random, e.g. while the
+  // setting is edited in the admin preview).
+  useEffect(() => {
+    // The other mode has its own list: what was already shown doesn't matter any more.
+    historyRef.current = [];
+    fetchMemeRef.current();
+  }, [popular]);
 
   useEffect(() => {
     setImgLoaded(false);

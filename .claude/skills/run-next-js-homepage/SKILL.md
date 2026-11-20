@@ -78,7 +78,7 @@ Env vars: `BASE_URL` (default `http://127.0.0.1:3123`), `ADMIN_PASSWORD` (defaul
 
 ```bash
 npm test                  # unit, ~1s
-npm run lint              # 3 known react-hooks warnings, 0 errors
+npm run lint              # clean: 0 warnings, 0 errors
 npm run test:integration  # rebuilds .next: stop the dev server first
 ```
 

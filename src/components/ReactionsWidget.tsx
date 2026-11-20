@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DEFAULT_EMOJIS } from "@/lib/reactions";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type { ReactionCount } from "@/lib/reaction-bus";
@@ -69,33 +69,45 @@ export default function ReactionsWidget({
     firstLoadRef.current = false;
   }
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/reactions");
-      const data = await res.json();
-      applyCounts(data);
-    } catch {
-      // ignore — counts stay at 0, nothing marked as reacted
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // The latest applyCounts, so the mount-only effect below can call it without depending on it
+  // (it only touches refs and state setters, so any version would do; see MemeWidget for why this
+  // isn't useEffectEvent yet).
+  const applyCountsRef = useRef(applyCounts);
   useEffect(() => {
-    load();
-  }, [load]);
+    applyCountsRef.current = applyCounts;
+  });
+
+  // The counts once, on mount.
+  useEffect(() => {
+    let live = true;
+    fetch("/api/reactions")
+      .then((res) => res.json())
+      .then((data: ReactionsResponse) => {
+        if (live) applyCountsRef.current(data);
+      })
+      .catch(() => {
+        // ignore — counts stay at 0, nothing marked as reacted
+      })
+      .finally(() => {
+        if (live) setLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   // Real-time sync: whenever anyone reacts/un-reacts, the server broadcasts
   // the updated counts to every connected client. We only update the numbers
   // (not the per-visitor `reacted` set, which is private to each visitor).
+  // No useCallback: useWebSocket always calls the latest handler (it keeps it in a ref).
   useWebSocket({
     coalesce: false,
-    onMessage: useCallback((msg: unknown) => {
+    onMessage: (msg: unknown) => {
       const m = msg as { type?: string; counts?: ReactionCount[] };
       if (m?.type === "reaction" && m.counts) {
         applyCounts({ counts: m.counts });
       }
-    }, []),
+    },
   });
 
   // Matches RATE_LIMIT_MS on the server. On a 429 we wait out the window and
