@@ -126,6 +126,16 @@ describe("strict parsing (what the admin panel saves)", () => {
     assert.equal(issues[0].path, "tabs.0.sections.0.title");
   });
 
+  it("rejects a missing or empty body instead of saving an empty, all-defaults site", () => {
+    for (const raw of [undefined, null, "x", [], {}, { name: "Only a name" }]) {
+      const { config, issues } = strictParseConfig(raw);
+      assert.equal(config, null, JSON.stringify(raw));
+      assert.ok(issues.length);
+    }
+    // An explicitly empty site is still allowed.
+    assert.ok(strictParseConfig({ version: 2, tabs: [] }).config);
+  });
+
   it("rejects duplicate ids", () => {
     const dup = structuredClone(valid);
     dup.tabs[1].sections[0].id = dup.tabs[0].sections[0].id;

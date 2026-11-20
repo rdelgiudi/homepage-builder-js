@@ -26,12 +26,15 @@ interface TabSectionsProps {
 export default function TabSections({ tab, widgetContext, animate, grid }: TabSectionsProps) {
   const arrange = arrangeOf(grid ?? { arrange: "choice", defaultSpan: 12 }, tab);
   const isGrid = arrange === "grid";
+  // Admin preview only: the panel finds tabs and widgets by these to drop new ones onto the page.
+  const marked = !!widgetContext.preview;
   const className = arrange === "grid" ? "section-grid gap-6 md:gap-8" : arrange === "masonry" ? "section-masonry" : "space-y-6 md:space-y-8";
   const stack = (
-    <div className={className} data-cols={arrange === "masonry" ? grid?.columns : undefined}>
+    <div className={className} data-cols={arrange === "masonry" ? grid?.columns : undefined} data-tab-id={marked ? tab.id : undefined}>
       {tab.sections.map((section, index) => (
         <div
           key={section.id}
+          data-section-id={marked ? section.id : undefined}
           className={`min-w-0${animate ? " animate-fade-in-up" : ""}`}
           style={{
             ...(isGrid ? ({ "--span": section.span ?? grid?.defaultSpan ?? 12 } as CSSProperties) : null),

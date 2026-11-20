@@ -7,6 +7,7 @@ import TabSections, { type GridOptions } from "@/components/TabSections";
 import type { WidgetContext } from "@/widgets/types";
 import type { Tab } from "@/lib/schema/config";
 import { useScrollStrip } from "./useScrollStrip";
+import { reportPreviewTab } from "./ConfigSync";
 
 function HamburgerButton({ open, onClick, label, className = "" }: { open: boolean; onClick: () => void; label: string; className?: string }) {
   return (
@@ -134,6 +135,19 @@ export default function Tabs({ tabs, enableTransitions, widgetContext, widthClas
     if (!el || !button || el.scrollWidth <= el.clientWidth) return;
     el.scrollTo({ left: Math.max(0, button.offsetLeft - (el.clientWidth - button.offsetWidth) / 2), behavior: "smooth" });
   }, [activeTab]);
+
+  // Admin preview: the builder opens the tab chosen here. Not on mount: the first render is
+  // always tab 0, before `?tab=` has been applied.
+  const shownTab = tabs[Math.min(activeTab, tabs.length - 1)];
+  const activeSlug = shownTab ? slugify(shownTab.label) : "";
+  const reported = useRef(false);
+  useEffect(() => {
+    if (!reported.current) {
+      reported.current = true;
+      return;
+    }
+    if (activeSlug) reportPreviewTab(activeSlug);
+  }, [activeSlug]);
 
   if (tabs.length === 0) return null;
   // The tab list can change under us (live config refresh, admin preview) — never index past it.

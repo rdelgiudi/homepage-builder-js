@@ -243,19 +243,24 @@ function Shell() {
           className="adm-work"
           style={{ gridTemplateColumns: `${panels.widths.left}px auto minmax(0, 1fr)${screen === "builder" ? ` auto ${panels.widths.right}px` : ""}` }}
         >
-          <aside className="adm-panel">
-            {screen === "builder" && builder.outline}
-            {screen === "site" && <SiteScreen />}
-            {screen === "background" && <BackgroundScreen />}
-            {screen === "effects" && <EffectsScreen />}
-          </aside>
-          <Resizer side="left" width={panels.widths.left} label="Resize the left panel" onResize={(w) => panels.set("left", w, screen === "builder")} />
-          {/* Keep the preview at this position on every draft screen so the iframe is never remounted. */}
-          <PreviewPane tabSlug={builder.tabSlug} />
-          {screen === "builder" && (
+          {builder.dnd(
             <>
-              <Resizer side="right" width={panels.widths.right} label="Resize the settings panel" onResize={(w) => panels.set("right", w, true)} />
-              <aside className="adm-panel">{builder.inspector}</aside>
+              <aside className="adm-panel">
+                {screen === "builder" && builder.outline}
+                {screen === "site" && <SiteScreen />}
+                {screen === "background" && <BackgroundScreen />}
+                {screen === "effects" && <EffectsScreen />}
+              </aside>
+              <Resizer side="left" width={panels.widths.left} label="Resize the left panel" onResize={(w) => panels.set("left", w, screen === "builder")} />
+              {/* Keep the preview at this position on every draft screen so the iframe is never remounted
+                  (which is also why the drag-and-drop context wraps all four screens, not just the builder). */}
+              <PreviewPane tabSlug={builder.tabSlug} drop={builder.previewDrop} editable={screen === "builder"} />
+              {screen === "builder" && (
+                <>
+                  <Resizer side="right" width={panels.widths.right} label="Resize the settings panel" onResize={(w) => panels.set("right", w, true)} />
+                  <aside className="adm-panel">{builder.inspector}</aside>
+                </>
+              )}
             </>
           )}
         </main>

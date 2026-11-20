@@ -248,16 +248,84 @@
   justify-content: center;
   padding: 0 14px 14px;
 }
+.adm-preview-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.adm-preview-frame.is-phone {
+  width: 390px;
+  max-width: 100%;
+}
 .adm-preview iframe {
+  display: block;
   width: 100%;
   height: 100%;
   border: 1px solid var(--a-line);
   border-radius: var(--a-radius);
   background: #111827;
 }
-.adm-preview iframe.is-phone {
-  width: 390px;
-  max-width: 100%;
+
+/* Dropping widgets onto the preview: a layer over the iframe's page area (inside its 1px
+   border), so marker coordinates are the page's own viewport coordinates. */
+.adm-drop-layer {
+  position: absolute;
+  inset: 1px;
+  overflow: hidden;
+  border-radius: var(--a-radius);
+  pointer-events: none;
+}
+.adm-drop-layer.is-active {
+  pointer-events: auto;
+}
+.adm-drop-layer.is-over {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--a-accent) 45%, transparent);
+}
+.adm-drop-marker {
+  position: absolute;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--a-accent) 10%, transparent);
+  outline: 1px dashed color-mix(in srgb, var(--a-accent) 70%, transparent);
+  transition: left 80ms ease-out, top 80ms ease-out, width 80ms ease-out, height 80ms ease-out;
+}
+/* The bar on the side the widget goes to. */
+.adm-drop-marker::after {
+  content: "";
+  position: absolute;
+  border-radius: 2px;
+  background: var(--a-accent);
+}
+.adm-drop-marker[data-side="left"]::after { left: -6px; top: 0; bottom: 0; width: 4px; }
+.adm-drop-marker[data-side="right"]::after { right: -6px; top: 0; bottom: 0; width: 4px; }
+.adm-drop-marker[data-side="above"]::after { top: -8px; left: 0; right: 0; height: 4px; }
+.adm-drop-marker[data-side="below"]::after { bottom: -8px; left: 0; right: 0; height: 4px; }
+.adm-drop-marker[data-side="end"]::after { display: none; }
+.adm-drop-marker.is-bad {
+  background: color-mix(in srgb, var(--a-bad) 10%, transparent);
+  outline-color: var(--a-bad);
+}
+.adm-drop-marker.is-bad::after {
+  background: var(--a-bad);
+}
+.adm-drop-marker.is-placing {
+  display: grid;
+  place-items: center;
+  animation: adm-placing 1s ease-in-out infinite alternate;
+}
+.adm-drop-marker.is-placing span {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--a-accent);
+  color: #fff;
+  font-size: 12px;
+}
+@keyframes adm-placing {
+  from { opacity: 1; }
+  to { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .adm-drop-marker { transition: none; }
+  .adm-drop-marker.is-placing { animation: none; }
 }
 
 .adm-page {
@@ -1012,9 +1080,16 @@ textarea.adm-input {
   box-shadow: 0 -2px 0 var(--a-accent);
 }
 .adm-row.is-overlay {
+  /* dnd-kit sizes the overlay like the dragged element, which for the preview's move handle is a small pill. */
+  min-width: 260px;
   border-color: var(--a-accent);
   box-shadow: 0 10px 24px rgb(0 0 0 / 0.45);
   cursor: grabbing;
+}
+/* The drag overlay (dnd-kit's wrapper) sits under the pointer for the whole drag: let the
+   wheel through, so the panel below scrolls (over the preview the builder forwards it). */
+.adm-drag-overlay {
+  pointer-events: none;
 }
 .adm-row-button {
   flex: 1;
@@ -1419,4 +1494,40 @@ textarea.adm-input {
   .adm-switch::after {
     transition: none;
   }
+}
+
+/* Preview: the widget under the pointer and its move handle (builder screen). */
+.adm-hover-box {
+  position: absolute;
+  border-radius: 8px;
+  outline: 1px dashed color-mix(in srgb, var(--a-accent) 60%, transparent);
+  pointer-events: none;
+}
+.adm-hover-box.is-selected {
+  outline: 2px solid var(--a-accent);
+}
+.adm-move-handle {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 220px;
+  padding: 3px 10px 3px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--a-accent);
+  color: #0b1020;
+  font: 600 12px/1.4 inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.35);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+.adm-move-handle:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }

@@ -129,7 +129,7 @@ export default function SitePage({ config, preview }: { config: HomepageConfig; 
   const barTabs = pinned ? tabs.filter((t) => t !== pinned) : tabs;
   const phoneBottomNav = bottomNav(config.layout, barTabs.length);
 
-  const widgetContext = widgetContextFor(config);
+  const widgetContext = preview ? { ...widgetContextFor(config), preview: true } : widgetContextFor(config);
 
   return (
     // The one-page layout shows every tab at once, so there is no "open tab" background to follow.

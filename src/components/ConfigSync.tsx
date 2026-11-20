@@ -8,6 +8,17 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 export const PREVIEW_REFRESH = "homepage:preview-refresh";
 /** Message `{ type: PREVIEW_TAB, tab }` — the admin panel asks its preview to show a tab. */
 export const PREVIEW_TAB = "homepage:preview-tab";
+/** Message `{ type: PREVIEW_SHOWN, tab }` the preview posts to the admin panel when a visitor-style tab switch or one-page jump/scroll changes what it shows. */
+export const PREVIEW_SHOWN = "homepage:preview-shown";
+
+/**
+ * Tells the admin panel which tab (slug) the page now shows, so its builder follows. Does
+ * nothing outside the panel's preview iframe (the live site has no parent to tell).
+ */
+export function reportPreviewTab(slug: string) {
+  if (typeof window === "undefined" || window.parent === window || !window.location.pathname.startsWith("/admin/preview")) return;
+  window.parent.postMessage({ type: PREVIEW_SHOWN, tab: slug }, window.location.origin);
+}
 
 /**
  * Re-renders the page with fresh config, without a reload:

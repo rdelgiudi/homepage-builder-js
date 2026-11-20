@@ -68,6 +68,10 @@ export interface ConfigIssue {
  * publish): nothing is dropped — every problem is returned as an issue instead.
  */
 export function strictParseConfig(raw: unknown): { config: HomepageConfig; issues: [] } | { config: null; issues: ConfigIssue[] } {
+  // Every top-level field has a default, so a missing body (`undefined`, `{}`) would otherwise
+  // "parse" into an empty site and be saved as the draft. A real config always lists its tabs.
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { config: null, issues: [{ path: "", message: "Expected a config object" }] };
+  if (!Array.isArray((raw as { tabs?: unknown }).tabs)) return { config: null, issues: [{ path: "tabs", message: "Expected a list of tabs" }] };
   const res = ConfigSchema.safeParse(migrateConfig(raw));
   if (!res.success) {
     return { config: null, issues: res.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })) };

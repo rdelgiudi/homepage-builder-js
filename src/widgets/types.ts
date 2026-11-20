@@ -37,6 +37,11 @@ export interface WidgetContext {
   /** Site default for the gradient frame; a section's own `widgetFrame` overrides it. */
   widgetFrame: boolean;
   widgetFrameWidth: number;
+  /**
+   * Rendered inside the admin panel's preview: `TabSections` then marks tabs and widgets
+   * (`data-tab-id`, `data-section-id`) so the panel can drop widgets onto the page.
+   */
+  preview?: boolean;
 }
 
 export interface WidgetRenderContext extends WidgetContext {

@@ -7,6 +7,7 @@ import type { Tab } from "@/lib/schema/config";
 import { Icon } from "@/widgets/shared";
 import type { WidgetContext } from "@/widgets/types";
 import TabSections, { type GridOptions } from "./TabSections";
+import { reportPreviewTab } from "./ConfigSync";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
@@ -31,6 +32,18 @@ export default function OnePage({ tabs, widgetContext, widthClass, grid, heading
   // On a phone the jump bar is wider than the screen: it scrolls, keeps the highlighted
   // button in view and fades the edges with more buttons beyond.
   const strip = useScrollStrip<HTMLDivElement>(active, tabs.length);
+
+  // Admin preview: the builder opens the section being read (jump bar or scrolling). Not on
+  // mount: `active` starts at the first tab before `?tab=` scrolls anywhere.
+  const activeLabel = tabs.find((t) => t.id === active)?.label;
+  const reported = useRef(false);
+  useEffect(() => {
+    if (!reported.current) {
+      reported.current = true;
+      return;
+    }
+    if (activeLabel !== undefined) reportPreviewTab(slugify(activeLabel));
+  }, [activeLabel]);
 
   /** While a jump is animating, the clicked section stays highlighted (timestamp it ends). */
   const jumpUntil = useRef(0);

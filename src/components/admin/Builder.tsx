@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -30,6 +30,8 @@ import { RowEditor, SpanControl } from "./LayoutControls";
 import { WidgetIcon } from "@/widgets/BrandIcon";
 import { COLUMNS, fitRow, packRows, placeInGrid, removeFromGrid, rowIds, setRowSpans, spanOf, splitRow, type DropTarget, type PlaceResult } from "./grid-layout";
 import { arrangeOf, gridOptions, ignoredTabSettings, isGridTab as isGridTabIn, pinnedTabId } from "@/lib/layouts";
+import { PREVIEW_DROP, type PreviewDropState } from "./PreviewPane";
+import { PREVIEW_MOVE, SECTION_DRAG, pickTarget, placeInList, previewCandidates, sideFor, type Point, type PreviewHit } from "./preview-drop";
 
 /** A row is selected through any of its widgets' ids (rows have no id of their own). */
 type Selection = { kind: "tab" | "section" | "row"; id: string } | null;
@@ -37,7 +39,7 @@ type Obj = Record<string, unknown>;
 
 // Drag ids are prefixed so one DndContext can tell tabs, sections and palette items apart.
 const TAB = "tab:";
-const SEC = "sec:";
+const SEC = SECTION_DRAG;
 const NEW = "new:";
 const LIST = "section-list";
 // Grid view: each tile is also a drop target (its own id, so `sec:` still means "the dragged widget").
@@ -58,15 +60,24 @@ function pointerOf(e: DragMoveEvent): { x: number; y: number } | null {
   return r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null;
 }
 
-/** Which side of a tile the pointer is on: outer 30% left/right = beside, otherwise top/bottom half = new row. */
-function sideOf(p: { x: number; y: number }, r: { left: number; top: number; width: number; height: number }): "left" | "right" | "above" | "below" {
-  const rx = (p.x - r.left) / (r.width || 1);
-  if (rx < 0.3) return "left";
-  if (rx > 0.7) return "right";
-  return p.y - r.top < r.height / 2 ? "above" : "below";
-}
-
 type GridHover = { target: DropTarget; result: PlaceResult<Section> };
+
+/** A drop on the preview: the new config it gives (or why not) and the row it lands in, if a grid row. */
+type PreviewPlace = { ok: true; config: HomepageConfig; row: Section[] | null } | { ok: false; reason: string };
+type PreviewHover = { hit: PreviewHit; place: PreviewPlace; text: string };
+
+const sameHover = (a: PreviewHover | null, b: PreviewHover | null) =>
+  a === b ||
+  (!!a &&
+    !!b &&
+    a.text === b.text &&
+    a.hit.tabId === b.hit.tabId &&
+    a.hit.id === b.hit.id &&
+    a.hit.side === b.hit.side &&
+    (["left", "top", "width", "height"] as const).every((k) => a.hit.box[k] === b.hit.box[k]));
+
+/** Pixels from the preview's top or bottom edge where a drag scrolls the page. */
+const SCROLL_EDGE = 56;
 
 const PALETTE_GROUPS: [category: string, title: string][] = [
   ["content", "Text and structure"],
@@ -99,6 +110,15 @@ function sectionSummary(section: Section): string {
   return "";
 }
 
+/** A drag's id with the preview's move handle (`move:<id>`) read as the widget itself (`sec:<id>`). */
+const dragId = (id: string | number) => {
+  const s = String(id);
+  return s.startsWith(PREVIEW_MOVE) ? SEC + s.slice(PREVIEW_MOVE.length) : s;
+};
+
+/** The tab that holds section `id`. */
+const tabOfSection = (config: HomepageConfig, id: string): Tab | undefined => config.tabs.find((t) => t.sections.some((s) => s.id === id));
+
 const mapTab = (config: HomepageConfig, tabId: string, fn: (tab: Tab) => Tab): HomepageConfig => ({
   ...config,
   tabs: config.tabs.map((t) => (t.id === tabId ? fn(t) : t)),
@@ -109,7 +129,8 @@ const collision: CollisionDetection = (args) => {
   const draggingTab = String(args.active.id).startsWith(TAB);
   const scoped = draggingTab ? { ...args, droppableContainers: args.droppableContainers.filter((c) => String(c.id).startsWith(TAB)) } : args;
   const hits = pointerWithin(scoped);
-  return hits.length ? hits : closestCenter(scoped);
+  // The preview counts only while the pointer is on it, never as the "closest" target.
+  return hits.length ? hits : closestCenter({ ...scoped, droppableContainers: scoped.droppableContainers.filter((c) => c.id !== PREVIEW_DROP) });
 };
 
 function SortableRow({ id, selected, onSelect, children, label }: { id: string; selected: boolean; onSelect: () => void; children: ReactNode; label: string }) {
@@ -276,7 +297,14 @@ function gridStatus(hover: GridHover, sections: Section[], defaultSpan: number):
  * The builder's two panels (outline on the left, inspector on the right) plus the tab the
  * preview should show. Returned as pieces so the shell can keep the preview mounted between them.
  */
-export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlug: string } {
+export function useBuilder(): {
+  outline: ReactNode;
+  inspector: ReactNode;
+  tabSlug: string;
+  /** Wraps the whole work area (outline, preview, inspector) in the drag-and-drop context. */
+  dnd: (children: ReactNode) => ReactNode;
+  previewDrop: PreviewDropState;
+} {
   const { config, published, update } = useAdmin();
   const [tabId, setTabId] = useState<string | null>(config.tabs[0]?.id ?? null);
   const [selection, setSelection] = useState<Selection>(null);
@@ -291,6 +319,14 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
     return () => clearTimeout(t);
   }, [notice]);
   const [envStatus, setEnvStatus] = useState<EnvStatus[]>([]);
+  // Dropping onto the preview.
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
+  const shownSlug = useRef("");
+  const [previewHover, setPreviewHover] = useState<PreviewHover | null>(null);
+  const [placing, setPlacing] = useState<PreviewDropState["placing"]>(null);
+  /** The latest drag position (window coordinates) and whether it is over the preview. */
+  const lastDrag = useRef<{ id: string; p: Point; overPreview: boolean } | null>(null);
+  const refreshPreviewHover = useRef<() => void>(() => {});
 
   useEffect(() => {
     api<{ widgets: EnvStatus[] }>("integrations")
@@ -367,23 +403,143 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
     setSelection({ kind: "section", id: sectionId });
   };
 
-  /** The section being dragged (a stand-in for a palette widget), or null for tabs. */
+  /**
+   * Puts `item` into tab `toTabId` with `place` (given that tab's sections, returns the new list
+   * or null for "no change"). If another tab holds the item, it leaves that tab in the same edit,
+   * which closes the gap in its grid row. Widgets picked up in the preview can come from any tab.
+   */
+  const moveInto = (c: HomepageConfig, item: Section, toTabId: string, place: (sections: Section[]) => Section[] | null): HomepageConfig => {
+    const target = c.tabs.find((t) => t.id === toTabId);
+    const sections = target ? place(target.sections) : null;
+    if (!sections) return c;
+    const from = c.tabs.find((t) => t.id !== toTabId && t.sections.some((s) => s.id === item.id));
+    return { ...c, tabs: c.tabs.map((t) => (t.id === toTabId ? { ...t, sections } : t.id === from?.id ? { ...t, sections: without(t, item.id) } : t)) };
+  };
+
+  /** The section being dragged (from any tab: the preview's handle can pick up any visible one), a stand-in for a palette widget, or null for tabs. */
   const draggedItem = (a: string): Section | null => {
-    if (a.startsWith(SEC)) return tab?.sections.find((s) => SEC + s.id === a) ?? null;
+    if (a.startsWith(SEC)) return tabOfSection(config, a.slice(SEC.length))?.sections.find((s) => SEC + s.id === a) ?? null;
     if (a.startsWith(NEW)) return { id: NEW_ITEM, type: a.slice(NEW.length) } as Section;
     return null;
   };
 
+  // --- dropping onto the preview ---
+
+  /**
+   * Puts `item` where a drop on the preview points: beside / above / below a widget of any tab
+   * the preview shows (one page shows them all, the profile layout a column tab too). Grid tabs
+   * use the same row logic as the outline; one-per-row tabs just take the position. An item
+   * from another tab leaves that tab in the same edit (one undo step).
+   */
+  const placeFromPreview = (c: HomepageConfig, item: Section, hit: PreviewHit): PreviewPlace => {
+    const target = c.tabs.find((t) => t.id === hit.tabId);
+    if (!target) return { ok: false, reason: "The preview is still catching up. Try again in a moment." };
+    if (isGridTab(target)) {
+      // A phone-width or narrow preview shows the grid as one column; "beside" is not offered
+      // there (previewCandidates), so it is above / below = a new full-width row.
+      const r = placeInGrid(target.sections, item, hit.id === null ? { id: null, side: "end" } : { id: hit.id, side: hit.side }, defaultSpan);
+      if (!r.ok) return r;
+      return { ok: true, row: r.row, config: moveInto(c, item, target.id, () => r.items) };
+    }
+    return { ok: true, row: null, config: moveInto(c, item, target.id, (sections) => placeInList(sections, item, hit.id, hit.side)) };
+  };
+
+  /** The line shown next to the pointer while hovering the preview. */
+  const previewText = (hit: PreviewHit, place: PreviewPlace): string => {
+    if (!place.ok) return place.reason;
+    const target = config.tabs.find((t) => t.id === hit.tabId);
+    const tabName = target?.label || "this tab";
+    if (hit.id === null) return `At the end of ${tabName}.`;
+    const there = target && target.id !== tab?.id ? ` in ${tabName}` : "";
+    const name = widgetMetaByType[target?.sections.find((s) => s.id === hit.id)?.type ?? ""]?.label ?? "this widget";
+    if ((hit.side === "left" || hit.side === "right") && place.row) return `Beside ${name}: the row becomes ${place.row.map((s) => spanOf(s, defaultSpan)).join(" / ")} of 12.`;
+    if (target && isGridTab(target)) return `New full-width row ${hit.side} ${name}${there}.`;
+    return `${hit.side === "above" ? "Above" : "Below"} ${name}${there}.`;
+  };
+
+  /** Hit-tests the preview page at a window position (the iframe is same-origin). */
+  const previewHoverAt = (activeId: string, p: Point): PreviewHover | null => {
+    const item = draggedItem(activeId);
+    const frame = frameRef.current;
+    const doc = frame?.contentDocument;
+    if (!item || !frame || !doc) return null;
+    const r = frame.getBoundingClientRect();
+    if (p.x < r.left || p.x > r.right || p.y < r.top || p.y > r.bottom) return null;
+    // Into the page's own viewport coordinates (inside the iframe's border).
+    const hit = pickTarget({ x: p.x - r.left - frame.clientLeft, y: p.y - r.top - frame.clientTop }, previewCandidates(doc));
+    if (!hit || hit.id === item.id) return null;
+    const place = placeFromPreview(config, item, hit);
+    return { hit, place, text: previewText(hit, place) };
+  };
+
+  // Scrolling the preview mid-drag (wheel, edge scroll) moves the widgets under a still pointer.
+  useEffect(() => {
+    refreshPreviewHover.current = () => {
+      const d = lastDrag.current;
+      if (!d?.overPreview) return;
+      const next = previewHoverAt(d.id, d.p);
+      setPreviewHover((prev) => (sameHover(prev, next) ? prev : next));
+    };
+  });
+
+  // While a widget is dragged: follow the preview's scrolling, and scroll it when the pointer
+  // rests near its top or bottom edge (the page may be much taller than the panel).
+  const draggingWidget = !!dragging && !dragging.startsWith(TAB);
+  useEffect(() => {
+    if (!draggingWidget) return;
+    const win = frameRef.current?.contentWindow;
+    const onScroll = () => refreshPreviewHover.current();
+    win?.addEventListener("scroll", onScroll, { passive: true });
+    // The wheel goes to whatever is under the pointer, which mid-drag is the drag overlay
+    // following it, not the preview: pass it on to the page while over the preview.
+    const onWheel = (e: WheelEvent) => {
+      if (lastDrag.current?.overPreview) frameRef.current?.contentWindow?.scrollBy(e.deltaX, e.deltaY);
+    };
+    window.addEventListener("wheel", onWheel, { passive: true });
+    let raf = 0;
+    const tick = () => {
+      const d = lastDrag.current;
+      const f = frameRef.current;
+      if (d?.overPreview && f) {
+        const r = f.getBoundingClientRect();
+        const up = r.top + SCROLL_EDGE - d.p.y;
+        const down = d.p.y - (r.bottom - SCROLL_EDGE);
+        if (d.p.x >= r.left && d.p.x <= r.right) {
+          if (up > 0 && up <= SCROLL_EDGE) f.contentWindow?.scrollBy(0, -Math.ceil(up / 3));
+          else if (down > 0 && down <= SCROLL_EDGE) f.contentWindow?.scrollBy(0, Math.ceil(down / 3));
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      win?.removeEventListener("scroll", onScroll);
+      window.removeEventListener("wheel", onWheel);
+    };
+  }, [draggingWidget]);
+
   // Grid view: work out the drop position and its result while dragging, so the outline can show
   // where the widget would land, or that there is no room, before it is dropped.
   const onDragMove = (e: DragMoveEvent) => {
+    const activeId = dragId(e.active.id);
+    const pointer = pointerOf(e);
+    const overPreview = e.over?.id === PREVIEW_DROP;
+    lastDrag.current = pointer ? { id: activeId, p: pointer, overPreview } : null;
+    if (overPreview) {
+      const next = pointer ? previewHoverAt(activeId, pointer) : null;
+      setPreviewHover((prev) => (sameHover(prev, next) ? prev : next));
+      if (hover) setHover(null);
+      return;
+    }
+    if (previewHover) setPreviewHover(null);
     if (!gridView || !tab) return;
-    const item = draggedItem(String(e.active.id));
+    const item = draggedItem(activeId);
     const o = e.over ? String(e.over.id) : "";
-    const p = pointerOf(e);
+    const p = pointer;
     let target: DropTarget | null = null;
     if (item && o === GRID_END) target = { id: null, side: "end" };
-    else if (item && o.startsWith(CELL) && p && e.over) target = { id: o.slice(CELL.length), side: sideOf(p, e.over.rect) };
+    else if (item && o.startsWith(CELL) && p && e.over) target = { id: o.slice(CELL.length), side: sideFor(p, e.over.rect, true) };
     if (!target || target.id === item?.id) {
       if (hover) setHover(null);
       return;
@@ -392,14 +548,43 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
     setHover({ target, result: placeInGrid(tab.sections, item!, target, defaultSpan) });
   };
 
-  const onDragEnd = ({ active, over }: DragEndEvent) => {
+  const endDrag = () => {
     setDragging(null);
-    const gridDrop = hover;
     setHover(null);
+    setPreviewHover(null);
+    lastDrag.current = null;
+  };
+
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    const gridDrop = hover;
+    const previewDropped = previewHover;
+    endDrag();
     if (!over || !tab) return;
-    const a = String(active.id);
+    const a = dragId(active.id);
     const o = String(over.id);
     if (a === o) return;
+
+    if (o === PREVIEW_DROP) {
+      if (!previewDropped) return;
+      const { hit, place } = previewDropped;
+      if (!place.ok) {
+        if (place.reason) setNotice(`${place.reason} The widget went back to where it was.`);
+        return;
+      }
+      const target = config.tabs.find((t) => t.id === hit.tabId);
+      const item = !target ? null : a.startsWith(NEW) ? newSection(config, target.id, a.slice(NEW.length)) : draggedItem(a);
+      if (!target || !item) return;
+      update((c) => {
+        const r = placeFromPreview(c, item, hit);
+        return r.ok ? r.config : c;
+      });
+      // The preview already shows that tab; sending it there again would scroll the one-page layout away.
+      if (target.id !== pinnedId) shownSlug.current = slugify(target.label);
+      setTabId(target.id);
+      setSelection({ kind: "section", id: item.id });
+      setPlacing({ box: hit.box, side: hit.side, label: a.startsWith(NEW) ? "Adding…" : "Moving…" });
+      return;
+    }
 
     if (gridView && gridDrop && (o.startsWith(CELL) || o === GRID_END)) {
       if (!gridDrop.result.ok) {
@@ -410,9 +595,9 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
       const item = a.startsWith(NEW) ? newSection(config, tab.id, a.slice(NEW.length)) : draggedItem(a);
       if (!item) return;
       update((c) =>
-        mapTab(c, tab.id, (t) => {
-          const r = placeInGrid(t.sections, item, gridDrop.target, defaultSpan);
-          return r.ok ? { ...t, sections: r.items } : t;
+        moveInto(c, item, tab.id, (sections) => {
+          const r = placeInGrid(sections, item, gridDrop.target, defaultSpan);
+          return r.ok ? r.items : null;
         })
       );
       setSelection({ kind: "section", id: item.id });
@@ -426,7 +611,10 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
         return from < 0 || to < 0 ? c : { ...c, tabs: arrayMove(c.tabs, from, to) };
       });
     } else if (a.startsWith(SEC)) {
-      if (o.startsWith(SEC)) {
+      const id = a.slice(SEC.length);
+      const fromTab = tabOfSection(config, id);
+      if (!fromTab) return;
+      if (o.startsWith(SEC) && fromTab.id === tab.id) {
         update((c) =>
           mapTab(c, tab.id, (t) => {
             const from = t.sections.findIndex((s) => SEC + s.id === a);
@@ -434,8 +622,16 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
             return from < 0 || to < 0 ? t : { ...t, sections: arrayMove(t.sections, from, to) };
           })
         );
+      } else if (o.startsWith(SEC)) {
+        // Picked up in the preview from another tab, dropped on a row of the open tab's list.
+        const item = draggedItem(a);
+        if (!item) return;
+        update((c) => moveInto(c, item, tab.id, (sections) => placeInList(sections, item, o.slice(SEC.length), "above")));
+        setSelection({ kind: "section", id });
       } else if (o.startsWith(TAB)) {
-        moveSection(a.slice(SEC.length), tab.id, o.slice(TAB.length));
+        moveSection(id, fromTab.id, o.slice(TAB.length));
+      } else if (o === LIST) {
+        moveSection(id, fromTab.id, tab.id);
       }
     } else if (a.startsWith(NEW)) {
       const type = a.slice(NEW.length);
@@ -450,7 +646,7 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
     const widget = (type: string) => ({ icon: <WidgetIcon type={type} fallback={widgetMetaByType[type].icon} />, label: widgetMetaByType[type].label });
     if (dragging.startsWith(NEW)) return widget(dragging.slice(NEW.length));
     if (dragging.startsWith(SEC)) {
-      const s = tab?.sections.find((x) => SEC + x.id === dragging);
+      const s = draggedItem(dragging);
       return s ? widget(s.type) : null;
     }
     const t = config.tabs.find((x) => TAB + x.id === dragging);
@@ -460,20 +656,7 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
   // --- outline ---
 
   const outline = (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={collision}
-      onDragStart={(e) => {
-        setDragging(String(e.active.id));
-        setNotice(null);
-      }}
-      onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
-      onDragCancel={() => {
-        setDragging(null);
-        setHover(null);
-      }}
-    >
+    <>
       <div className="adm-panel-head">
         <h2>Tabs</h2>
         <button type="button" className="adm-btn is-small" onClick={addTab}>
@@ -528,11 +711,6 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
           </div>
           {gridView ? (
             <div className="adm-pad-x">
-              {notice && (
-                <p className="adm-notice is-bad adm-grid-notice" role="status">
-                  {notice}
-                </p>
-              )}
               {/* One grid per row, packed by packRows (the same wrapping the site's CSS grid does),
                   so each row can have a handle that selects it for the row editor. */}
               <div className="adm-grid-rows">
@@ -623,8 +801,32 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
         </>
       )}
 
+    </>
+  );
+
+  const refused = (hover && !hover.result.ok) || (previewHover && !previewHover.place.ok);
+  const dragHint = previewHover ? { text: previewHover.text, ok: previewHover.place.ok } : gridView && hover && tab ? { text: gridStatus(hover, tab.sections, defaultSpan), ok: hover.result.ok } : null;
+  const dnd = (children: ReactNode) => (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={collision}
+      onDragStart={(e) => {
+        setDragging(dragId(e.active.id));
+        setNotice(null);
+      }}
+      onDragMove={onDragMove}
+      onDragEnd={onDragEnd}
+      onDragCancel={endDrag}
+    >
+      {children}
+      {/* Fixed, not in the flow: a message that appears or goes mid-drag would move the tiles under the pointer. */}
+      {notice && (
+        <p className="adm-notice is-bad adm-grid-notice" role="status">
+          {notice}
+        </p>
+      )}
       {/* A refused grid drop animates back to where the widget came from; anything else lands instantly. */}
-      <DragOverlay dropAnimation={hover && !hover.result.ok ? defaultDropAnimation : null}>
+      <DragOverlay className="adm-drag-overlay" dropAnimation={refused ? defaultDropAnimation : null}>
         {overlayLabel && (
           <div className="adm-row is-overlay">
             <span className="adm-row-icon" aria-hidden>
@@ -632,10 +834,10 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
             </span>
             <span className="adm-row-text">
               <span className="adm-row-title">{overlayLabel.label}</span>
-              {/* Grid view: where it would land (or why it can't), right next to the pointer. */}
-              {gridView && hover && tab && (
-                <span className={`adm-overlay-hint${hover.result.ok ? "" : " is-bad"}`} aria-live="polite">
-                  {gridStatus(hover, tab.sections, defaultSpan)}
+              {/* Grid view or preview: where it would land (or why it can't), right next to the pointer. */}
+              {dragHint && (
+                <span className={`adm-overlay-hint${dragHint.ok ? "" : " is-bad"}`} aria-live="polite">
+                  {dragHint.text}
                 </span>
               )}
             </span>
@@ -825,5 +1027,36 @@ export function useBuilder(): { outline: ReactNode; inspector: ReactNode; tabSlu
   }
 
   // The column tab isn't in the site's tab bar, so the preview stays on the tab it shows.
-  return { outline, inspector, tabSlug: tab && tab.id !== pinnedId ? slugify(tab.label) : "" };
+  return {
+    outline,
+    inspector,
+    dnd,
+    tabSlug: tab && tab.id !== pinnedId ? slugify(tab.label) : "",
+    previewDrop: {
+      onSelect: (id: string) => {
+        const t = tabOfSection(config, id);
+        if (!t) return;
+        // The preview already shows it (see shownSlug); the one-page preview must not jump.
+        if (t.id !== pinnedId) shownSlug.current = slugify(t.label);
+        setTabId(t.id);
+        setSelection({ kind: "section", id });
+      },
+      selectedId: selection?.kind === "section" ? selection.id : null,
+      onTabShown: (slug: string) => {
+        const t = config.tabs.find((x) => x.id !== pinnedId && slugify(x.label) === slug);
+        // The preview shows it already: record that, so opening it here sends nothing back.
+        shownSlug.current = slug;
+        // Mid-drag (one page scrolling under an edge auto-scroll) the outline must stay put.
+        if (!t || t.id === tab?.id || dragging) return;
+        setTabId(t.id);
+        // Keep the selection only if it still belongs to the open tab.
+        setSelection((sel) => (sel && (sel.kind === "tab" ? sel.id === t.id : t.sections.some((s) => s.id === sel.id)) ? sel : null));
+      },
+      frameRef,
+      shownSlug,
+      active: draggingWidget,
+      marker: previewHover ? { box: previewHover.hit.box, side: previewHover.hit.side, bad: !previewHover.place.ok } : null,
+      placing,
+    },
+  };
 }
