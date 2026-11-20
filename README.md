@@ -572,7 +572,7 @@ See `AGENTS.md` for a file-by-file layout and implementation notes.
 
 ## Admin panel
 
-![admin panel preview](https://sharex.giudi.me/Wela0/rAperELi71.png/raw)
+![admin panel preview](https://sharex.giudi.me/Wela0/yenEQoqI62/raw.png)
 
 Run `npm run admin:hash`, type a password, paste the printed `ADMIN_PASSWORD_HASH=...` line into `.env`, restart, and open `/admin`. Without an admin password the panel does not exist (`/admin` and `/api/admin/*` answer 404).
 
