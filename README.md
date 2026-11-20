@@ -1,5 +1,7 @@
 # Homepage builder with customizable components
 
+![site preview](https://sharex.giudi.me/Wela0/rOxodAKo96/raw)
+
 A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integration. Powers my site: https://giudi.me.
 
 ⚠️ WARNING ⚠️: Entire project is AI generated, there may be some major bugs or overall weirdly structured code.
@@ -569,6 +571,8 @@ A canvas overlay that renders a comet-style trail following the cursor, matching
 See `AGENTS.md` for a file-by-file layout and implementation notes.
 
 ## Admin panel
+
+![admin panel preview](https://sharex.giudi.me/Wela0/rAperELi71.png/raw)
 
 Run `npm run admin:hash`, type a password, paste the printed `ADMIN_PASSWORD_HASH=...` line into `.env`, restart, and open `/admin`. Without an admin password the panel does not exist (`/admin` and `/api/admin/*` answer 404).
 
