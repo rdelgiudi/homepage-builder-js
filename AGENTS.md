@@ -59,7 +59,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   ├── loading.tsx              # Cold-load skeleton
 │   │   ├── page.tsx                 # Homepage — <SitePage> with the published config (homepage.json read at runtime via fs)
 │   │   ├── overlay/                 # Stream overlay: [id]/page.tsx = one published widget, transparent (OBS Browser Source); loading.tsx renders nothing
-│   │   └── posts/[slug]/page.tsx    # One blog post (lib/posts.ts) inside <SiteShell>
+│   │   └── posts/[...slug]/page.tsx # One blog post (lib/posts.ts) inside <SiteShell>; the slug is the file's path (folders allowed)
 │   ├── components/
 │   │   ├── OverlayView.tsx          # The overlay page's client part: one widget via TabSections, ?theme on <html>, ConfigSync
 │   │   ├── SitePage.tsx             # SiteShell (page colour, background, effects, header, counters, ConfigSync, ThemeSwitcher) + SitePage (the whole site from a config; used by / and /admin/preview, builds WidgetContext)
@@ -98,7 +98,10 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │       ├── preview-drop.ts      # Hit-testing the preview for drops: previewCandidates (DOM), pickTarget/sideFor/placeInList (pure, unit-tested)
 │   │       ├── ConfigScreens.tsx    # Site / Background / Effects
 │   │       ├── LayoutControls.tsx   # LayoutPicker (site layout thumbnails) + SpanControl (widget width in a grid)
-│   │       ├── ContentScreen.tsx    # Markdown files editor
+│   │       ├── ContentScreen.tsx    # Markdown files: folder tree (drag to move, rename/move, delete), editor + rendered preview
+│   │       ├── MarkdownEditor.tsx   # Textarea with the formatting toolbar, shortcuts, image upload/paste/drop
+│   │       ├── markdown-edit.ts     # Toolbar actions as pure text edits (unit-tested)
+│   │       ├── content-tree.ts      # Folder tree + drop targets for the Content screen (pure, unit-tested)
 │   │       ├── CommentsScreen.tsx   # Moderation queue, settings, audit log
 │   │       ├── InboxScreen.tsx      # Contact-form messages: unread/all, mark read, reply by email, block, delete
 │   │       ├── SuggestionsScreen.tsx # Game suggestions per game: status (will play / played / dismissed…), read, block, delete
@@ -136,7 +139,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 │   │   ├── reaction-bus.ts          # broadcastReaction() — pushes a reaction to all WS clients via globalThis.__wssBroadcast
 │   │   ├── background.ts            # backgroundLayer(): background.base → CSS variables/classes (pure); safeUrl()
 │   │   ├── uploads.ts               # DATA_DIR/uploads: storeImage (sharp → WebP), storeVideo, resolveUpload, listUploads
-│   │   ├── content.ts               # CONTENT_DIR + resolveContentFile() (plain *.md names only)
+│   │   ├── content.ts               # CONTENT_DIR, resolveContentFile()/resolveContentFolder() (plain paths, ≤ 4 folders deep), listContent() (recursive)
 │   │   ├── markdown.ts              # Server-side markdown → HTML (marked), mtime-cached
 │   │   ├── layouts.ts               # LAYOUT_FEATURES: what each site layout does with tab settings; gridOptions, pinnedTabId, ignoredTabSettings, bottomNav
 │   │   ├── widget-context.ts        # widgetContextFor(config): the WidgetContext (site + overlay)
@@ -336,7 +339,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - Markdown files (Content screen), comment moderation and the Inbox are **not** part of the draft — they apply immediately.
 
 ### Admin forms are generated from the schema
-- `components/admin/schemas.ts` converts the zod schemas with `z.toJSONSchema(schema, { io: "input" })`; `SchemaForm` walks the result. A control is chosen from the JSON Schema type plus the `ui` hint set via `.meta({ ui })`: `color`, `gradient` (string array as color stops), `textarea`, `icon`, `tristate` (optional boolean: unset = inherit), `content-file` (dropdown of `src/content/*.md`), `emoji-list`, `time` (HH:mm picker). `.meta({ labels: { value: "Name" } })` gives enum values display names. An array of enum values (e.g. weekdays) renders as toggle buttons. Enums with ≤ 5 options render as a segmented control; bounded numbers get a slider; arrays of objects get a collapsible list editor.
+- `components/admin/schemas.ts` converts the zod schemas with `z.toJSONSchema(schema, { io: "input" })`; `SchemaForm` walks the result. A control is chosen from the JSON Schema type plus the `ui` hint set via `.meta({ ui })`: `color`, `gradient` (string array as color stops), `textarea`, `icon`, `tristate` (optional boolean: unset = inherit), `content-file` (dropdown of every markdown file under `src/content/`, grouped by folder), `emoji-list`, `time` (HH:mm picker). `.meta({ labels: { value: "Name" } })` gives enum values display names. An array of enum values (e.g. weekdays) renders as toggle buttons. Enums with ≤ 5 options render as a segmented control; bounded numbers get a slider; arrays of objects get a collapsible list editor.
 - "Optional" = not in `required` and no `default`. Clearing an optional string/array/boolean **removes the key** rather than storing `""`/`[]`/`false`.
 - `id`, `version` and any `const` property (a section's `type`, `background.base.type`) are never rendered. Don't hide keys by name beyond that — `background.effect.type` is a real, editable field.
 - Adding a field with `.meta({ title, description })` to a schema is all it takes for it to appear in the panel.
@@ -491,9 +494,9 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - Fixed hosts and no keys, so the request carries a validated username (like chess): AniList GraphQL (`postJson()` in `widget-data.ts`), Letterboxd `/<user>/rss/` (diary only; list entries without `letterboxd:filmTitle` are skipped), Open Library `/people/<user>/books/<shelf>.json` (covers from `covers.openlibrary.org`). Cached 30 min per service/user/list.
 - AniList answers "no such user" and "private" with 404 and some unknown names with 500; Open Library answers a private log with 403 — each is turned into a message that says what to fix. Goodreads was dropped: its RSS answers 404 for every account.
 
-### Blog posts (`posts` + `/posts/[slug]` + `src/lib/posts.ts`)
-- A post is any `src/content/*.md` whose front matter has a `date` (`YYYY-MM-DD`; gray-matter turns an unquoted date into a `Date`, `postDate()` handles both). `title`, `summary` (else an excerpt of the body), `tags` and `draft: true` are optional. Files without a date stay plain content for the markdown widget. They are edited in the admin **Content** screen like any other file and are live immediately (not part of the draft).
-- The page is `/posts/<file name without .md>`, served by the public container; the slug goes through `resolveContentFile()`. It renders inside `SiteShell` (same background, header, effects as the site) at 870px; "Back" links to the first tab that has a `posts` widget.
+### Blog posts (`posts` + `/posts/[...slug]` + `src/lib/posts.ts`)
+- A post is any markdown file under `src/content/` (folders included) whose front matter has a `date` (`YYYY-MM-DD`; gray-matter turns an unquoted date into a `Date`, `postDate()` handles both). `title`, `summary` (else an excerpt of the body), `tags` and `draft: true` are optional. Files without a date stay plain content for the markdown widget. They are edited in the admin **Content** screen like any other file and are live immediately (not part of the draft).
+- The page is `/posts/<path without .md>` (`blog/2026/hello.md` → `/posts/blog/2026/hello`, a catch-all route; top-level posts keep their old URLs), served by the public container; the slug goes through `resolveContentFile()`, which checks every part. It renders inside `SiteShell` (same background, header, effects as the site) at 870px; "Back" links to the first tab that has a `posts` widget.
 - Unknown slugs call `notFound()`. Under the root `loading.tsx` that is streamed with status 200 (same reason as the admin 404 in `websocket-server.js`), so a missing post is a soft 404.
 
 ### Widget registry (`src/widgets/`)
@@ -557,7 +560,9 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - Available via `animate-pulse-glow` class.
 
 ### Markdown files are runtime, not bundled
-- API route `/api/markdown` reads `src/content/` via `fs.readFileSync` at request time. The `file` param goes through `resolveContentFile()` (`src/lib/content.ts`), which only accepts plain `*.md` file names — never build a content path from user input any other way.
+- API route `/api/markdown` reads `src/content/` via `fs.readFileSync` at request time. The `file` param goes through `resolveContentFile()` (`src/lib/content.ts`), which accepts only `/`-separated plain names (each part starts with a letter or digit, so no `.`/`..`/hidden parts; no backslashes, empty parts or leading `/`; at most `MAX_FOLDER_DEPTH` = 4 folders; no folder named `*.md`) — never build a content path from user input any other way. `resolveContentFolder()` is the same for folders and never returns the content folder itself (that is what keeps `DELETE ?folder=` from emptying it). `listContent()` lists only names those two accept.
+- **Content screen** (`/api/admin/content`): GET = `{ files, folders }`; PUT `{ file, content }` (creates the file's folders) or `{ folder }`; PATCH `{ from, to }` renames/moves a file or a folder, refuses an existing target (409), a folder into itself, or contents that would end up too deep, and answers `moved: [{ from, to }]` for every file. The panel then points the draft's Markdown widgets at the new names (one undo step); the live site keeps the old names until Publish, which the message says. DELETE `?file=` or `?folder=` (recursive). All file changes are live immediately, as before.
+- **Editor toolbar** (`MarkdownEditor.tsx`): headings, bold/italic/strike/code, link, image (address or upload; pasting or dropping an image file uploads it), lists, checklist, quote, code block, table, divider, and "Post details" (front matter with today's date). Shortcuts Ctrl/⌘+B, I, K, S. Each action is a pure edit from `markdown-edit.ts`, applied with `document.execCommand("insertText")` so the textarea's own undo keeps working (fallback `setRangeText` + `onChange`); toolbar buttons `preventDefault` on mousedown so the textarea keeps its selection. Content isn't part of the draft, so the panel's Undo/Redo doesn't apply here.
 - Renders to HTML server-side via `src/lib/markdown.ts` (using `marked`); mtime-cached.
 - Sets `Cache-Control: public, max-age=300` and `export const revalidate = 300`.
 - Client renders the returned HTML via `dangerouslySetInnerHTML` — `react-markdown` / `remark-gfm` are not in the client bundle.

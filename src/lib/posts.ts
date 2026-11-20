@@ -1,13 +1,13 @@
 /**
- * Blog posts = markdown files in src/content/ whose front matter has a `date`. They are
- * listed by the `posts` widget and each one is a page at /posts/<file name without .md>.
+ * Blog posts = markdown files in src/content/ (folders included) whose front matter has a
+ * `date`. They are listed by the `posts` widget and each one is a page at
+ * /posts/<path without .md> ("blog/2026/hello.md" → /posts/blog/2026/hello).
  * Files without a date stay plain content files (for the markdown widget); `draft: true`
  * hides a post. Everything is read at request time and cached per file by mtime.
  */
 import fs from "fs";
-import path from "path";
 import matter from "gray-matter";
-import { CONTENT_DIR, resolveContentFile } from "@/lib/content";
+import { listContent, resolveContentFile } from "@/lib/content";
 import { renderMarkdownToHtml } from "@/lib/markdown";
 
 export interface PostSummary {
@@ -24,7 +24,6 @@ export interface Post extends PostSummary {
   html: string;
 }
 
-const SLUG = /^[A-Za-z0-9][A-Za-z0-9._-]{0,77}$/;
 
 /** gray-matter turns an unquoted YAML date into a Date; a quoted one stays a string. */
 export function postDate(value: unknown): string | null {
@@ -55,7 +54,7 @@ export function excerpt(markdown: string, max = 180): string {
 export function toPost(slug: string, data: Record<string, unknown>, body: string): Omit<Post, "html"> | null {
   const date = postDate(data.date);
   if (!date || data.draft === true) return null;
-  const title = typeof data.title === "string" && data.title.trim() ? data.title.trim() : slug.replace(/[-_]+/g, " ");
+  const title = typeof data.title === "string" && data.title.trim() ? data.title.trim() : (slug.split("/").pop() ?? slug).replace(/[-_]+/g, " ");
   const summary = typeof data.summary === "string" && data.summary.trim() ? data.summary.trim() : excerpt(body);
   const tags = Array.isArray(data.tags) ? data.tags.filter((t): t is string => typeof t === "string" && !!t.trim()).map((t) => t.trim()) : [];
   const words = body.split(/\s+/).filter(Boolean).length;
@@ -65,7 +64,7 @@ export function toPost(slug: string, data: Record<string, unknown>, body: string
 const cache = new Map<string, { mtimeMs: number; post: Omit<Post, "html"> | null; body: string; html?: string }>();
 
 function load(slug: string): { mtimeMs: number; post: Omit<Post, "html"> | null; body: string; html?: string } | null {
-  if (!SLUG.test(slug)) return null;
+  // The slug is the file's path without ".md"; resolveContentFile checks every part of it.
   const file = resolveContentFile(`${slug}.md`);
   if (!file) return null;
   let stat: fs.Stats;
@@ -90,15 +89,8 @@ function load(slug: string): { mtimeMs: number; post: Omit<Post, "html"> | null;
 
 /** Every published post, newest first. */
 export function listPosts(): PostSummary[] {
-  let names: string[];
-  try {
-    names = fs.readdirSync(CONTENT_DIR);
-  } catch {
-    return [];
-  }
-  const posts = names.flatMap((name) => {
-    if (!name.endsWith(".md")) return [];
-    const post = load(path.basename(name, ".md"))?.post;
+  const posts = listContent().files.flatMap(({ name }) => {
+    const post = load(name.slice(0, -".md".length))?.post;
     return post ? [post] : [];
   });
   return posts.sort((a, b) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title));

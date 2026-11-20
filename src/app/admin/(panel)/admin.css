@@ -1531,3 +1531,139 @@ textarea.adm-input {
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
+
+/* ---------- content: folder tree ---------- */
+
+.adm-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.adm-tree-item > .adm-tree {
+  margin: 0;
+}
+.adm-tree .adm-row {
+  gap: 2px;
+}
+.adm-tree-caret {
+  flex: none;
+  width: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--a-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.adm-tree [draggable="true"] {
+  cursor: grab;
+}
+.adm-row.is-drop,
+.adm-panel-head.is-drop {
+  outline: 2px dashed var(--a-accent);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--a-accent) 10%, transparent);
+}
+.adm-rename {
+  flex: 1;
+  min-width: 220px;
+  padding: 4px 6px;
+}
+.adm-folder-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.adm-folder-bar > .adm-muted {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+}
+.adm-folder-bar > .adm-spacer {
+  display: none;
+}
+.adm-tree .adm-badge {
+  flex: none;
+  align-self: center;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.adm-tree-empty {
+  padding-top: 4px;
+  padding-bottom: 6px;
+  color: var(--a-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+.adm-create {
+  display: grid;
+  gap: 6px;
+}
+.adm-editor-name {
+  overflow-wrap: anywhere;
+}
+
+/* ---------- content: markdown toolbar ---------- */
+
+.adm-md {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  gap: 6px;
+}
+.adm-md .adm-code {
+  flex: 1;
+  min-height: 0;
+}
+.adm-md-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 4px;
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+  background: var(--a-panel);
+}
+.adm-md-group {
+  display: flex;
+  gap: 2px;
+}
+.adm-md-group + .adm-md-group {
+  padding-left: 8px;
+  border-left: 1px solid var(--a-line);
+}
+.adm-md-tool {
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--a-text);
+  font: 500 12.5px/1 inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.adm-md-tool:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--a-accent) 16%, transparent);
+}
+.adm-md-tool:focus-visible {
+  outline: 2px solid var(--a-accent);
+  outline-offset: -2px;
+}
+.adm-md-tool:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.adm-md-tool b,
+.adm-md-tool i,
+.adm-md-tool s {
+  font-size: 14px;
+}
+.adm-md-tool code {
+  font: 12px ui-monospace, monospace;
+}
+.adm-md-error {
+  margin: 0;
+}

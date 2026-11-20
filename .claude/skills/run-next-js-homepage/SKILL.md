@@ -94,6 +94,9 @@ npm run test:integration  # rebuilds .next: stop the dev server first
 - Element boxes inside the iframe (`frame.$(…).boundingBox()`) are already in page coordinates.
 - The preview shows changes ~1 s after a drop (500 ms autosave + refresh). The driver waits 2.5 s.
 - **A `bash` heredoc containing `$$` (Playwright's `frame.$$eval`) got blocked** by the agent's shell safety check. Write driver scripts with the file-writing tool, not heredocs.
+- **The dev server edits the real `src/content/`** (only `DATA_DIR` is throwaway). Test content screens inside a throwaway folder (e.g. `zz-run-test`) and delete it with `s.api("/api/admin/content?folder=zz-run-test", { method: "DELETE" })`.
+- **`pkill -f "node websocket-server.js"` kills your own shell**, because the pattern matches the command line running it. Stop servers by port (`lsof -ti:3123 -sTCP:LISTEN | xargs -r kill`).
+- Several `page.getByRole("button", { name: "Rename / move" })` exist on the Content screen (the selected folder's and the file's). Scope locators to `.adm-editor-bar` / `.adm-folder-bar`.
 - `homepage.json` in this repo is the widget showcase ("Lorem Ipsum"). Tab ids are `start`, `content`, `live`, `gaming`, `community`.
 
 ## Troubleshooting
@@ -104,4 +107,5 @@ npm run test:integration  # rebuilds .next: stop the dev server first
 | `browserType.launch: Target page, context or browser has been closed` + `Socket path too long` | Long `TMPDIR`; fixed in the driver. If you launch Chromium yourself, pass `env: { ...process.env, TMPDIR: "/tmp" }`. |
 | `page.fill: Timeout … input[type=password]` | Server not up, `ADMIN_PASSWORD` not set, or the cold-start 404. Check `$RUN/server.log`. |
 | Draft turned into an empty "Homepage / Welcome" site | Fixed now: `PUT /api/admin/config` without `{ config }` answers 400. Discard with `s.discardDraft()`. |
+| `npm run test:integration`: every test fails with `Server did not start within 60s`. Started by hand, the build logs `Cannot find module './NNNN.js'` | `.next` holds mixed dev and production output (a dev server ran on the same checkout). Stop every server, `rm -rf -- ./.next`, and run it again. |
 | A drag does nothing, and the hint is `null` | The press missed the element (scrolled away). Re-measure it right before `drag()`. |

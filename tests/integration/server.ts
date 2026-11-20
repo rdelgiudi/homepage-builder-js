@@ -41,7 +41,11 @@ export async function startServer(options: { env: Record<string, string>; config
   fs.mkdirSync(path.join(dir, "src/content"), { recursive: true });
   const configPath = path.join(dir, "src/config/homepage.json");
   fs.writeFileSync(configPath, JSON.stringify(options.config, null, 2));
-  for (const [name, text] of Object.entries(options.content ?? {})) fs.writeFileSync(path.join(dir, "src/content", name), text);
+  for (const [name, text] of Object.entries(options.content ?? {})) {
+    // Names may include folders ("blog/hello.md").
+    fs.mkdirSync(path.dirname(path.join(dir, "src/content", name)), { recursive: true });
+    fs.writeFileSync(path.join(dir, "src/content", name), text);
+  }
 
   const port = await freePort();
   // Every integration is switched off explicitly: dotenv never overrides a variable that

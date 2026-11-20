@@ -9,17 +9,19 @@ import { postDateLabel } from "@/widgets/posts/date";
 
 export const dynamic = "force-dynamic";
 
-type Props = { params: Promise<{ slug: string }> };
+/** `/posts/blog/2026/hello` = src/content/blog/2026/hello.md (posts can live in folders). */
+type Props = { params: Promise<{ slug: string[] }> };
+const slugOf = async (params: Props["params"]) => (await params).slug.join("/");
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const post = getPost((await params).slug);
+  const post = getPost(await slugOf(params));
   if (!post) notFound();
   return { title: `${post.title} · ${getConfig().name}`, description: post.summary };
 }
 
 /** One blog post: a markdown file from src/content/ with a `date` in its front matter (see lib/posts.ts). */
 export default async function PostPage({ params }: Props) {
-  const post = getPost((await params).slug);
+  const post = getPost(await slugOf(params));
   if (!post) notFound();
   const config = getConfig();
   // "Back" returns to the tab that lists the posts.

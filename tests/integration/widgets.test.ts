@@ -30,6 +30,8 @@ const content = {
   "older.md": "---\ntitle: Older post\ndate: \"2026-01-02\"\nsummary: A custom summary\n---\n\nOlder body.",
   "draft.md": "---\ntitle: Secret draft\ndate: 2026-11-19\ndraft: true\n---\n\nNot yet.",
   "about.md": "# About\n\nNot a post (no date).",
+  "blog/2026/nested.md": "---\ntitle: Nested post\ndate: 2026-06-01\n---\n\nFrom a *folder*.",
+  "notes/todo.md": "# Todo\n\nA note in a folder.",
 };
 
 describe("new widgets", () => {
@@ -56,15 +58,27 @@ describe("new widgets", () => {
     const all = await fetch(server.url + "/api/widgets/posts").then((r) => r.json());
     assert.deepEqual(
       all.data.posts.map((p: { slug: string }) => p.slug),
-      ["hello-world", "older"]
+      ["hello-world", "blog/2026/nested", "older"]
     );
-    assert.equal(all.data.posts[1].summary, "A custom summary");
+    assert.equal(all.data.posts[2].summary, "A custom summary");
     assert.equal(all.data.posts[0].summary, "First post body.");
     const news = await fetch(server.url + "/api/widgets/posts?tag=NEWS").then((r) => r.json());
     assert.deepEqual(
       news.data.posts.map((p: { slug: string }) => p.slug),
       ["hello-world"]
     );
+  });
+
+  it("serves posts and markdown from folders", async () => {
+    const res = await fetch(server.url + "/posts/blog/2026/nested");
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /<title>Nested post · Widget test site<\/title>/);
+    assert.match(html, /<em>folder<\/em>/);
+    assert.match(await fetch(server.url + "/api/markdown?file=notes/todo.md").then((r) => r.text()), /A note in a folder/);
+    for (const bad of ["notes/../about.md", "notes%2F..%2Fabout.md", "notes/.x.md"]) {
+      assert.equal((await fetch(`${server.url}/api/markdown?file=${bad}`)).status, 404, bad);
+    }
   });
 
   it("serves a post as its own page", async () => {

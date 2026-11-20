@@ -477,15 +477,27 @@ function ContentFileSelect({ value, onChange, label }: { value: string; onChange
     contentFiles.then(setFiles);
   }, []);
   const options = files.includes(value) || !value ? files : [value, ...files];
+  const option = (f: string) => (
+    <option key={f} value={f}>
+      {f.slice(f.lastIndexOf("/") + 1)}
+      {!files.includes(f) && files.length ? " (missing)" : ""}
+    </option>
+  );
+  // Files in folders are grouped under their folder's path.
+  const folders = [...new Set(options.map((f) => (f.includes("/") ? f.slice(0, f.lastIndexOf("/")) : "")))].sort();
   return (
     <select className="adm-input" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}>
       {!value && <option value="">Choose a file…</option>}
-      {options.map((f) => (
-        <option key={f} value={f}>
-          {f}
-          {!files.includes(f) && files.length ? " (missing)" : ""}
-        </option>
-      ))}
+      {folders.map((dir) => {
+        const inDir = options.filter((f) => (f.includes("/") ? f.slice(0, f.lastIndexOf("/")) : "") === dir);
+        return dir ? (
+          <optgroup key={dir} label={`${dir}/`}>
+            {inDir.map(option)}
+          </optgroup>
+        ) : (
+          inDir.map(option)
+        );
+      })}
     </select>
   );
 }

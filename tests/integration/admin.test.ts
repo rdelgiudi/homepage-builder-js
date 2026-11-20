@@ -263,6 +263,64 @@ describe("admin panel switched on", () => {
     });
   });
 
+  describe("markdown content folders", () => {
+    it("creates folders and files in them, lists both", async () => {
+      assert.equal((await admin.json("/api/admin/content", { method: "PUT", json: { folder: "blog/2026" } })).status, 200);
+      assert.equal((await admin.json("/api/admin/content", { method: "PUT", json: { file: "blog/2026/hello.md", content: "# Hello" } })).status, 200);
+      // A file's folders are created with it.
+      assert.equal((await admin.json("/api/admin/content", { method: "PUT", json: { file: "notes/todo.md", content: "x" } })).status, 200);
+      const list = await admin.json("/api/admin/content");
+      const data = list.data as { files: { name: string }[]; folders: string[] };
+      assert.deepEqual(data.folders, ["blog", "blog/2026", "notes"]);
+      assert.deepEqual(data.files.map((f) => f.name), ["about.md", "blog/2026/hello.md", "notes/todo.md"]);
+      assert.equal(((await admin.json("/api/admin/content?file=blog/2026/hello.md")).data as { content: string }).content, "# Hello");
+    });
+
+    it("moves files and folders and reports every file that moved", async () => {
+      let res = await admin.json("/api/admin/content", { method: "PATCH", json: { from: "notes/todo.md", to: "blog/todo.md" } });
+      assert.deepEqual(res.data, { ok: true, moved: [{ from: "notes/todo.md", to: "blog/todo.md" }] });
+      res = await admin.json("/api/admin/content", { method: "PATCH", json: { from: "blog", to: "archive/blog" } });
+      assert.deepEqual((res.data as { moved: unknown[] }).moved, [
+        { from: "blog/2026/hello.md", to: "archive/blog/2026/hello.md" },
+        { from: "blog/todo.md", to: "archive/blog/todo.md" },
+      ]);
+      assert.match(await fetch(server.url + "/api/markdown?file=archive/blog/2026/hello.md").then((r) => r.text()), /Hello/);
+    });
+
+    it("refuses moves that clash, go into themselves or end up too deep", async () => {
+      assert.equal((await admin.json("/api/admin/content", { method: "PUT", json: { file: "archive/x.md", content: "x" } })).status, 200);
+      assert.equal((await admin.json("/api/admin/content", { method: "PATCH", json: { from: "archive/x.md", to: "about.md" } })).status, 409);
+      assert.equal((await admin.json("/api/admin/content", { method: "PATCH", json: { from: "archive", to: "archive/inner" } })).status, 400);
+      // archive/blog/2026/hello.md would end up five folders deep.
+      const deep = await admin.json("/api/admin/content", { method: "PATCH", json: { from: "archive", to: "a/b/archive" } });
+      assert.equal(deep.status, 400);
+      assert.match(String(deep.data.error), /more than 4 folders deep/);
+      assert.equal((await admin.json("/api/admin/content", { method: "PATCH", json: { from: "nope.md", to: "x.md" } })).status, 404);
+    });
+
+    it("refuses paths outside the content folder", async () => {
+      for (const file of ["../evil.md", "a/../../evil.md", "/abs.md", ".git/x.md", "a//b.md"]) {
+        assert.equal((await admin.json("/api/admin/content", { method: "PUT", json: { file, content: "x" } })).status, 400, file);
+      }
+      for (const folder of ["..", "../x", "", "a/b/c/d/e"]) {
+        assert.equal((await admin.json("/api/admin/content", { method: "PUT", json: { folder } })).status, 400, folder);
+      }
+      assert.equal((await admin.json("/api/admin/content?folder=..", { method: "DELETE" })).status, 400);
+      assert.equal((await admin.json("/api/admin/content?folder=", { method: "DELETE" })).status, 400);
+    });
+
+    it("deletes a folder with everything in it", async () => {
+      assert.equal((await admin.json("/api/admin/content?folder=archive", { method: "DELETE" })).status, 200);
+      const data = (await admin.json("/api/admin/content")).data as { files: { name: string }[]; folders: string[] };
+      assert.deepEqual(data.files.map((f) => f.name), ["about.md"]);
+      assert.deepEqual(data.folders, ["notes"]); // emptied by the move, still there
+    });
+
+    it("needs a session", async () => {
+      assert.equal((await new Client(server.url).json("/api/admin/content")).status, 401);
+    });
+  });
+
   describe("public endpoints", () => {
     it("records one poll vote per visitor and lets them change it", async () => {
       const visitor = new Client(server.url);

@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { hashPassword, verifyPassword, isValidHash } from "@/lib/admin/password";
-import { CONTENT_DIR, resolveContentFile } from "@/lib/content";
+import { CONTENT_DIR, resolveContentFile, resolveContentFolder } from "@/lib/content";
 import { resolveUpload, UPLOAD_DIR } from "@/lib/uploads";
 import { backgroundLayer, safeUrl } from "@/lib/background";
 import { htmlToText, httpUrl } from "@/lib/widget-data";
@@ -33,11 +33,39 @@ describe("admin password hashing", () => {
 });
 
 describe("file names from requests", () => {
-  it("only maps plain .md names into the content folder", () => {
+  it("only maps plain .md paths into the content folder", () => {
     assert.equal(resolveContentFile("about.md"), path.join(CONTENT_DIR, "about.md"));
     assert.equal(resolveContentFile("my-page_2.md"), path.join(CONTENT_DIR, "my-page_2.md"));
-    for (const bad of ["../../.env", "../package.json", "..%2f.env", "/etc/passwd", "sub/dir.md", "about.txt", ".hidden.md", "", null, undefined]) {
+    assert.equal(resolveContentFile("blog/2026/hello.md"), path.join(CONTENT_DIR, "blog", "2026", "hello.md"));
+    for (const bad of [
+      "../../.env",
+      "../package.json",
+      "..%2f.env",
+      "/etc/passwd",
+      "blog/../../package.json",
+      "blog/./x.md",
+      "blog//x.md",
+      "/blog/x.md",
+      "blog/x.md/",
+      "blog\\x.md",
+      ".git/x.md",
+      "blog/.hidden.md",
+      "a.md/b.md",
+      "a/b/c/d/e/too-deep.md",
+      "about.txt",
+      ".hidden.md",
+      "",
+      null,
+      undefined,
+    ]) {
       assert.equal(resolveContentFile(bad), null, String(bad));
+    }
+  });
+
+  it("only maps plain folder paths into the content folder, never the folder itself", () => {
+    assert.equal(resolveContentFolder("blog/2026"), path.join(CONTENT_DIR, "blog", "2026"));
+    for (const bad of ["", ".", "..", "../src", "blog/..", "/blog", "blog/", "x.md", "a/b/c/d/e", null]) {
+      assert.equal(resolveContentFolder(bad), null, String(bad));
     }
   });
 
