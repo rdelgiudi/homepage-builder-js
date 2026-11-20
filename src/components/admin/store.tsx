@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { HomepageConfig } from "@/lib/schema/config";
 import { api, ApiError, type ConfigIssue } from "./api";
 import { sameConfig } from "./same";
+import { TYPING_IDLE_MS, endsStep, isLongText, isTypingField, wordsAtStart } from "./typing-history";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -58,7 +59,8 @@ interface LoadResponse {
 export function AdminProvider({ children }: { children: ReactNode }) {
   const [published, setPublished] = useState<HomepageConfig | null>(null);
   // The edited config and its undo history change together, so they live in one state value.
-  const [doc, setDoc] = useState<{ config: HomepageConfig; past: HomepageConfig[]; future: HomepageConfig[] } | null>(null);
+  // `group`: the typing step the newest undo entry belongs to (null = a normal edit), see `update`.
+  const [doc, setDoc] = useState<{ config: HomepageConfig; past: HomepageConfig[]; future: HomepageConfig[]; group: number | null } | null>(null);
   const config = doc?.config ?? null;
   const [problems, setProblems] = useState<string[]>([]);
   const [writable, setWritable] = useState(true);
@@ -78,7 +80,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     api<LoadResponse>("config")
       .then((data) => {
         setPublished(data.published);
-        setDoc({ config: data.draft ?? data.published, past: [], future: [] });
+        setDoc({ config: data.draft ?? data.published, past: [], future: [], group: null });
         serverDraft.current = data.draft;
         setProblems(data.problems);
         setWritable(data.writable);
@@ -123,25 +125,77 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     };
   }, [config, published, save]);
 
+  // --- typing = one undo step per burst (rules in typing-history.ts) ---
+  // Edits made while typing into one field share a step until a pause, leaving the field, or
+  // (bigger fields) a few words. Detected here from the event being handled, so the form
+  // controls and all callers of `update` need nothing special.
+  const typing = useRef<{ el: Element; id: number; startWords: number } | null>(null);
+  const typingIds = useRef(0);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   /** Sets a new config and records the old one for undo. */
   const push = useCallback((next: HomepageConfig) => {
-    setDoc((d) => (d && !same(next, d.config) ? { config: next, past: [...d.past.slice(-MAX_UNDO + 1), d.config], future: [] } : d));
+    typing.current = null;
+    setDoc((d) => (d && !same(next, d.config) ? { config: next, past: [...d.past.slice(-MAX_UNDO + 1), d.config], future: [], group: null } : d));
   }, []);
 
+  /** Ends the current typing step: the next keystroke starts a new undo entry. */
+  const checkpoint = useCallback(() => {
+    typing.current = null;
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+  }, []);
+  useEffect(() => {
+    document.addEventListener("focusout", checkpoint);
+    return () => {
+      document.removeEventListener("focusout", checkpoint);
+      checkpoint();
+    };
+  }, [checkpoint]);
+
+  /** The typing step this edit belongs to, or null when it isn't typing (a click, a drag, an upload finishing). */
+  const typingStep = (): number | null => {
+    const el = document.activeElement as (HTMLInputElement | HTMLTextAreaElement) | null;
+    // Only edits made while an `input` event is being handled count, so an async edit (an
+    // upload that finishes) never joins the step of the field that happens to have focus.
+    if (window.event?.type !== "input" || !isTypingField(el) || !el) {
+      checkpoint();
+      return null;
+    }
+    let caret = el.value.length;
+    try {
+      caret = el.selectionStart ?? caret; // null for number / color / range inputs
+    } catch {}
+    if (typing.current?.el !== el) typing.current = { el, id: ++typingIds.current, startWords: wordsAtStart(el.value, caret) };
+    const step = typing.current;
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(checkpoint, TYPING_IDLE_MS);
+    // This edit still joins the step; the next keystroke starts a new one.
+    if (endsStep(step.startWords, el.value, caret, isLongText(el.tagName, el.value))) checkpoint();
+    return step.id;
+  };
+
   const update = useCallback((fn: (c: HomepageConfig) => HomepageConfig) => {
+    const group = typingStep();
     setDoc((d) => {
       if (!d) return d;
       const next = fn(d.config);
-      return same(next, d.config) ? d : { config: next, past: [...d.past.slice(-MAX_UNDO + 1), d.config], future: [] };
+      if (same(next, d.config)) return d;
+      // Same typing step as the newest undo entry: replace the config, keep the entry.
+      if (group !== null && d.group === group) return { ...d, config: next, future: [] };
+      return { config: next, past: [...d.past.slice(-MAX_UNDO + 1), d.config], future: [], group };
     });
+    // typingStep only reads refs; the eslint rule can't see that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const undo = useCallback(() => {
-    setDoc((d) => (d && d.past.length ? { config: d.past[d.past.length - 1], past: d.past.slice(0, -1), future: [d.config, ...d.future] } : d));
+    typing.current = null;
+    setDoc((d) => (d && d.past.length ? { config: d.past[d.past.length - 1], past: d.past.slice(0, -1), future: [d.config, ...d.future], group: null } : d));
   }, []);
 
   const redo = useCallback(() => {
-    setDoc((d) => (d && d.future.length ? { config: d.future[0], past: [...d.past, d.config], future: d.future.slice(1) } : d));
+    typing.current = null;
+    setDoc((d) => (d && d.future.length ? { config: d.future[0], past: [...d.past, d.config], future: d.future.slice(1), group: null } : d));
   }, []);
 
   const publish = useCallback(async () => {
