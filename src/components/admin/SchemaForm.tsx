@@ -55,6 +55,8 @@ export default function SchemaForm({ schema, value, onChange, hide }: FormProps)
             optional={!required.has(key) && node.default === undefined}
             value={value?.[key]}
             onChange={(v) => onChange(withKey(value ?? {}, key, v))}
+            // An icon's preview follows its sibling "Invert icon in dark mode" (the panel is always dark).
+            invertIcon={value?.invertDark === true}
           />
         );
       })}
@@ -68,9 +70,11 @@ interface FieldProps {
   optional: boolean;
   value: unknown;
   onChange: (value: unknown) => void;
+  /** Icon fields: preview the image inverted, as the site shows it in dark mode. */
+  invertIcon?: boolean;
 }
 
-function Field({ name, node, optional, value, onChange }: FieldProps) {
+function Field({ name, node, optional, value, onChange, invertIcon }: FieldProps) {
   const label = node.title ?? humanize(name);
   const current = value === undefined ? node.default : value;
 
@@ -116,13 +120,13 @@ function Field({ name, node, optional, value, onChange }: FieldProps) {
   return (
     <div className="adm-field">
       <span className="adm-label">{label}</span>
-      <Control node={node} optional={optional} value={current} onChange={onChange} label={label} />
+      <Control node={node} optional={optional} value={current} onChange={onChange} label={label} invertIcon={invertIcon} />
       {node.description && <span className="adm-hint">{node.description}</span>}
     </div>
   );
 }
 
-function Control({ node, optional, value, onChange, label }: Omit<FieldProps, "name"> & { label: string }) {
+function Control({ node, optional, value, onChange, label, invertIcon }: Omit<FieldProps, "name"> & { label: string }) {
   if (node.type === "boolean") {
     // Tri-state: unset means "follow the site-wide setting".
     return (
@@ -219,7 +223,7 @@ function Control({ node, optional, value, onChange, label }: Omit<FieldProps, "n
     const isUrl = /^https?:\/\//.test(text);
     return (
       <div className="adm-inline">
-        <span className="adm-icon-preview" aria-hidden>
+        <span className={`adm-icon-preview${invertIcon ? " is-inverted" : ""}`} aria-hidden>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {isUrl ? <img src={text} alt="" /> : text}
         </span>

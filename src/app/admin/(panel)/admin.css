@@ -613,6 +613,9 @@ textarea.adm-input {
 .adm-icon-preview img {
   width: 20px;
   height: 20px;
+}
+/* The panel is always dark, so it shows what the site shows in dark mode. */
+.adm-icon-preview.is-inverted img {
   filter: invert(1);
 }
 
