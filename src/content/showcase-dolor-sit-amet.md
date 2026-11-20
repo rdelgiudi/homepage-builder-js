@@ -1,5 +1,6 @@
 ---
 title: Dolor sit amet
+author: Dolor Sit
 date: 2026-10-12
 tags: [showcase]
 ---

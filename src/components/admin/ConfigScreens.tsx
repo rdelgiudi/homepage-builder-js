@@ -185,7 +185,7 @@ export function ScopeBar({ scope, shown, onScope }: ScreenProps) {
   );
 }
 
-/** Header & layout: name, tagline, title colors, favicon, layout, counters (the site's or one page's own). */
+/** Header & layout: name, tagline, title colors, favicon, blog post author, layout, counters (the site's or one page's own). */
 export function HeaderLayoutScreen(props: ScreenProps) {
   const { config } = useAdmin();
   return (
@@ -198,6 +198,9 @@ export function HeaderLayoutScreen(props: ScreenProps) {
       </Group>
       <SiteOnly title="Favicon" scope={props.scope} onScope={props.onScope}>
         <RootForm schema={formSchemas.favicon} />
+      </SiteOnly>
+      <SiteOnly title="Blog posts" scope={props.scope} onScope={props.onScope}>
+        <RootForm schema={formSchemas.postAuthor} />
       </SiteOnly>
       <Group group="layout" title="Layout" {...props}>
         {(value, onChange, pageId) => (

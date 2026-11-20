@@ -17,7 +17,9 @@ const slugOf = async (params: Props["params"]) => (await params).slug.join("/");
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const post = getPost(await slugOf(params));
   if (!post) notFound();
-  return { title: `${post.title} · ${getConfig().name}`, description: post.summary };
+  const config = getConfig();
+  const author = post.author || config.postAuthor.trim();
+  return { title: `${post.title} · ${config.name}`, description: post.summary, ...(author && { authors: [{ name: author }] }) };
 }
 
 /** One blog post: a markdown file from src/content/ with a `date` in its front matter (see lib/posts.ts). */
@@ -25,6 +27,7 @@ export default async function PostPage({ params }: Props) {
   const post = getPost(await slugOf(params));
   if (!post) notFound();
   const config = getConfig();
+  const author = post.author || config.postAuthor.trim();
   // "Back" returns to the page and tab that list the posts.
   const page = sitePages(config).find((p) => p.tabs.some((t) => t.sections.some((s) => s.type === "posts")));
   const tab = page?.tabs.find((t) => t.sections.some((s) => s.type === "posts"));
@@ -38,6 +41,7 @@ export default async function PostPage({ params }: Props) {
         <header className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white break-words">{post.title}</h1>
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            {author && <>By {author} · </>}
             <time dateTime={post.date}>{postDateLabel(post.date)}</time> · {post.minutes} min read
           </p>
           {post.tags.length > 0 && (

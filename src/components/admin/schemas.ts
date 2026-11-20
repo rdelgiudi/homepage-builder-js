@@ -38,6 +38,7 @@ export const formSchemas = {
   /** Name and tagline: the site's, or a page's own (same shape). */
   header: pick("name", "tagline"),
   favicon: pick("favicon"),
+  postAuthor: pick("postAuthor"),
   gradients: pick("titleGradient", "taglineGradient"),
   layout: config.properties!.layout,
   counters: config.properties!.counters,

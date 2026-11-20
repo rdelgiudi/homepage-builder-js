@@ -208,6 +208,10 @@ export const ConfigSchema = z.object({
   version: z.literal(CONFIG_VERSION),
   ...headerFields,
   favicon: z.string().default("").meta({ title: "Favicon URL", description: "Empty = animated gradient ring" }),
+  postAuthor: z
+    .string()
+    .default("")
+    .meta({ title: "Default author", description: "Shown on blog posts that don't name their own `author` in their front matter. Empty = no author" }),
   ...titleColorFields,
   layout: LayoutSchema.prefault({}),
   background: BackgroundSchema.prefault({}),

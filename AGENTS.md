@@ -224,6 +224,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 | `name` | Site title (HTML `<title>`, page h1) |
 | `tagline` | Page subtitle, also used as `<meta name="description">` |
 | `favicon` | URL for favicon (optional, empty/omit = auto-generated animated gradient ring using `titleGradient` colors) |
+| `postAuthor` | Default blog post author, shown on posts without their own front matter `author` (empty = none). Site-only, edited under Header & layout → Blog posts; reaches the widget as `WidgetContext.postAuthor`. |
 | `titleGradient` | Array of CSS color stops for title gradient text; omit or empty = solid color |
 | `taglineGradient` | Array of CSS color stops for tagline gradient; empty array or omit = inherits `titleGradient` |
 | `layout` | `{ site, bentoColumns, masonryColumns, fullWidth, pinnedTab?, mobileNav, sectionHeadings }` — site shell: `"tabs"` (default), `"sidebar"`, `"onepage"`, `"bento"`, `"linkinbio"`, `"masonry"`, `"profile"`; `bentoColumns` (2–4, default 2) = widgets per row in bento; `masonryColumns` (2–3, default 3); `fullWidth` (bento/masonry, default false) = no page width cap; `pinnedTab` (profile) = id of the tab shown as the column; `mobileNav` (`menu` \| `bottom`) = phones' tab navigation; `sectionHeadings` (default `true`) = tab names above each one-page section. All `showIf` on `site` in the panel. See "Site layouts and the grid". |
@@ -305,7 +306,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - **schedule** — Weekly slots `items: [{ label, icon?, days: ["mon"…], time: "HH:mm", duration (min, 0 = none), url? }]` in the owner's `timezone`; after mount the next week's occurrences are listed in the visitor's own zone with "Live now" / "in 3 h" (`occurrences.ts`). The server renders the plain configured times.
 - **media** — "Watching / reading": `service` (`anilist` | `letterboxd` | `openlibrary`), `username`, `kind` (anime/manga, AniList), `list` (`current` | `finished` | `planned`; Letterboxd is always the diary), `limit`, `layout` (`covers` | `list`), `columns`, `showRatings`.
 - **stats** — Big numbers: `items: [{ value, label, icon? }]`, `columns`, `style` (`cards` | `plain`), `gradient` (title gradient), `countUp` (from 0 when scrolled into view; the final value is in the server HTML and for reduced motion).
-- **posts** — Blog post list (`limit`, `tag`, `layout` `list` | `cards`, `showSummary`, `showReadingTime`). See "Blog posts".
+- **posts** — Blog post list (`limit`, `tag`, `layout` `list` | `cards`, `showSummary`, `showReadingTime`, `showAuthor`). See "Blog posts".
 
 ## Critical Gotchas
 
@@ -517,7 +518,7 @@ Next.js 15 + TypeScript + Tailwind CSS personal homepage built from one JSON con
 - AniList answers "no such user" and "private" with 404 and some unknown names with 500; Open Library answers a private log with 403 — each is turned into a message that says what to fix. Goodreads was dropped: its RSS answers 404 for every account.
 
 ### Blog posts (`posts` + `/posts/[...slug]` + `src/lib/posts.ts`)
-- A post is any markdown file under `src/content/` (folders included) whose front matter has a `date` (`YYYY-MM-DD`; gray-matter turns an unquoted date into a `Date`, `postDate()` handles both). `title`, `summary` (else an excerpt of the body), `tags` and `draft: true` are optional. Files without a date stay plain content for the markdown widget. They are edited in the admin **Content** screen like any other file and are live immediately (not part of the draft).
+- A post is any markdown file under `src/content/` (folders included) whose front matter has a `date` (`YYYY-MM-DD`; gray-matter turns an unquoted date into a `Date`, `postDate()` handles both). `title`, `summary` (else an excerpt of the body), `tags`, `author` (else the site's `postAuthor`; the fallback is applied where it is shown — the post page with `getConfig()`, the widget via `ctx.postAuthor` — so the preview follows the draft) and `draft: true` are optional. Files without a date stay plain content for the markdown widget. They are edited in the admin **Content** screen like any other file and are live immediately (not part of the draft).
 - The page is `/posts/<path without .md>` (`blog/2026/hello.md` → `/posts/blog/2026/hello`, a catch-all route; top-level posts keep their old URLs), served by the public container; the slug goes through `resolveContentFile()`, which checks every part. It renders inside `SiteShell` (same background, header, effects as the site) at 870px; "Back" links to the first tab that has a `posts` widget.
 - Unknown slugs call `notFound()`. Under the root `loading.tsx` that is streamed with status 200 (same reason as the admin 404 in `websocket-server.js`), so a missing post is a soft 404.
 

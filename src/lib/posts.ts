@@ -3,7 +3,7 @@
  * `date`. They are listed by the `posts` widget and each one is a page at
  * /posts/<path without .md> ("blog/2026/hello.md" → /posts/blog/2026/hello).
  * Files without a date stay plain content files (for the markdown widget); `draft: true`
- * hides a post. Everything is read at request time and cached per file by mtime.
+ * hides a post; `author` overrides the site's `postAuthor`. Everything is read at request time and cached per file by mtime.
  */
 import fs from "fs";
 import matter from "gray-matter";
@@ -18,6 +18,8 @@ export interface PostSummary {
   summary: string;
   tags: string[];
   minutes: number;
+  /** Front matter `author`; unset = the site's `postAuthor` (applied where it is shown). */
+  author?: string;
 }
 
 export interface Post extends PostSummary {
@@ -58,7 +60,8 @@ export function toPost(slug: string, data: Record<string, unknown>, body: string
   const summary = typeof data.summary === "string" && data.summary.trim() ? data.summary.trim() : excerpt(body);
   const tags = Array.isArray(data.tags) ? data.tags.filter((t): t is string => typeof t === "string" && !!t.trim()).map((t) => t.trim()) : [];
   const words = body.split(/\s+/).filter(Boolean).length;
-  return { slug, title, date, summary, tags, minutes: Math.max(1, Math.round(words / 220)) };
+  const author = typeof data.author === "string" && data.author.trim() ? data.author.trim() : undefined;
+  return { slug, title, date, summary, tags, minutes: Math.max(1, Math.round(words / 220)), ...(author && { author }) };
 }
 
 const cache = new Map<string, { mtimeMs: number; post: Omit<Post, "html"> | null; body: string; html?: string }>();

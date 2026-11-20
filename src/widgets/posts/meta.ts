@@ -11,6 +11,7 @@ export const schema = z.object({
   layout: z.enum(["list", "cards"]).default("list").meta({ title: "Layout" }),
   showSummary: z.boolean().default(true).meta({ title: "Show summary", description: "The post's `summary`, or the start of its text" }),
   showReadingTime: z.boolean().default(true).meta({ title: "Show reading time" }),
+  showAuthor: z.boolean().default(true).meta({ title: "Show author", description: "The post's `author`, or the site's default author (Header & layout)" }),
 });
 
 export type PostsSection = z.infer<typeof schema>;
@@ -22,5 +23,5 @@ export const meta = {
   category: "content",
   description: "Lists markdown files from src/content/ that have a date in their front matter; each opens as its own page",
   schema,
-  defaults: { limit: 5, layout: "list", showSummary: true, showReadingTime: true },
+  defaults: { limit: 5, layout: "list", showSummary: true, showReadingTime: true, showAuthor: true },
 } satisfies WidgetMeta;

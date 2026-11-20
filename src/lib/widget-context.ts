@@ -7,7 +7,7 @@ import type { WidgetContext } from "@/widgets/types";
  * looks the same in both.
  */
 export function widgetContextFor(config: HomepageConfig): WidgetContext {
-  const { effects, titleGradient } = config;
+  const { effects, titleGradient, postAuthor } = config;
   return {
     gradientBorders: effects.gradientBorders,
     progressGradient: effects.progressGradient,
@@ -18,5 +18,6 @@ export function widgetContextFor(config: HomepageConfig): WidgetContext {
     discordServerId: process.env.DISCORD_SERVER_ID,
     widgetFrame: effects.widgetFrame,
     widgetFrameWidth: effects.widgetFrameWidth,
+    postAuthor,
   };
 }

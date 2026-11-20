@@ -183,6 +183,9 @@ describe("blog posts", () => {
     assert.equal(post.title, "hello world");
     assert.deepEqual(post.tags, ["meta"]);
     assert.equal(post.minutes, 2);
+    assert.equal(post.author, undefined);
+    assert.equal(toPost("guest", { date: "2026-11-18", author: "  Jane Doe " }, "text")!.author, "Jane Doe");
+    assert.equal(toPost("blank", { date: "2026-11-18", author: " " }, "text")!.author, undefined);
   });
 
   it("builds a plain-text excerpt", () => {
