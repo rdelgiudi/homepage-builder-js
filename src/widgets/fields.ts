@@ -28,7 +28,7 @@ export const invertDarkField = z
 /** Icon + text title row rendered above a widget. */
 export const titleFields = {
   icon: iconField,
-  text: z.string().optional().meta({ title: "Title" }),
+  text: z.string().optional().meta({ translate: true, title: "Title" }),
   align: alignField,
   invertDark: invertDarkField,
 };

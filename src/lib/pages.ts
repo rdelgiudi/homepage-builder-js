@@ -202,6 +202,29 @@ export interface PageLink {
   sectionType: string;
   /** The markdown file it is in, for links inside a Markdown widget's file. */
   file?: string;
+  /** The translation that file is, for links found in one (unset = the original). */
+  lang?: string;
+}
+
+/** What is wrong with the links in one translation and isn't in the original. */
+export interface TranslationLinks {
+  code: string;
+  unreachable: SitePage[];
+  broken: PageLink[];
+}
+
+/**
+ * A translation's links checked on their own: its markdown files can link other pages than the
+ * originals. `own` = the files it has its own version of (the rest is the original's, and
+ * reported there).
+ */
+export function translationLinks(original: SiteMap, translated: SiteMap, code: string, own: Set<string>): TranslationLinks {
+  const known = new Set(original.unreachable.map((p) => p.slug));
+  return {
+    code,
+    unreachable: translated.unreachable.filter((p) => !known.has(p.slug)),
+    broken: translated.broken.filter((l) => l.file && own.has(l.file)).map((l) => ({ ...l, lang: code })),
+  };
 }
 
 export interface SiteMap {

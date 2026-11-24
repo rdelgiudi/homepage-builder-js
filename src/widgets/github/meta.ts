@@ -5,8 +5,8 @@ import type { WidgetMeta } from "../types";
 export const repoItemSchema = z.object({
   owner: z.string().meta({ title: "Owner" }),
   repo: z.string().meta({ title: "Repository" }),
-  label: z.string().optional().meta({ title: "Label" }),
-  note: z.string().optional().meta({ title: "Note" }),
+  label: z.string().optional().meta({ translate: "name", title: "Label" }),
+  note: z.string().optional().meta({ translate: true, title: "Note" }),
 });
 
 export const schema = z.object({

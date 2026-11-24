@@ -7,6 +7,7 @@
  *   - `effects.particleBackground/particleEffect` → `background.effect.type`
  *   - tabs and sections gain a stable `id`
  */
+import { slugify } from "@/lib/tab-slug";
 import { CONFIG_VERSION } from "./config";
 
 type Obj = Record<string, unknown>;
@@ -15,9 +16,7 @@ function isObj(v: unknown): v is Obj {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-export function slugify(text: string): string {
-  return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-}
+export { slugify };
 
 function v1ToV2(v1: Obj): Obj {
   const { backgroundColor, effects, ...rest } = v1;
@@ -93,10 +92,39 @@ function ensureIds(config: Obj): Obj {
   return out;
 }
 
+/** Place of translations that are for every place a text is in (`expandShared` in lib/i18n/texts.ts gives them out). */
+export const SHARED = "*";
+
+/**
+ * Translations written without a place: `texts: { "Home": "Inizio" }`, and the lists `same` /
+ * `check` of texts. They become entries of the place `SHARED`.
+ */
+export function sharedTranslation(t: unknown): unknown {
+  if (!isObj(t)) return t;
+  const { same, check, ...rest } = t;
+  const texts: Obj = {};
+  const shared: Record<string, Obj> = {};
+  const add = (text: string, entry: Obj) => (shared[text] = { ...(Object.hasOwn(shared, text) ? shared[text] : null), ...entry });
+  for (const [key, value] of Object.entries(isObj(t.texts) ? t.texts : {})) {
+    if (typeof value === "string") add(key, { to: value });
+    else texts[key] = value;
+  }
+  for (const text of Array.isArray(same) ? same : []) if (typeof text === "string") add(text, { same: true });
+  for (const text of Array.isArray(check) ? check : []) if (typeof text === "string") add(text, { check: true });
+  if (!Object.keys(shared).length) return same === undefined && check === undefined ? t : { ...rest, texts: t.texts };
+  return { ...rest, texts: { ...texts, [SHARED]: { ...(isObj(texts[SHARED]) ? texts[SHARED] : null), ...shared } } };
+}
+
+function sharedTexts(config: Obj): Obj {
+  const { languages } = config;
+  if (!isObj(languages) || !Array.isArray(languages.translations)) return config;
+  return { ...config, languages: { ...languages, translations: languages.translations.map(sharedTranslation) } };
+}
+
 export function migrateConfig(raw: unknown): Obj {
   let config: Obj = isObj(raw) ? raw : {};
   if (config.version === undefined) config = v1ToV2(config);
   // Future: if (config.version === 2) config = v2ToV3(config);
   if (config.version !== CONFIG_VERSION) return config; // unknown/newer version — let validation report it
-  return ensureIds(config);
+  return sharedTexts(ensureIds(config));
 }

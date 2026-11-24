@@ -6,9 +6,9 @@ export const schema = z.object({
   ...base("notice"),
   tone: z.enum(["info", "success", "warning", "danger", "neutral"]).default("info").meta({ title: "Colour" }),
   icon: iconField.meta({ title: "Icon", ui: "icon", description: "Emoji or image URL. Empty = the colour's own symbol" }),
-  title: z.string().optional().meta({ title: "Heading" }),
-  message: z.string().default("").meta({ title: "Text", ui: "textarea" }),
-  linkText: z.string().optional().meta({ title: "Link text" }),
+  title: z.string().optional().meta({ translate: "labels", title: "Heading" }),
+  message: z.string().default("").meta({ translate: "labels", title: "Text", ui: "textarea" }),
+  linkText: z.string().optional().meta({ translate: true, title: "Link text" }),
   linkUrl: z.string().optional().meta({ title: "Link", description: "http(s). Shown after the text" }),
   until: z
     .string()

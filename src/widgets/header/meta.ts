@@ -4,7 +4,7 @@ import type { WidgetMeta } from "../types";
 
 export const schema = z.object({
   ...base("header"),
-  title: z.string().meta({ title: "Title" }),
+  title: z.string().meta({ translate: true, title: "Title" }),
   icon: iconField,
   align: alignField,
   invertDark: invertDarkField,

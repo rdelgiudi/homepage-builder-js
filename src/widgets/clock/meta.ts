@@ -7,7 +7,7 @@ export const schema = z.object({
   ...titleFields,
   ...frameField,
   timezone: z.string().default("UTC").meta({ title: "Time zone", ui: "timezone" }),
-  place: z.string().optional().meta({ title: "Place name", description: "Shown next to the time. Empty = the time zone's city" }),
+  place: z.string().optional().meta({ translate: "name", title: "Place name", description: "Shown next to the time. Empty = the time zone's city" }),
   hour12: z.boolean().default(false).meta({ title: "12-hour clock" }),
   showDate: z.boolean().default(true).meta({ title: "Show the date" }),
   showDifference: z.boolean().default(true).meta({ title: "Show the difference to the visitor's time" }),

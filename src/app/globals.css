@@ -723,6 +723,24 @@ html.dark.custom-scrollbar * {
   }
 }
 
+/* ===== Languages ===== */
+/* A language picker floating in a corner (SitePage): above what is already in that corner and,
+   on phones, above the bottom tab bar; below a banner that is stuck to the top. */
+.lang-float {
+  bottom: calc(var(--bottom-nav-h, 0px) + var(--lang-lift, 24px));
+}
+.lang-float.is-top {
+  bottom: auto;
+  top: calc(var(--banner-shown, 0px) + 16px);
+}
+/* Right-to-left languages: each paragraph by its own direction. The layout isn't mirrored. */
+main[data-rtl] :is(p, h1, h2, h3, h4, li, blockquote, summary, label, td, th) {
+  unicode-bidi: plaintext;
+}
+main[data-rtl] .prose {
+  direction: rtl;
+}
+
 /* ===== Banner (src/components/Banner.tsx) ===== */
 /* A fixed height at any image size, so nothing moves when the logo has loaded. */
 .site-logo {

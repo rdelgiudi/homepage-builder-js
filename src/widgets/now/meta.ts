@@ -4,8 +4,8 @@ import type { WidgetMeta } from "../types";
 
 export const nowItemSchema = z.object({
   icon: iconField,
-  label: z.string().meta({ title: "Label", description: "For example: Working on, Reading, Playing" }),
-  text: z.string().default("").meta({ title: "What" }),
+  label: z.string().meta({ translate: true, title: "Label", description: "For example: Working on, Reading, Playing" }),
+  text: z.string().default("").meta({ translate: true, title: "What" }),
   url: z.string().optional().meta({ title: "Link", description: "Optional http(s) link for the text" }),
 });
 

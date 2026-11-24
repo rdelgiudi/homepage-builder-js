@@ -102,6 +102,7 @@ describe("banner settings per layout", () => {
       fullWidth: false,
       scroll: "tabs",
       themeSwitch: "floating",
+      languagePicker: "banner",
     });
   });
 

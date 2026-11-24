@@ -1,13 +1,16 @@
 /**
  * Blog posts = markdown files in src/content/ (folders included) whose front matter has a
  * `date`. They are listed by the `posts` widget and each one is a page at
- * /posts/<path without .md> ("blog/2026/hello.md" → /posts/blog/2026/hello).
+ * /posts/<path without .md> ("blog/2026/hello.md" → /posts/blog/2026/hello; a language's folder
+ * isn't part of it).
  * Files without a date stay plain content files (for the markdown widget); `draft: true`
  * hides a post; `author` overrides the site's `postAuthor`. Everything is read at request time and cached per file by mtime.
  */
 import fs from "fs";
 import matter from "gray-matter";
+import { getConfig } from "@/lib/config";
 import { listContent, resolveContentFile } from "@/lib/content";
+import { LANGUAGE_CODE, contentCandidates, contentLanguages, contentPlace, isOriginal, type ContentLanguages } from "@/lib/i18n/languages";
 import { renderMarkdownToHtml } from "@/lib/markdown";
 
 export interface PostSummary {
@@ -64,10 +67,17 @@ export function toPost(slug: string, data: Record<string, unknown>, body: string
   return { slug, title, date, summary, tags, minutes: Math.max(1, Math.round(words / 220)), ...(author && { author }) };
 }
 
-const cache = new Map<string, { mtimeMs: number; post: Omit<Post, "html"> | null; body: string; html?: string }>();
+interface Entry {
+  mtimeMs: number;
+  post: Omit<Post, "html"> | null;
+  data: Record<string, unknown>;
+  body: string;
+  html?: string;
+}
+const cache = new Map<string, Entry>();
 
-function load(slug: string): { mtimeMs: number; post: Omit<Post, "html"> | null; body: string; html?: string } | null {
-  // The slug is the file's path without ".md"; resolveContentFile checks every part of it.
+function load(slug: string): Entry | null {
+  // The file's path without ".md" (its language folder included); resolveContentFile checks every part of it.
   const file = resolveContentFile(`${slug}.md`);
   if (!file) return null;
   let stat: fs.Stats;
@@ -81,7 +91,7 @@ function load(slug: string): { mtimeMs: number; post: Omit<Post, "html"> | null;
   try {
     // A fresh object each time: gray-matter caches its result by input string.
     const { data, content } = matter(fs.readFileSync(file, "utf8"));
-    const entry = { mtimeMs: stat.mtimeMs, post: toPost(slug, data as Record<string, unknown>, content), body: content };
+    const entry: Entry = { mtimeMs: stat.mtimeMs, post: toPost(slug, data as Record<string, unknown>, content), data: data as Record<string, unknown>, body: content };
     cache.set(slug, entry);
     return entry;
   } catch (err) {
@@ -90,25 +100,53 @@ function load(slug: string): { mtimeMs: number; post: Omit<Post, "html"> | null;
   }
 }
 
-/** Every published post, newest first. */
-export function listPosts(): PostSummary[] {
-  const posts = listContent().files.flatMap(({ name }) => {
-    const post = load(name.slice(0, -".md".length))?.post;
-    return post ? [post] : [];
-  });
+/**
+ * A post in a language. `name` = the file without its language folder. The text is the
+ * language's (a translation marked `draft: true` isn't used yet), else the original's, else any.
+ * Its front matter is merged over the first version that is a complete post (has a date), so a
+ * translation only needs what differs; after the main language was swapped with a translation,
+ * that version may be a translation. An original that is a draft hides the post everywhere.
+ */
+function inLanguage(name: string, languages: ContentLanguages, lang: string | undefined): { post: Omit<Post, "html">; entry: Entry } | null {
+  const slug = name.slice(0, -".md".length);
+  const versions = contentCandidates(name, languages).flatMap((file) => load(file.slice(0, -".md".length)) ?? []);
+  const [main] = versions;
+  const base = versions.find((v) => v.post);
+  if (!main || main.data.draft === true || !base?.post) return null;
+  const own = lang && lang !== languages.original && LANGUAGE_CODE.test(lang) ? load(`${lang}/${slug}`) : null;
+  const shown = own && own.data.draft !== true ? own : main;
+  if (shown === base) return { post: { ...base.post, slug }, entry: base };
+  // The other version's summary would be in the wrong language: an excerpt of this one is better.
+  const { summary: _summary, ...shared } = base.data;
+  const post = toPost(slug, { ...shared, ...shown.data }, shown.body);
+  return post ? { post, entry: shown } : { post: { ...base.post, slug }, entry: base };
+}
+
+/** Every published post, newest first; in `lang` where it has a translation ("it/hello.md" for "en/hello.md"). */
+export function listPosts(lang?: string): PostSummary[] {
+  const languages = contentLanguages(getConfig().languages);
+  const files = new Set(listContent().files.map((f) => f.name));
+  // One post per name, whatever languages it is in.
+  const names = new Set([...files].map((file) => contentPlace(file, languages, files).name));
+  const posts = [...names].flatMap((name) => inLanguage(name, languages, lang)?.post ?? []);
   return posts.sort((a, b) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title));
 }
 
-export function getPost(slug: string): Post | null {
-  const entry = load(slug);
-  if (!entry?.post) return null;
-  entry.html ??= renderMarkdownToHtml(entry.body);
-  return { ...entry.post, html: entry.html };
+/** `languages`: the site's, or the draft's in the admin preview. */
+export function getPost(slug: string, lang?: string, languages: ContentLanguages = contentLanguages(getConfig().languages)): Post | null {
+  const name = `${slug}.md`;
+  if (!resolveContentFile(name)) return null;
+  const asked = contentPlace(name, languages, new Set(listContent().files.map((f) => f.name)));
+  // A translation has no address of its own.
+  const found = isOriginal(asked, languages) ? inLanguage(asked.name, languages, lang) : null;
+  if (!found) return null;
+  found.entry.html ??= renderMarkdownToHtml(found.entry.body);
+  return { ...found.post, html: found.entry.html };
 }
 
 /** Widget endpoint: the list, optionally only posts with a tag. */
 export async function posts(p: URLSearchParams): Promise<{ posts: PostSummary[] }> {
   const tag = (p.get("tag") ?? "").trim().toLowerCase();
-  const all = listPosts();
+  const all = listPosts(p.get("lang") ?? undefined);
   return { posts: tag ? all.filter((post) => post.tags.some((t) => t.toLowerCase() === tag)) : all };
 }

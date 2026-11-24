@@ -6,10 +6,10 @@ export const schema = z.object({
   ...base("contact"),
   ...titleFields,
   ...frameField,
-  intro: z.string().optional().meta({ title: "Intro text", ui: "textarea", description: "Shown above the form" }),
+  intro: z.string().optional().meta({ translate: true, title: "Intro text", ui: "textarea", description: "Shown above the form" }),
   askEmail: z.enum(["optional", "required", "hidden"]).default("optional").meta({ title: "Email address", description: "Ask for one so you can reply" }),
-  buttonText: z.string().default("Send message").meta({ title: "Button text" }),
-  successText: z.string().default("Thanks! Your message is on its way.").meta({ title: "After sending" }),
+  buttonText: z.string().default("Send message").meta({ translate: true, title: "Button text" }),
+  successText: z.string().default("Thanks! Your message is on its way.").meta({ translate: true, title: "After sending" }),
 });
 
 export type ContactSection = z.infer<typeof schema>;

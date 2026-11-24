@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { contentLanguages, contentPlace } from "@/lib/i18n/languages";
 import type { Tab } from "@/lib/schema/config";
 import type { JsonSchema } from "./schemas";
 import { api, uploadFile } from "./api";
@@ -481,7 +482,14 @@ function TabSelect({ value, onChange, label }: { value: string; onChange: (v: st
 }
 
 function ContentFileSelect({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
-  const [files, setFiles] = useState<string[]>([]);
+  const { config, published } = useAdmin();
+  const [onDisk, setFiles] = useState<string[]>([]);
+  // Names without the language folder; a translation is chosen by the visitor's language, not here.
+  const files = useMemo(() => {
+    const languages = contentLanguages(config.languages, published.languages.original);
+    const all = new Set(onDisk);
+    return [...new Set(onDisk.map((f) => contentPlace(f, languages, all).name))].sort((a, b) => a.localeCompare(b));
+  }, [onDisk, config.languages, published.languages.original]);
   useEffect(() => {
     contentFiles ??= api<{ files: { name: string }[] }>("content")
       .then((d) => d.files.map((f) => f.name))

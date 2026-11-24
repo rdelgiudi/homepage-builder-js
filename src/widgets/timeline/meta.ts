@@ -3,9 +3,9 @@ import { base, titleFields, frameField } from "../fields";
 import type { WidgetMeta } from "../types";
 
 export const timelineItemSchema = z.object({
-  title: z.string().meta({ title: "Title" }),
-  date: z.string().optional().meta({ title: "When", description: "Any text: a year, a date, a range" }),
-  text: z.string().optional().meta({ title: "Details", ui: "textarea" }),
+  title: z.string().meta({ translate: true, title: "Title" }),
+  date: z.string().optional().meta({ translate: true, title: "When", description: "Any text: a year, a date, a range" }),
+  text: z.string().optional().meta({ translate: true, title: "Details", ui: "textarea" }),
 });
 
 export const schema = z.object({

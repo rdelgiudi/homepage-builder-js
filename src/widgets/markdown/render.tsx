@@ -5,5 +5,5 @@ import type { MarkdownSection } from "./meta";
 export const view: WidgetView<MarkdownSection> = {
   titled: false,
   frame: "wrap",
-  render: (section) => <MarkdownWidget file={section.file} />,
+  render: (section, ctx) => <MarkdownWidget file={section.file} lang={ctx.lang} fresh={ctx.preview} />,
 };

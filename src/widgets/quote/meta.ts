@@ -3,8 +3,8 @@ import { base, frameField } from "../fields";
 import type { WidgetMeta } from "../types";
 
 export const quoteItemSchema = z.object({
-  text: z.string().meta({ title: "Quote", ui: "textarea" }),
-  author: z.string().optional().meta({ title: "Who said it" }),
+  text: z.string().meta({ translate: true, title: "Quote", ui: "textarea" }),
+  author: z.string().optional().meta({ translate: "name", title: "Who said it" }),
 });
 
 export const schema = z.object({

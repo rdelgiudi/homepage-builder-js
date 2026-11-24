@@ -1,9 +1,10 @@
 import fs from "fs";
 import path from "path";
+import { COMMON_LANGUAGES, LANGUAGE_CODE, contentCandidates, type ContentLanguages } from "@/lib/i18n/languages";
 
 export const CONTENT_DIR = path.join(process.cwd(), "src", "content");
 
-/** Folders a content path may have above its file ("a/b/c/d/file.md" at most). */
+/** Folders a content path may have above its file ("a/b/c/d/file.md" at most), plus a language's folder at the start. */
 export const MAX_FOLDER_DEPTH = 4;
 
 /** One folder name: starts with a letter or digit (so never "." / ".." / hidden), no slashes. */
@@ -19,7 +20,7 @@ function parts(name: unknown, file: boolean): string[] | null {
   if (typeof name !== "string" || !name || name.length > 400) return null;
   const p = name.split("/");
   const folders = file ? p.slice(0, -1) : p;
-  if (folders.length > MAX_FOLDER_DEPTH) return null;
+  if (folders.length > MAX_FOLDER_DEPTH + (LANGUAGE_CODE.test(folders[0] ?? "") ? 1 : 0)) return null;
   // A folder named like a file ("x.md") would make paths ambiguous in the editor's tree.
   if (!folders.every((s) => FOLDER.test(s) && !s.endsWith(".md"))) return null;
   if (file && !FILE_NAME.test(p[p.length - 1])) return null;
@@ -46,6 +47,26 @@ export function resolveContentFolder(name: string | null | undefined): string | 
   return p ? inside(p) : null;
 }
 
+/**
+ * The file to show for a content file's name: its translation into `lang` if there is one, else
+ * the original, wherever that is (`contentCandidates`). Null when there is none, or the name
+ * isn't a plain `*.md` path.
+ */
+export function findContentFile(name: string, languages: ContentLanguages, lang?: string | null): { name: string; path: string } | null {
+  if (!resolveContentFile(name)) return null;
+  for (const candidate of contentCandidates(name, languages, lang)) {
+    const file = resolveContentFile(candidate);
+    if (file && fs.existsSync(file)) return { name: candidate, path: file };
+  }
+  // The original language was changed but its folder wasn't renamed (edited by hand, or the
+  // folder is read-only): better any language than nothing.
+  for (const code of COMMON_LANGUAGES) {
+    const file = resolveContentFile(`${code}/${name}`);
+    if (file && fs.existsSync(file)) return { name: `${code}/${name}`, path: file };
+  }
+  return null;
+}
+
 export interface ContentFile {
   /** Path relative to the content folder, with `/` ("blog/hello.md"). */
   name: string;
@@ -61,7 +82,7 @@ export interface ContentFile {
 export function listContent(folder = ""): { files: ContentFile[]; folders: string[] } {
   const files: ContentFile[] = [];
   const folders: string[] = [];
-  const walk = (rel: string, depth: number) => {
+  const walk = (rel: string) => {
     let entries: string[];
     try {
       entries = fs.readdirSync(rel ? path.join(CONTENT_DIR, ...rel.split("/")) : CONTENT_DIR);
@@ -77,16 +98,17 @@ export function listContent(folder = ""): { files: ContentFile[]; folders: strin
         continue;
       }
       if (stat.isDirectory()) {
-        if (depth < MAX_FOLDER_DEPTH && resolveContentFolder(name)) {
+        // (also what limits the depth)
+        if (resolveContentFolder(name)) {
           folders.push(name);
-          walk(name, depth + 1);
+          walk(name);
         }
       } else if (stat.isFile() && resolveContentFile(name)) {
         files.push({ name, bytes: stat.size, modifiedAt: stat.mtimeMs });
       }
     }
   };
-  walk(folder, folder ? folder.split("/").length : 0);
+  walk(folder);
   files.sort((a, b) => a.name.localeCompare(b.name));
   folders.sort();
   return { files, folders };

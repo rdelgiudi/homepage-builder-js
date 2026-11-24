@@ -3,7 +3,8 @@
 import { useState, type ReactNode } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { MAX_PAGE_DEPTH, PAGE_SEGMENT, PAGE_SLUG, isReservedSlug, type HomepageConfig, type Page } from "@/lib/schema/config";
-import { HOME, pagePath, parentAddress, type PageLink, type SiteMap, type SitePage } from "@/lib/pages";
+import { HOME, pagePath, parentAddress, type PageLink, type SiteMap, type SitePage, type TranslationLinks } from "@/lib/pages";
+import { languageName } from "@/lib/i18n/languages";
 import { widgetMetaByType } from "@/widgets/meta";
 import SchemaForm from "./SchemaForm";
 import { formSchemas } from "./schemas";
@@ -18,7 +19,7 @@ const pageName = (map: SiteMap, slug: string) => map.pages.find((p) => p.slug ==
 /** "the Links widget on Home" / "about.md (Markdown widget) on Page 2". */
 export function describeLink(map: SiteMap, l: PageLink): string {
   const widget = widgetMetaByType[l.sectionType]?.label ?? "a widget";
-  return `${l.file ? `${l.file} (${widget} widget)` : `the ${widget} widget`} on ${pageName(map, l.from)}`;
+  return `${l.file ? `${l.file}${l.lang ? ` in ${languageName(l.lang, "en")}` : ""} (${widget} widget)` : `the ${widget} widget`} on ${pageName(map, l.from)}`;
 }
 
 /** One page in the tree: opens it, has a settings button, and takes widgets dropped on it. */
@@ -67,6 +68,8 @@ interface OutlineProps {
   map: SiteMap;
   /** Links in markdown files are still being read: warnings wait for that (useSiteMap). */
   checking?: boolean;
+  /** Problems only a translation has (useSiteMap). */
+  translations?: TranslationLinks[];
   /** The page the builder edits. */
   currentId: string;
   /** The page whose settings are open in the inspector. */
@@ -83,7 +86,7 @@ interface OutlineProps {
  * that can't be reached from the homepage by following links are marked in place and explained
  * below, with a one-click fix; links to pages that don't exist are listed after that.
  */
-export function PagesOutline({ map, checking = false, currentId, settingsId, onOpen, onSettings, onAdd, onLinkFromHome, onShowLink }: OutlineProps) {
+export function PagesOutline({ map, checking = false, translations = [], currentId, settingsId, onOpen, onSettings, onAdd, onLinkFromHome, onShowLink }: OutlineProps) {
   const row = (page: SitePage, depth: number, warn = false): ReactNode => (
     <PageRow key={page.id || "home"} page={page} depth={depth} warn={warn} current={page.id === currentId} settings={settingsId === page.id} onOpen={onOpen} onSettings={onSettings} />
   );
@@ -147,6 +150,31 @@ export function PagesOutline({ map, checking = false, currentId, settingsId, onO
           </ul>
         </div>
       )}
+      {translations.map((t) => (
+        <div key={t.code} className="adm-pad adm-pages-warn" role="status">
+          <p className="adm-notice is-warn">
+            <strong>Only in {languageName(t.code, "en")}:</strong>{" "}
+            {t.unreachable.length > 0 && (
+              <>
+                {t.unreachable.map((p) => p.title).join(", ")} can&apos;t be reached from the homepage. The original markdown files link there, their {languageName(t.code, "en")} versions don&apos;t.
+              </>
+            )}
+            {t.unreachable.length > 0 && t.broken.length > 0 && " "}
+            {t.broken.length > 0 && <>Links to pages that don&apos;t exist:</>}
+          </p>
+          {t.broken.length > 0 && (
+            <ul className="adm-broken">
+              {t.broken.map((l, i) => (
+                <li key={i}>
+                  <button type="button" className="adm-link" onClick={() => onShowLink(l)}>
+                    <code>{l.href}</code> in {describeLink(map, l)}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
       {map.broken.length > 0 && (
         <div className="adm-pad">
           <p className="adm-notice is-warn">

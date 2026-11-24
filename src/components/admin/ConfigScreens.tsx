@@ -193,6 +193,8 @@ export function ScopeBar({ scope, shown, onScope }: ScreenProps) {
 
 /** The banner's settings: one set for every screen, or one for wide screens and one for phones (the preview shows the one being edited). */
 function BannerForm({ value, onChange, layout, device, onDevice }: { value: BannerConfig; onChange: (v: BannerConfig) => void; layout: LayoutConfig } & Pick<ScreenProps, "device" | "onDevice">) {
+  // The picker's place matters once there is a language to pick.
+  const multilingual = useAdmin().config.languages.translations.length > 0;
   const { phone, ...wide } = value;
   const screens: BannerScreens = phone ? device : "all";
   const edited: BannerOptions = phone && device === "phone" ? phone : wide;
@@ -229,7 +231,7 @@ function BannerForm({ value, onChange, layout, device, onDevice }: { value: Bann
         </div>
       )}
       {/* Keyed: the two sets don't share half-typed input. */}
-      <SchemaForm key={screens} schema={formSchemas.banner} value={edited as unknown as Obj} hide={["phone", ...ignored.flatMap((i) => i.keys)]} onChange={(v) => set(v as unknown as BannerOptions)} />
+      <SchemaForm key={screens} schema={formSchemas.banner} value={edited as unknown as Obj} hide={["phone", ...(multilingual ? [] : ["languagePicker"]), ...ignored.flatMap((i) => i.keys)]} onChange={(v) => set(v as unknown as BannerOptions)} />
       {ignored.map(
         (i) =>
           i.note && (

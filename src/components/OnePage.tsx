@@ -8,11 +8,8 @@ import type { Tab } from "@/lib/schema/config";
 import { Icon } from "@/widgets/shared";
 import type { WidgetContext } from "@/widgets/types";
 import TabSections, { type GridOptions } from "./TabSections";
+import { tabSlug } from "@/lib/tab-slug";
 import { reportPreviewTab } from "./ConfigSync";
-
-function slugify(text: string): string {
-  return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-}
 
 interface OnePageProps {
   tabs: Tab[];
@@ -35,15 +32,16 @@ export default function OnePage({ tabs, banner, widgetContext, widthClass, grid,
 
   // Admin preview: the builder opens the section being read (jump bar or scrolling). Not on
   // mount: `active` starts at the first tab before `?tab=` scrolls anywhere.
-  const activeLabel = tabs.find((t) => t.id === active)?.label;
+  const activeTab = tabs.find((t) => t.id === active);
+  const activeSlug = activeTab && tabSlug(activeTab);
   const reported = useRef(false);
   useEffect(() => {
     if (!reported.current) {
       reported.current = true;
       return;
     }
-    if (activeLabel !== undefined) reportPreviewTab(slugify(activeLabel));
-  }, [activeLabel]);
+    if (activeSlug !== undefined) reportPreviewTab(activeSlug);
+  }, [activeSlug]);
 
   /** While a jump is animating, the clicked section stays highlighted (timestamp it ends). */
   const jumpUntil = useRef(0);
@@ -87,7 +85,7 @@ export default function OnePage({ tabs, banner, widgetContext, widthClass, grid,
   const scrollTo = (tab: Tab, smooth: boolean) => {
     jumpUntil.current = Date.now() + (smooth ? 900 : 100);
     setActive(tab.id);
-    const section = document.getElementById(slugify(tab.label));
+    const section = document.getElementById(tabSlug(tab));
     if (!section) return;
     // A banner that hides on the way down needs no room above the section; on the way up it returns.
     const gap = parseFloat(getComputedStyle(section).scrollMarginTop) || 0;
@@ -100,7 +98,7 @@ export default function OnePage({ tabs, banner, widgetContext, widthClass, grid,
   // `?tab=<slug>` (shared links, the admin preview) scrolls to that section.
   const tabParam = searchParams.get("tab");
   useEffect(() => {
-    const target = tabParam && tabs.find((t) => slugify(t.label) === tabParam);
+    const target = tabParam && tabs.find((t) => tabSlug(t) === tabParam);
     if (target) scrollTo(target, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabParam]);
@@ -130,7 +128,7 @@ export default function OnePage({ tabs, banner, widgetContext, widthClass, grid,
       />
 
       {tabs.map((tab) => (
-        <section key={tab.id} id={slugify(tab.label)} data-tab={tab.id} className="scroll-mt-[var(--banner-h,56px)] pt-10 first:pt-6" aria-label={tab.label}>
+        <section key={tab.id} id={tabSlug(tab)} data-tab={tab.id} className="scroll-mt-[var(--banner-h,56px)] pt-10 first:pt-6" aria-label={tab.label}>
           {tabs.length > 1 && headings && (
             <h2 className="flex items-center gap-3 mb-6 text-2xl font-bold text-gray-900 dark:text-white">
               {tab.icon && <Icon icon={tab.icon} invertDark={tab.invertDark} width={28} height={28} />}

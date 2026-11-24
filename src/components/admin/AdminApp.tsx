@@ -6,18 +6,23 @@ import { AdminProvider, useAdmin } from "./store";
 import { useBuilder } from "./Builder";
 import PreviewPane, { type PreviewDevice } from "./PreviewPane";
 import { BackgroundScreen, EffectsScreen, HeaderLayoutScreen, ScopeBar, type ScreenProps, type SettingsScope } from "./ConfigScreens";
-import ContentScreen from "./ContentScreen";
+import LanguagesScreen from "./LanguagesScreen";
+import ContentScreen, { type ContentTarget } from "./ContentScreen";
 import CommentsScreen from "./CommentsScreen";
 import InboxScreen from "./InboxScreen";
 import SuggestionsScreen from "./SuggestionsScreen";
 import { HistoryScreen, IntegrationsScreen } from "./OtherScreens";
-import { useSiteMap } from "./useSiteMap";
+import { languageName } from "@/lib/i18n/languages";
+import { translationStatus } from "@/lib/i18n/texts";
+import { forgetContentFiles } from "./SchemaForm";
+import { forgetFileLinks, useSiteMap } from "./useSiteMap";
 
 const SCREENS = [
   { id: "builder", label: "Builder" },
   { id: "header-layout", label: "Header & layout" },
   { id: "background", label: "Background" },
   { id: "effects", label: "Effects" },
+  { id: "languages", label: "Languages" },
   { id: "content", label: "Content" },
   { id: "comments", label: "Comments" },
   { id: "inbox", label: "Inbox" },
@@ -28,7 +33,7 @@ const SCREENS = [
 type ScreenId = (typeof SCREENS)[number]["id"];
 
 /** Screens that edit the draft and therefore show the live preview. */
-const DRAFT_SCREENS: ScreenId[] = ["builder", "header-layout", "background", "effects"];
+const DRAFT_SCREENS: ScreenId[] = ["builder", "header-layout", "background", "effects", "languages"];
 
 const isScreen = (s: string): s is ScreenId => SCREENS.some((x) => x.id === s);
 
@@ -121,19 +126,39 @@ function Shell() {
   const admin = useAdmin();
   const builder = useBuilder();
   const [screen, setScreen] = useState<ScreenId>("builder");
+  // Publishing can move markdown files into their language's folder.
+  useEffect(() => {
+    forgetContentFiles();
+    forgetFileLinks();
+  }, [admin.published]);
   const [pending, setPending] = useState(0);
   const [unread, setUnread] = useState(0);
   const [suggested, setSuggested] = useState(0);
   const panels = usePanelWidths();
   // Pages nobody can reach from the homepage, and links to pages that don't exist (lib/pages.ts).
-  const map = useSiteMap(admin.config);
+  const map = useSiteMap(admin.config, admin.published.languages.original);
   const stranded = map.unreachable.map((p) => `${p.title} (/${p.slug})`);
+  // The same per translation: its markdown files may lack a link the originals have.
+  const strandedIn = map.translations.filter((t) => t.unreachable.length).map((t) => `in ${languageName(t.code, "en")}, ${t.unreachable.map((p) => `${p.title} (/${p.slug})`).join(", ")}`);
+  const brokenLinks = map.broken.length + map.translations.reduce((n, t) => n + t.broken.length, 0);
   // Header & layout / Background / Effects edit the whole site, or the own settings of the page the builder
   // (and so the preview) shows. Choosing another page there opens it in the builder too.
   const [scopeKind, setScopeKind] = useState<"site" | "page">("site");
   const scope: SettingsScope = scopeKind === "page" ? { kind: "page", ...builder.page } : { kind: "site" };
   // The preview's width, also which of the banner's two sets (wide screens / phones) is edited.
   const [device, setDevice] = useState<PreviewDevice>("desktop");
+  // The preview's language, also the one the Languages screen translates into. Falls back to
+  // the original when that language is removed.
+  const { original, translations } = admin.config.languages;
+  const [chosenLang, setLang] = useState<string | null>(null);
+  const lang = translations.some((t) => t.code === chosenLang) ? chosenLang! : original;
+  // Texts missing in the languages visitors can choose.
+  const missing = translations.flatMap((t) => {
+    const count = t.enabled ? translationStatus(admin.config, t).count.missing : 0;
+    return count ? [{ name: languageName(t.code, "en"), count }] : [];
+  });
+  /** A file the Languages screen asks the Content screen to open. */
+  const [openFile, setOpenFile] = useState<ContentTarget | null>(null);
   const screenProps: ScreenProps = {
     device,
     onDevice: setDevice,
@@ -158,6 +183,7 @@ function Shell() {
     return () => window.removeEventListener("hashchange", fromHash);
   }, []);
   const go = (id: ScreenId) => {
+    if (id !== "content") setOpenFile(null);
     window.location.hash = id;
     setScreen(id);
   };
@@ -208,7 +234,8 @@ function Shell() {
         <button type="button" className="adm-btn is-primary" disabled={!admin.hasDraft || admin.busy || admin.issues.length > 0 || !admin.writable} onClick={() => {
             // Still reading markdown files: wait for the full check rather than publish unchecked.
             if (map.checking) return window.alert("Still checking the links between your pages. Try again in a moment.");
-            if (stranded.length && !window.confirm(`${stranded.join(", ")} can't be reached from the homepage: no link leads there. Publish anyway?`)) return;
+            const lost = [...(stranded.length ? [stranded.join(", ")] : []), ...strandedIn].join("; ");
+            if (lost && !window.confirm(`Can't be reached from the homepage, because no link leads there: ${lost}. Publish anyway?`)) return;
             admin.publish();
           }}>
           {admin.busy ? "Publishing…" : "Publish"}
@@ -222,6 +249,11 @@ function Shell() {
         {SCREENS.map((s) => (
           <button key={s.id} type="button" aria-current={s.id === screen ? "page" : undefined} onClick={() => go(s.id)}>
             {s.label}
+            {s.id === "languages" && missing.length > 0 && (
+              <span className="adm-count is-draft" title={missing.map((m) => `${m.name}: ${m.count} missing`).join(", ")}>
+                ⚠
+              </span>
+            )}
             {s.id === "comments" && pending > 0 && <span className="adm-count is-draft">{pending}</span>}
             {s.id === "inbox" && unread > 0 && <span className="adm-count is-draft">{unread}</span>}
             {s.id === "suggestions" && suggested > 0 && <span className="adm-count is-draft">{suggested}</span>}
@@ -229,7 +261,7 @@ function Shell() {
         ))}
       </nav>
 
-      {(admin.error || admin.issues.length > 0 || admin.problems.length > 0 || !admin.writable || stranded.length > 0 || map.broken.length > 0) && (
+      {(admin.error || admin.issues.length > 0 || admin.problems.length > 0 || !admin.writable || stranded.length > 0 || strandedIn.length > 0 || brokenLinks > 0) && (
         <div className="adm-banners">
           {admin.error && (
             <p className="adm-notice is-bad">
@@ -251,16 +283,17 @@ function Shell() {
               </ul>
             </div>
           )}
-          {(stranded.length > 0 || map.broken.length > 0) && (
+          {(stranded.length > 0 || strandedIn.length > 0 || brokenLinks > 0) && (
             <p className="adm-notice is-warn">
               {stranded.length > 0 && (
                 <>
                   {stranded.length === 1 ? `The page ${stranded[0]} can't` : `The pages ${stranded.join(", ")} can't`} be reached from the homepage: no link leads there.{" "}
                 </>
               )}
-              {map.broken.length > 0 && (
+              {strandedIn.length > 0 && <>Only {strandedIn.join("; ")} can&apos;t be reached: the translated markdown files don&apos;t link there. </>}
+              {brokenLinks > 0 && (
                 <>
-                  {map.broken.length === 1 ? "1 link points" : `${map.broken.length} links point`} to a page that doesn&apos;t exist.{" "}
+                  {brokenLinks === 1 ? "1 link points" : `${brokenLinks} links point`} to a page that doesn&apos;t exist.{" "}
                 </>
               )}
               {screen !== "builder" && (
@@ -293,15 +326,25 @@ function Shell() {
             <>
               <aside className="adm-panel">
                 {screen === "builder" && builder.outline}
-                {screen !== "builder" && <ScopeBar {...screenProps} />}
+                {screen !== "builder" && screen !== "languages" && <ScopeBar {...screenProps} />}
                 {screen === "header-layout" && <HeaderLayoutScreen {...screenProps} />}
                 {screen === "background" && <BackgroundScreen {...screenProps} />}
                 {screen === "effects" && <EffectsScreen {...screenProps} />}
+                {screen === "languages" && (
+                  <LanguagesScreen
+                    lang={lang}
+                    onLang={setLang}
+                    onOpenFile={(file) => {
+                      setOpenFile(file);
+                      go("content");
+                    }}
+                  />
+                )}
               </aside>
               <Resizer side="left" width={panels.widths.left} label="Resize the left panel" onResize={(w) => panels.set("left", w, screen === "builder")} />
               {/* Keep the preview at this position on every draft screen so the iframe is never remounted
-                  (which is also why the drag-and-drop context wraps all four screens, not just the builder). */}
-              <PreviewPane target={builder.previewTarget} drop={builder.previewDrop} editable={screen === "builder"} device={device} onDevice={setDevice} />
+                  (which is also why the drag-and-drop context wraps all of them, not just the builder). */}
+              <PreviewPane target={builder.previewTarget} drop={builder.previewDrop} editable={screen === "builder"} device={device} onDevice={setDevice} lang={lang} onLang={setLang} />
               {screen === "builder" && (
                 <>
                   <Resizer side="right" width={panels.widths.right} label="Resize the settings panel" onResize={(w) => panels.set("right", w, true)} />
@@ -313,7 +356,7 @@ function Shell() {
         </main>
       ) : (
         <main className="adm-full">
-          {screen === "content" && <ContentScreen />}
+          {screen === "content" && <ContentScreen initial={openFile} />}
           {screen === "comments" && <CommentsScreen onCounts={setPending} />}
           {screen === "inbox" && <InboxScreen onCounts={setUnread} />}
           {screen === "suggestions" && <SuggestionsScreen onCounts={setSuggested} />}

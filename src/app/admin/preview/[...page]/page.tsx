@@ -4,6 +4,8 @@ import ConfigSync from "@/components/ConfigSync";
 import { getConfig } from "@/lib/config";
 import { isAdminSession } from "@/lib/admin/auth";
 import { getDraftConfig } from "@/lib/admin/publish";
+import { previewLanguage } from "@/lib/i18n/server";
+import { localize } from "@/lib/i18n/texts";
 import { pageView } from "@/lib/pages";
 
 /** A page other than the homepage, rendered from the draft for the admin preview (see ../page.tsx). */
@@ -23,5 +25,6 @@ export default async function PreviewExtraPage({ params }: { params: Promise<{ p
       </main>
     );
   }
-  return <SitePage config={pageView(config, page.id)} preview onPage />;
+  const language = await previewLanguage(config);
+  return <SitePage config={pageView(localize(config, language.current), page.id)} language={language} preview onPage />;
 }

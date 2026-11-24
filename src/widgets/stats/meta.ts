@@ -3,8 +3,8 @@ import { base, titleFields, frameField, iconField } from "../fields";
 import type { WidgetMeta } from "../types";
 
 export const statItemSchema = z.object({
-  value: z.string().meta({ title: "Value", description: "For example: 2,400 h · 12 years · 98% · #1" }),
-  label: z.string().meta({ title: "Label" }),
+  value: z.string().meta({ translate: true, title: "Value", description: "For example: 2,400 h · 12 years · 98% · #1" }),
+  label: z.string().meta({ translate: true, title: "Label" }),
   icon: iconField,
 });
 

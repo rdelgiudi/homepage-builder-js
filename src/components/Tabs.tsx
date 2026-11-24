@@ -6,8 +6,8 @@ import { Icon } from "@/widgets/shared";
 import TabSections, { type GridOptions } from "@/components/TabSections";
 import type { WidgetContext } from "@/widgets/types";
 import type { Tab } from "@/lib/schema/config";
-import Banner, { type BannerSetup } from "./Banner";
-import ThemeSwitcher from "./ThemeSwitcher";
+import Banner, { BannerControls, bannerControls, type BannerSetup } from "./Banner";
+import { tabSlug } from "@/lib/tab-slug";
 import { reportPreviewTab } from "./ConfigSync";
 
 function HamburgerButton({ open, onClick, label, className = "" }: { open: boolean; onClick: () => void; label: string; className?: string }) {
@@ -60,10 +60,6 @@ interface TabsProps {
   uniformNav?: boolean;
 }
 
-function slugify(text: string): string {
-  return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-}
-
 export default function Tabs({ tabs, banner, enableTransitions, widgetContext, widthClass, nav = "top", sideHeader, hideNavIfSingle, grid, mobileNav = "menu", column, uniformNav = false }: TabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -81,7 +77,7 @@ export default function Tabs({ tabs, banner, enableTransitions, widgetContext, w
     if (transitioning.current) return;
     const tabParam = searchParams.get("tab");
     if (tabParam) {
-      const index = tabs.findIndex((t) => slugify(t.label) === tabParam);
+      const index = tabs.findIndex((t) => tabSlug(t) === tabParam);
       if (index !== -1 && index !== mountedTab) {
         setActiveTab(index);
         setMountedTab(index);
@@ -111,7 +107,7 @@ export default function Tabs({ tabs, banner, enableTransitions, widgetContext, w
     setActiveTab(index);
     // Keep the current path (the admin preview lives at /admin/preview) and any other params.
     const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", slugify(tabs[index].label));
+    params.set("tab", tabSlug(tabs[index]));
     router.push(`${window.location.pathname}?${params}`, { scroll: false });
 
     if (enableTransitions) {
@@ -142,7 +138,7 @@ export default function Tabs({ tabs, banner, enableTransitions, widgetContext, w
   // Admin preview: the builder opens the tab chosen here. Not on mount: the first render is
   // always tab 0, before `?tab=` has been applied.
   const shownTab = tabs[Math.min(activeTab, tabs.length - 1)];
-  const activeSlug = shownTab ? slugify(shownTab.label) : "";
+  const activeSlug = shownTab ? tabSlug(shownTab) : "";
   const reported = useRef(false);
   useEffect(() => {
     if (!reported.current) {
@@ -158,6 +154,7 @@ export default function Tabs({ tabs, banner, enableTransitions, widgetContext, w
   const mountedIndex = Math.min(mountedTab, tabs.length - 1);
 
   const side = nav === "side";
+  const sideControls = bannerControls(banner.options, banner.language);
   const showNav = !(hideNavIfSingle && tabs.length === 1);
   const bottom = showNav && mobileNav === "bottom";
 
@@ -165,11 +162,16 @@ export default function Tabs({ tabs, banner, enableTransitions, widgetContext, w
     <div className={side ? "w-full md:grid md:grid-cols-[230px_minmax(0,1fr)] md:gap-10" : "w-full"}>
       {side && (
         <aside className="hidden md:flex flex-col gap-8 sticky top-0 self-start max-h-screen overflow-y-auto py-10">
-          {banner.options.themeSwitch === "banner" ? (
-            // Beside the title: below the tabs it would end up over the counters in a short window.
+          {sideControls.picker ? (
+            // Above the title: below the tabs they would end up over the counters in a short window.
+            <div>
+              <BannerControls {...banner} className="-mt-4 mb-3 -ml-2" />
+              {sideHeader}
+            </div>
+          ) : sideControls.theme ? (
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">{sideHeader}</div>
-              <ThemeSwitcher placement="banner" />
+              <BannerControls {...banner} />
             </div>
           ) : (
             sideHeader

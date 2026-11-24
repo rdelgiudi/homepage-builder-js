@@ -14,11 +14,11 @@ export const shelfItemSchema = z.object({
   url: z.string().optional().meta({ title: "Link", description: "Overrides the Steam store link" }),
   status: z.enum(["playing", "finished", "favourite", "backlog", "dropped"]).optional().meta({ title: "Status" }),
   rating: z.number().int().min(1).max(5).optional().meta({ title: "Rating", description: "1–5 stars" }),
-  note: z.string().optional().meta({ title: "Note", ui: "textarea" }),
+  note: z.string().optional().meta({ translate: true, title: "Note", ui: "textarea" }),
   group: z
     .string()
     .optional()
-    .meta({ title: "Group", description: "Any name. Used when the shelf's Group is Custom; games with the same name share a row" }),
+    .meta({ translate: true, title: "Group", description: "Any name. Used when the shelf's Group is Custom; games with the same name share a row" }),
 });
 
 export const schema = z.object({
@@ -47,6 +47,8 @@ export const schema = z.object({
     .array(z.string())
     .default([])
     .meta({
+      translate: true,
+      translateAs: "items.group",
       title: "Group order",
       description: "Custom groups listed here come first, in this order; the rest follow in the order they first appear. Games without a group go last, under \"Other\"",
       showIf: { groupBy: ["custom"] },

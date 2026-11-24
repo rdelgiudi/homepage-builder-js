@@ -1,5 +1,7 @@
 "use client";
 
+import { PREVIEW_LANGUAGE, rememberLanguage } from "@/components/LanguagePicker";
+import { languageName } from "@/lib/i18n/languages";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { PREVIEW_READY, PREVIEW_REFRESH, PREVIEW_SHOWN, PREVIEW_TAB } from "@/components/ConfigSync";
@@ -66,12 +68,17 @@ export default function PreviewPane({
   editable,
   device,
   onDevice,
+  lang,
+  onLang,
 }: {
   target: { page: string; tab: string };
   drop: PreviewDropState;
   editable: boolean;
   device: PreviewDevice;
   onDevice: (device: PreviewDevice) => void;
+  /** The language the preview shows. */
+  lang: string;
+  onLang: (code: string) => void;
 }) {
   const { savedTick, hasDraft, config } = useAdmin();
   const { frameRef: frame, shownSlug } = drop;
@@ -95,6 +102,8 @@ export default function PreviewPane({
    * be taken for a link the visitor followed, which would switch the builder back.
    */
   const goingTo = useRef<{ page: string; until: number } | null>(null);
+  /** The language the preview was last told to show. */
+  const shownLang = useRef<string | null>(null);
   /** What the preview should show now, for re-sending when it (re)starts listening. */
   const want = useRef(target);
   want.current = target;
@@ -107,6 +116,9 @@ export default function PreviewPane({
         shownSlug.current = `${page}|${tab}`;
         goingTo.current = { page, until: Date.now() + 10_000 };
         frame.current?.contentWindow?.postMessage({ type: PREVIEW_TAB, page, tab }, window.location.origin);
+        // Loaded before the language cookie was set (the iframe starts before this component runs).
+        const shows = frame.current?.contentDocument?.querySelector("main")?.lang;
+        if (shows && shownLang.current && shows !== shownLang.current) frame.current?.contentWindow?.postMessage(PREVIEW_REFRESH, window.location.origin);
         return;
       }
       if (e.data?.type !== PREVIEW_SHOWN || typeof e.data.tab !== "string") return;
@@ -123,6 +135,28 @@ export default function PreviewPane({
   useEffect(() => {
     if (savedTick > 0) post(PREVIEW_REFRESH);
   }, [savedTick, post]);
+
+  // The preview's language is a cookie only /admin sees, so a choice here never changes the
+  // language the owner's own browser gets on the live site. The preview's own picker sets the
+  // same cookie and says so.
+  useEffect(() => {
+    if (shownLang.current === lang) return;
+    shownLang.current = lang;
+    rememberLanguage(lang, true);
+    post(PREVIEW_REFRESH);
+  }, [lang, post]);
+  const onLangRef = useRef(onLang);
+  onLangRef.current = onLang;
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin || e.source !== frame.current?.contentWindow) return;
+      if (e.data?.type !== PREVIEW_LANGUAGE || typeof e.data.code !== "string") return;
+      shownLang.current = e.data.code;
+      onLangRef.current(e.data.code);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [frame]);
 
   useEffect(() => {
     // Not when the preview already shows it: after a drop on the one-page layout, re-sending
@@ -218,13 +252,24 @@ export default function PreviewPane({
     <section className="adm-preview" aria-label="Preview">
       <div className="adm-preview-bar">
         <span className="adm-muted">{hasDraft ? "Preview of your draft" : "Preview — same as the live site"}</span>
-        <div className="adm-seg" role="group" aria-label="Preview size">
-          <button type="button" aria-pressed={device === "desktop"} onClick={() => onDevice("desktop")}>
-            Desktop
-          </button>
-          <button type="button" aria-pressed={device === "phone"} onClick={() => onDevice("phone")}>
-            Phone
-          </button>
+        <div className="adm-preview-tools">
+          {config.languages.translations.length > 0 && (
+            <select className="adm-input" aria-label="Preview language" value={lang} onChange={(e) => onLang(e.target.value)}>
+              {[config.languages.original, ...config.languages.translations.map((t) => t.code)].map((code) => (
+                <option key={code} value={code}>
+                  {languageName(code, "en")}
+                </option>
+              ))}
+            </select>
+          )}
+          <div className="adm-seg" role="group" aria-label="Preview size">
+            <button type="button" aria-pressed={device === "desktop"} onClick={() => onDevice("desktop")}>
+              Desktop
+            </button>
+            <button type="button" aria-pressed={device === "phone"} onClick={() => onDevice("phone")}>
+              Phone
+            </button>
+          </div>
         </div>
       </div>
       <div className="adm-preview-stage">

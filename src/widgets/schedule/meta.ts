@@ -4,7 +4,7 @@ import type { WidgetMeta } from "../types";
 import { WEEKDAYS } from "./occurrences";
 
 export const slotSchema = z.object({
-  label: z.string().meta({ title: "What", description: "For example: Speedrun practice, Community game night" }),
+  label: z.string().meta({ translate: true, title: "What", description: "For example: Speedrun practice, Community game night" }),
   icon: iconField,
   days: z
     .array(z.enum(WEEKDAYS))
@@ -25,7 +25,7 @@ export const schema = z.object({
   ...frameField,
   timezone: z.string().default("UTC").meta({ title: "Your time zone", ui: "timezone", description: "The times above are in this zone; visitors see them in their own" }),
   items: z.array(slotSchema).max(30).default([]).meta({ title: "Slots" }),
-  note: z.string().optional().meta({ title: "Note", description: "Small line under the schedule, e.g. “Times may change — check Discord”" }),
+  note: z.string().optional().meta({ translate: true, title: "Note", description: "Small line under the schedule, e.g. “Times may change — check Discord”" }),
 });
 
 export type ScheduleSection = z.infer<typeof schema>;

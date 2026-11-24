@@ -186,7 +186,7 @@ describe("showcase config (src/config/homepage.showcase.json)", () => {
 
   it("its markdown files exist", () => {
     const files = sections().flatMap((s) => (s.type === "markdown" ? [s.file] : []));
-    for (const f of files) assert.ok(fs.existsSync(path.join(import.meta.dirname, "../../src/content", f)), f);
+    for (const f of files) assert.ok(fs.existsSync(path.join(import.meta.dirname, "../../src/content/en", f)), f);
   });
 
   it("has no key the schema doesn't know (zod would drop it silently)", () => {
@@ -215,7 +215,7 @@ describe("showcase config (src/config/homepage.showcase.json)", () => {
   it("its pages are all reachable from the homepage, and no link points at a missing page", () => {
     const config = strictParseConfig(showcase).config!;
     const fileLinks = Object.fromEntries(
-      sections().flatMap((s) => (s.type === "markdown" ? [[s.file, markdownLinks(fs.readFileSync(path.join(import.meta.dirname, "../../src/content", s.file), "utf-8"))]] : []))
+      sections().flatMap((s) => (s.type === "markdown" ? [[s.file, markdownLinks(fs.readFileSync(path.join(import.meta.dirname, "../../src/content/en", s.file), "utf-8"))]] : []))
     );
     const map = siteMap(config, fileLinks);
     assert.ok(config.pages.length >= 2, "the showcase has example pages");

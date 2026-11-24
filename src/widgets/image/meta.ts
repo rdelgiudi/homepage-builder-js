@@ -4,8 +4,8 @@ import type { WidgetMeta } from "../types";
 
 export const imageItemSchema = z.object({
   src: z.string().meta({ title: "Image", ui: "image" }),
-  alt: z.string().optional().meta({ title: "Description", description: "Read aloud by screen readers" }),
-  caption: z.string().optional().meta({ title: "Caption" }),
+  alt: z.string().optional().meta({ translate: true, title: "Description", description: "Read aloud by screen readers" }),
+  caption: z.string().optional().meta({ translate: true, title: "Caption" }),
   link: z.string().optional().meta({ title: "Link", description: "Opens when the image is clicked. Empty = the image itself" }),
 });
 

@@ -6,8 +6,8 @@ export const schema = z.object({
   ...base("poll"),
   ...titleFields,
   ...frameField,
-  question: z.string().default("").meta({ title: "Question" }),
-  options: z.array(z.string()).default([]).meta({ title: "Options", description: "Renaming an option starts its count from zero" }),
+  question: z.string().default("").meta({ translate: true, title: "Question" }),
+  options: z.array(z.string()).default([]).meta({ translate: "labels", title: "Options", description: "Renaming an option starts its count from zero" }),
   results: z.enum(["after", "always"]).default("after").meta({ title: "Show results", description: "After = only once the visitor has voted" }),
 });
 

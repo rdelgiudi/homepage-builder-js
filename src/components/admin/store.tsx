@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { HomepageConfig } from "@/lib/schema/config";
 import { api, ApiError, type ConfigIssue } from "./api";
+import { carryTranslations, expandShared } from "@/lib/i18n/texts";
 import { sameConfig } from "./same";
 import { TYPING_IDLE_MS, endsStep, isLongText, isTypingField, wordsAtStart } from "./typing-history";
 
@@ -178,7 +179,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     const group = typingStep();
     setDoc((d) => {
       if (!d) return d;
-      const next = fn(d.config);
+      // Translations follow a text that is being edited (they are keyed by it).
+      const before = expandShared(d.config);
+      const next = carryTranslations(before, fn(before));
       if (same(next, d.config)) return d;
       // Same typing step as the newest undo entry: replace the config, keep the entry.
       if (group !== null && d.group === group) return { ...d, config: next, future: [] };
@@ -206,11 +209,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       await save(config, published);
       if (!same(serverDraft.current, config)) return; // save failed; issues are already shown
-      const res = await api<{ published: HomepageConfig }>("config/publish", { method: "POST", body: {} });
+      const res = await api<{ published: HomepageConfig; warning?: string }>("config/publish", { method: "POST", body: {} });
       serverDraft.current = null;
       setPublished(res.published);
       setDoc((d) => (d ? { ...d, config: res.published } : d));
       setProblems([]);
+      if (res.warning) setError(res.warning);
       setSaveState("idle");
     } catch (err) {
       if (err instanceof ApiError && err.issues.length) setIssues(err.issues);

@@ -38,10 +38,13 @@ const storage = {
   },
 };
 
-function Notice({ section }: { section: NoticeSection }) {
+function Notice({ section }: { section: NoticeSection & { titleLabels?: string; messageLabels?: string } }) {
   const until = section.until ? zonedTimeToMs(section.until, section.timezone) : null;
   const [expired, setExpired] = useState(() => until !== null && Date.now() >= until);
   const [dismissed, setDismissed] = useState(false);
+  // A dismissal is remembered by the original text, so it holds in every language.
+  const title = section.titleLabels ?? section.title;
+  const message = section.messageLabels ?? section.message;
   const key = `notice:${section.id}:${hash(`${section.title ?? ""}\n${section.message}`)}`;
 
   // Read after mount (server HTML has no localStorage).
@@ -68,10 +71,10 @@ function Notice({ section }: { section: NoticeSection }) {
     <div role="status" className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-left ${tone.box}`}>
       <Icon icon={section.icon || tone.icon} className="text-xl leading-6 shrink-0" width={22} height={22} />
       <div className="min-w-0 flex-1">
-        {section.title && <p className="font-semibold">{section.title}</p>}
-        {section.message && (
+        {title && <p className="font-semibold">{title}</p>}
+        {message && (
           <p className="whitespace-pre-wrap break-words text-sm leading-6 opacity-90">
-            {section.message}
+            {message}
             {link && (
               <>
                 {" "}
@@ -82,7 +85,7 @@ function Notice({ section }: { section: NoticeSection }) {
             )}
           </p>
         )}
-        {!section.message && link && (
+        {!message && link && (
           <a href={link} {...opens(link)} className="text-sm font-medium underline underline-offset-2 hover:opacity-80">
             {section.linkText || "More"}
           </a>

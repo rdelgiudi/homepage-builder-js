@@ -5,12 +5,15 @@ import { Suspense } from "react";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import FaviconAnimation from "@/components/FaviconAnimation";
 import ConfigSync from "@/components/ConfigSync";
-import type { BannerConfig, BannerOptions, HomepageConfig, SiteLayout } from "@/lib/schema/config";
+import LanguagePicker from "@/components/LanguagePicker";
+import LanguageSync from "@/components/LanguageSync";
+import { isRtl, type SiteLanguage } from "@/lib/i18n/languages";
+import type { BannerConfig, BannerOptions, CountersConfig, HomepageConfig, SiteLayout } from "@/lib/schema/config";
 import { bannerOptions } from "@/lib/banner";
 import Banner, { type BannerSet, type BannerSetup } from "@/components/Banner";
 import SiteHeader from "@/components/SiteHeader";
 import BackgroundLayer from "@/components/BackgroundLayer";
-import { slugify } from "@/lib/schema/migrate";
+import { tabSlug } from "@/lib/tab-slug";
 import OnePage from "@/components/OnePage";
 import { COLUMN_GRID, LAYOUT_FEATURES, bottomNav, gridOptions, pinnedTabId } from "@/lib/layouts";
 import { widgetContextFor } from "@/lib/widget-context";
@@ -46,11 +49,11 @@ function headerProps(config: HomepageConfig, homeHref?: string) {
 }
 
 /** The banner of a page with this config: its settings as the layout applies them, and its title. */
-function bannerSetup(config: HomepageConfig, homeHref?: string): BannerSetup {
+function bannerSetup(config: HomepageConfig, language: SiteLanguage, preview: boolean, homeHref?: string): BannerSetup {
   const header = headerProps(config, homeHref);
   const { options, phone } = bannerOptions(config.layout, config.banner);
   const set = (o: BannerOptions): BannerSet => ({ options: o, brand: <SiteHeader {...header} banner={o} variant={o.arrangement === "inline" ? "bar" : "top"} /> });
-  return { ...set(options), ...(phone && { phone: set(phone) }) };
+  return { ...set(options), ...(phone && { phone: set(phone) }), language, preview };
 }
 
 /** The floating light/dark switch, on the screens whose banner doesn't have it. */
@@ -66,12 +69,50 @@ function FloatingThemeSwitch({ banner }: { banner: BannerConfig }) {
 }
 
 /**
+ * The language picker outside the banner: floating in a corner, or at the end of the page. In
+ * the bottom corners it sits above what is already there (counters, light/dark switch), and
+ * everything moves above the phones' bottom tab bar (`--lang-lift` in globals.css).
+ */
+function PlacedLanguagePicker({ banner, counters, language, preview, where }: { banner: BannerConfig; counters: CountersConfig; language: SiteLanguage; preview: boolean; where: "floating" | "footer" }) {
+  if (language.choices.length < 2) return null;
+  const show = (set: BannerOptions, screens: string) => {
+    const place = set.languagePicker;
+    if (place === "banner" || (place === "footer") !== (where === "footer")) return null;
+    if (place === "footer")
+      return (
+        <div key={screens} className={`pt-10 flex justify-center ${screens}`}>
+          <LanguagePicker language={language} preview={preview} look="footer" />
+        </div>
+      );
+    const [edge, side] = place.split("-");
+    const lines = side === "left" ? Number(counters.viewers) + Number(counters.visitors) : 0;
+    const below = side === "right" ? (set.themeSwitch === "floating" ? 60 : 0) : lines * 30;
+    return (
+      <div
+        key={screens}
+        className={`lang-float fixed z-40 ${side === "right" ? "right-6" : "left-4"} ${edge === "top" ? "is-top" : ""} ${screens}`}
+        style={{ "--lang-lift": `${(side === "right" ? 24 : 16) + below}px` } as React.CSSProperties}
+      >
+        <LanguagePicker language={language} preview={preview} look="floating" />
+      </div>
+    );
+  };
+  return (
+    <>
+      {show(banner, banner.phone ? "max-md:hidden" : "")}
+      {banner.phone && show(banner.phone, "md:hidden")}
+    </>
+  );
+}
+
+/**
  * Everything around the content: page colour, background layer, effects, the banner (unless
  * the content draws it, with its tab bar), counters, live config refresh and the theme switch. Shared by the site (`SitePage`)
  * and the blog post pages.
  */
 export function SiteShell({
   config,
+  language,
   preview,
   width,
   ownBanner = false,
@@ -80,7 +121,9 @@ export function SiteShell({
   homeHref,
   children,
 }: {
+  /** Already in `language` (`localize()`). */
   config: HomepageConfig;
+  language: SiteLanguage;
   preview: boolean;
   width: string;
   /** `children` draw the banner themselves (Tabs and OnePage: the tab bar is part of it). */
@@ -108,6 +151,8 @@ export function SiteShell({
     <main
       className="min-h-screen bg-page relative z-10 overflow-x-clip"
       style={pageVars}
+      lang={language.current}
+      data-rtl={isRtl(language.current) ? "" : undefined}
       data-card-opacity={surface.cards < 100 ? "" : undefined}
       data-bottom-nav={bottomNav ? "" : undefined}
     >
@@ -115,14 +160,15 @@ export function SiteShell({
         <BackgroundLayer
           base={background.base}
           overlay={background.overlay}
-          tabOverrides={tabBackgrounds ? tabs.flatMap((t) => (t.background ? [{ slug: slugify(t.label), base: t.background }] : [])) : []}
-          firstTabSlug={tabs[0] ? slugify(tabs[0].label) : ""}
+          tabOverrides={tabBackgrounds ? tabs.flatMap((t) => (t.background ? [{ slug: tabSlug(t), base: t.background }] : [])) : []}
+          firstTabSlug={tabs[0] ? tabSlug(tabs[0]) : ""}
         />
       </Suspense>
       <EffectsController particles={background.effect} palette={titleGradient} customScrollbar={effects.customScrollbar} mouseTrail={effects.mouseTrail} mouseTrailColors={effects.mouseTrailColors} reactionFlyer={effects.reactionFlyer} />
       <div className={`w-full ${width} mx-auto px-4 md:px-8 pb-8`}>
-        {!ownBanner && <Banner {...bannerSetup(config, homeHref)} widthClass={width} />}
+        {!ownBanner && <Banner {...bannerSetup(config, language, preview, homeHref)} widthClass={width} />}
         {children}
+        <PlacedLanguagePicker banner={config.banner} counters={counters} language={language} preview={preview} where="footer" />
       </div>
 
       <div className="site-fixed-bottom fixed bottom-4 left-4 z-30">
@@ -131,20 +177,23 @@ export function SiteShell({
       <ConfigSync preview={preview} />
       {effects.faviconAnimation && !preview && <FaviconAnimation gradient={titleGradient} />}
       <FloatingThemeSwitch banner={config.banner} />
+      <PlacedLanguagePicker banner={config.banner} counters={counters} language={language} preview={preview} where="floating" />
+      <LanguageSync lang={language.current} preview={preview} />
     </main>
   );
 }
 
 /**
  * The whole site, rendered from `config`. Used by `/` (the published config) and by
- * `/admin/preview` (the admin panel's draft, `preview` = true). For another page, `config`
+ * `/admin/preview` (the admin panel's draft, `preview` = true). `config` is already in `language`
+ * (`localize()`). For another page, `config`
  * is that page's view (`pageView()` in lib/pages.ts: its tabs, everything else shared) and
  * `onPage` is set, which makes the site name link back to the homepage.
  */
-export default function SitePage({ config, preview, onPage = false }: { config: HomepageConfig; preview: boolean; onPage?: boolean }) {
+export default function SitePage({ config, language, preview, onPage = false }: { config: HomepageConfig; language: SiteLanguage; preview: boolean; onPage?: boolean }) {
   const { effects, tabs } = config;
   const homeHref = onPage ? "/" : undefined;
-  const banner = bannerSetup(config, homeHref);
+  const banner = bannerSetup(config, language, preview, homeHref);
 
   const site = config.layout.site;
   const width = config.layout.fullWidth && (site === "bento" || site === "masonry") ? FULL_WIDTH : PAGE_WIDTH[site];
@@ -157,11 +206,12 @@ export default function SitePage({ config, preview, onPage = false }: { config: 
   const barTabs = pinned ? tabs.filter((t) => t !== pinned) : tabs;
   const phoneBottomNav = bottomNav(config.layout, barTabs.length);
 
-  const widgetContext = preview ? { ...widgetContextFor(config), preview: true } : widgetContextFor(config);
+  const context = widgetContextFor(config, language);
+  const widgetContext = preview ? { ...context, preview: true } : context;
 
   return (
     // The one-page layout shows every tab at once, so there is no "open tab" background to follow.
-    <SiteShell config={config} preview={preview} width={width} ownBanner={tabs.length > 0} tabBackgrounds={features.tabBackground} bottomNav={phoneBottomNav} homeHref={homeHref}>
+    <SiteShell config={config} language={language} preview={preview} width={width} ownBanner={tabs.length > 0} tabBackgrounds={features.tabBackground} bottomNav={phoneBottomNav} homeHref={homeHref}>
       <Suspense fallback={<TabsFallback />}>
         {site === "onepage" ? (
           <OnePage tabs={tabs} banner={banner} widgetContext={widgetContext} widthClass={width} grid={grid} headings={config.layout.sectionHeadings} />

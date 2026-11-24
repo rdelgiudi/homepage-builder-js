@@ -3,7 +3,7 @@ import { base, titleFields, frameField, iconField } from "../fields";
 import type { WidgetMeta } from "../types";
 
 export const serviceSchema = z.object({
-  label: z.string().meta({ title: "Name" }),
+  label: z.string().meta({ translate: "name", title: "Name" }),
   url: z.string().meta({ title: "Address to check", description: "http(s). Visible in the page source to every visitor" }),
   icon: iconField,
 });

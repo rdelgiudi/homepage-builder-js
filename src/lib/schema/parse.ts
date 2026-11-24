@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import { SectionSchema } from "@/widgets/meta";
-import { ConfigSchema, PAGE_SETTING_GROUPS, PageSchema, PageSettingsSchema, TabSchema, type HomepageConfig } from "./config";
+import { ConfigSchema, LanguagesSchema, PAGE_SETTING_GROUPS, PageSchema, PageSettingsSchema, TabSchema, TranslationSchema, type HomepageConfig } from "./config";
+import { expandShared } from "@/lib/i18n/texts";
 import { migrateConfig } from "./migrate";
 
 export interface ParseResult {
@@ -107,9 +108,33 @@ export function parseConfig(raw: unknown): ParseResult {
     });
   }
 
+  // Translations: an invalid language is dropped, invalid language settings fall back to the defaults.
+  if ("languages" in migrated) {
+    const raw = migrated.languages;
+    if (raw && typeof raw === "object" && Array.isArray((raw as { translations?: unknown }).translations)) {
+      const original = (raw as { original?: unknown }).original ?? "en";
+      const codes = new Set<unknown>([original]);
+      migrated.languages = {
+        ...raw,
+        translations: (raw as { translations: unknown[] }).translations.filter((t, i) => {
+          const res = TranslationSchema.safeParse(t);
+          const problem = !res.success ? describe(res.error) : codes.has(res.data.code) ? `"${res.data.code}" is already used` : null;
+          if (problem) warnings.push(`languages.translations[${i}]: ${problem} — dropped`);
+          else codes.add(res.data!.code);
+          return !problem;
+        }),
+      };
+    }
+    const res = LanguagesSchema.safeParse(migrated.languages);
+    if (!res.success) {
+      warnings.push(`languages: ${describe(res.error)} — ignored`);
+      delete migrated.languages;
+    }
+  }
+
   const res = ConfigSchema.safeParse(migrated);
   if (!res.success) return { config: null, errors: [describe(res.error)], warnings };
-  return { config: res.data, errors: [], warnings };
+  return { config: expandShared(res.data), errors: [], warnings };
 }
 
 export interface ConfigIssue {
@@ -150,5 +175,10 @@ export function strictParseConfig(raw: unknown): { config: HomepageConfig; issue
     slugs.add(page.slug);
     checkTabs(page.tabs, `pages.${pi}.tabs`);
   });
-  return issues.length ? { config: null, issues } : { config: res.data, issues: [] };
+  const codes = new Set([res.data.languages.original]);
+  res.data.languages.translations.forEach((t, ti) => {
+    if (codes.has(t.code)) issues.push({ path: `languages.translations.${ti}.code`, message: `The language "${t.code}" is used twice` });
+    codes.add(t.code);
+  });
+  return issues.length ? { config: null, issues } : { config: expandShared(res.data), issues: [] };
 }

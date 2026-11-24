@@ -3,9 +3,12 @@ import path from "path";
 import matter from "gray-matter";
 import { NextResponse } from "next/server";
 import { readJson, withAdmin } from "@/lib/admin/auth";
-import { isWritable } from "@/lib/admin/publish";
 import { audit } from "@/lib/admin/store";
-import { CONTENT_DIR, MAX_FOLDER_DEPTH, listContent, resolveContentFile, resolveContentFolder } from "@/lib/content";
+import { CONTENT_DIR, MAX_FOLDER_DEPTH, findContentFile, listContent, resolveContentFile, resolveContentFolder } from "@/lib/content";
+import { contentLanguages, contentPlace, type ContentLanguages } from "@/lib/i18n/languages";
+import { removeEmptyFolders } from "@/lib/i18n/organize";
+import { getConfig } from "@/lib/config";
+import { getDraftConfig, isWritable } from "@/lib/admin/publish";
 import { renderMarkdownToHtml } from "@/lib/markdown";
 
 export const dynamic = "force-dynamic";
@@ -23,13 +26,19 @@ function writeError(err: unknown) {
   throw err;
 }
 
-/** Without `file`: every markdown file and folder. With `file`: that file's text. */
+const languages = (): ContentLanguages => contentLanguages((getDraftConfig() ?? getConfig()).languages, getConfig().languages.original);
+
+/**
+ * Without `file`: every markdown file and folder. With `file`: that file's text; a name without
+ * its language folder (as widgets use it) finds the original.
+ */
 export const GET = withAdmin(async (request) => {
   const name = new URL(request.url).searchParams.get("file");
   if (name === null) return NextResponse.json({ ...listContent(), writable: isWritable(CONTENT_DIR) });
 
-  const filePath = resolveContentFile(name);
+  let filePath = resolveContentFile(name);
   if (!filePath) return NextResponse.json({ error: BAD_NAME }, { status: 400 });
+  if (!fs.existsSync(filePath)) filePath = findContentFile(name, languages())?.path ?? filePath;
   try {
     return NextResponse.json({ name, content: fs.readFileSync(filePath, "utf-8") });
   } catch {
@@ -72,7 +81,8 @@ export const PUT = withAdmin(async (request) => {
 });
 
 /**
- * Renames or moves a file or a folder: `{ from, to }`, both files or both folders. Answers with
+ * Renames or moves a file or a folder: `{ from, to }`, both files or both folders. A file's
+ * other languages ("it/about.md" for "en/about.md") move with it. Answers with
  * every file that moved (`moved: [{ from, to }]`), so the panel can point widgets at the new names.
  */
 export const PATCH = withAdmin(async (request) => {
@@ -88,19 +98,45 @@ export const PATCH = withAdmin(async (request) => {
   if (!fs.existsSync(src)) return NextResponse.json({ error: "Not found." }, { status: 404 });
   if (fs.existsSync(dest)) return NextResponse.json({ error: `${to} already exists.` }, { status: 409 });
 
-  let moved: { from: string; to: string }[] = [{ from, to }];
+  const moved: { from: string; to: string }[] = [{ from, to }];
   if (!isFile) {
     if (to.startsWith(`${from}/`)) return NextResponse.json({ error: "A folder can't be moved into itself." }, { status: 400 });
     // Everything inside must still be a valid path at its new depth.
     const inner = listContent(from).files.map((f) => f.name.slice(from.length + 1));
-    moved = inner.map((rel) => ({ from: `${from}/${rel}`, to: `${to}/${rel}` }));
+    moved.splice(0, 1, ...inner.map((rel) => ({ from: `${from}/${rel}`, to: `${to}/${rel}` })));
     const tooDeep = moved.find((m) => !resolveContentFile(m.to));
     if (tooDeep) return NextResponse.json({ error: `That would put ${tooDeep.to} more than ${MAX_FOLDER_DEPTH} folders deep.` }, { status: 400 });
   }
 
+  // The other languages' versions go to the same new place in their own folders.
+  const langs = languages();
+  const files = new Set(listContent().files.map((f) => f.name));
+  const places = [...files].map((name) => ({ name, place: contentPlace(name, langs, files) }));
+  let translations = moved.flatMap((m) => {
+    const was = contentPlace(m.from, langs, files);
+    const now = contentPlace(m.to, langs, files);
+    if (was.name === now.name) return [];
+    return places.filter((p) => p.place.name === was.name && p.name !== m.from).map((p) => ({ from: p.name, to: p.place.code ? `${p.place.code}/${now.name}` : now.name }));
+  });
+  const inMove = new Set(moved.map((m) => m.from));
+  translations = translations.filter((t) => !inMove.has(t.from));
+  for (const t of translations) {
+    const target = resolveContentFile(t.to);
+    if (!target) return NextResponse.json({ error: BAD_NAME }, { status: 400 });
+    if (fs.existsSync(target)) return NextResponse.json({ error: `${t.to} already exists.` }, { status: 409 });
+  }
+  moved.push(...translations);
+
   try {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.renameSync(src, dest);
+    for (const t of translations) {
+      const source = resolveContentFile(t.from)!;
+      const target = resolveContentFile(t.to)!;
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.renameSync(source, target);
+      removeEmptyFolders(path.dirname(source));
+    }
   } catch (err) {
     return writeError(err);
   }

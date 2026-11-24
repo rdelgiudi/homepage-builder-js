@@ -21,6 +21,7 @@ A customizable Next.js homepage with Discord, Steam, Overwatch, and GitHub integ
 - **Canvas effects**: stars, comet, snow, fireflies, constellation, aurora; optional mouse trail and a flying emoji whenever someone reacts
 - **Admin panel** (optional): drag-and-drop builder, schema-generated forms, live draft preview, publish with version history, media uploads, markdown editor, comment moderation, contact-form inbox, game suggestions
 - Live viewer count and total visitor counter
+- **Translations**: write the site in one language, add others in the admin panel; visitors get a language picker
 - Light/dark mode, animated gradient title and favicon, gradient widget frames
 - Responsive: under 768px the tab bar collapses into a compact bar with a slide-in menu
 - No outbound API requests while nobody is on the site (Steam, Overwatch and Discord enrichment pause; data widgets only fetch when a visitor's page asks)
@@ -44,9 +45,9 @@ cp src/config/homepage.showcase.json src/config/homepage.json  # a starting poin
 npm run dev
 ```
 
-The showcase config has every widget type with placeholder ("lorem ipsum") content, live widgets pointing at well-known public accounts, sample markdown files (`src/content/showcase-*.md`), and a few extra pages linked from its homepage: `/about` looks like the homepage (site-wide settings), while `/projects` and `/colophon` have their own name, colors, layout, background, effects or counters. Widgets that need keys (Discord, Steam, Overwatch, Twitch) say what is missing until you set them in `.env`. Remove what you don't need in the admin panel, or skip the copy and build the site from scratch there.
+The showcase config has every widget type with placeholder ("lorem ipsum") content, live widgets pointing at well-known public accounts, sample markdown files (`src/content/en/showcase-*.md`, one also in Italian and Polish), and a few extra pages linked from its homepage: `/about` looks like the homepage (site-wide settings), while `/projects` and `/colophon` have their own name, colors, layout, background, effects or counters. Widgets that need keys (Discord, Steam, Overwatch, Twitch) say what is missing until you set them in `.env`. Remove what you don't need in the admin panel, or skip the copy and build the site from scratch there.
 
-Open [http://localhost:3000](http://localhost:3000) to view your homepage. Without `homepage.json` the site starts with an empty default config. `homepage.json` and `src/content/*.md` are gitignored, so your own content stays out of the repository. To use the admin panel locally, set `ADMIN_PASSWORD` (or `ADMIN_PASSWORD_HASH`, see [Admin panel](#admin-panel)) in `.env` and open `/admin`.
+Open [http://localhost:3000](http://localhost:3000) to view your homepage. Without `homepage.json` the site starts with an empty default config. `homepage.json` and everything else in `src/content/` are gitignored, so your own content stays out of the repository. To use the admin panel locally, set `ADMIN_PASSWORD` (or `ADMIN_PASSWORD_HASH`, see [Admin panel](#admin-panel)) in `.env` and open `/admin`.
 
 ### Checks
 
@@ -158,6 +159,7 @@ The top of every page: name or logo, tagline and tab bar. In the admin panel it 
 | `fullWidth` | `true` = the banner uses the whole screen width instead of the page column |
 | `scroll` | `tabs` (default): the title goes away, the tabs stay. `hide`: all of it goes when scrolling down and returns when scrolling up. `all`: all of it stays. |
 | `themeSwitch` | Light/dark switch: `floating` (default, bottom right) or `banner` |
+| `languagePicker` | `banner` (default), `bottom-right`, `bottom-left`, `top-right`, `top-left` (floating), `footer` (end of the page). Only shown with more than one language, see [Languages](#languages). |
 
 Phones use the same settings unless `banner.phone` is set: an object with the same options, used instead of all of them below 768px (what it leaves out is that option's default). In the admin panel: **Different on phones**, then choose which set to edit.
 
@@ -166,6 +168,23 @@ Phones use the same settings unless `banner.phone` is set: an object with the sa
 ```
 
 In the sidebar layout the title, tabs and switch are in the left column on wide screens; the banner is for phones.
+
+### Languages
+
+```json
+"languages": {
+  "original": "en",
+  "detect": true,
+  "translations": [{ "code": "it", "texts": { "Home": "Inizio", "Find me here": "Mi trovi qui" } }]
+}
+```
+
+Write the site in one language (`original`) and add translations in the admin panel under **Languages**: every text of the site is listed there with a field for its translation, what is missing, and what to check because the original was edited since. The same text in two places is translated in each (it may mean something else there); what you chose elsewhere is offered, and you confirm it with **Same here**. By hand, `texts` can simply map an original text to its translation, which then counts for every place that has the text (the panel writes it out per place). A text without a translation is shown in the original.
+
+- Visitors can choose every language that is switched on, even before anything is translated (those texts are shown in the original); with one language there is no picker. The panel shows how many texts are missing. Names (your site, projects, tools, places, people) are listed to check instead: translate them, or tick "Doesn't translate". Any other text can be ticked the same way. Its place is `banner.languagePicker`. `enabled: false` keeps a language out of it while you work on it (the panel's preview still shows it).
+- `detect` (default `true`): visitors start in their browser's language if the site has it. A choice in the picker is remembered (cookie). `?lang=it` links to a language.
+- **Markdown files and blog posts** are kept in one folder per language: `src/content/en/about.md` and `src/content/it/about.md`. Publishing with a first translation moves your files into the original language's folder; widgets and links keep using the plain name (`about.md`), and the post address stays `/posts/<name>`. A file without a translation is shown in the original. In the Content screen you don't see these folders: choose a language above the files and translate them there. A post's translation may have its own `title`, `summary` and `tags`; `draft: true` in it means it isn't used yet.
+- Text that is built into the widgets (such as "No posts yet.") and data from other sites is not translated.
 
 ### Background
 

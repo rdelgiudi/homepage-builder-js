@@ -325,7 +325,7 @@ export function useBuilder(): {
   const config = pageView(site, pageId);
   // Synchronous on purpose: grouping typing into undo steps reads the event being handled.
   const update = (fn: (c: HomepageConfig) => HomepageConfig) => updateSite((c) => withPageTabs(c, pageId, fn(pageView(c, pageId)).tabs));
-  const map = useSiteMap(site);
+  const map = useSiteMap(site, published.languages.original);
   const [tabId, setTabId] = useState<string | null>(config.tabs[0]?.id ?? null);
   const [selection, setSelection] = useState<Selection>(null);
   const [dragging, setDragging] = useState<string | null>(null);
@@ -811,6 +811,7 @@ export function useBuilder(): {
       <PagesOutline
         map={map}
         checking={map.checking}
+        translations={map.translations}
         currentId={pageId}
         settingsId={selection?.kind === "page" ? selection.id : null}
         onOpen={(id) => openPage(id)}

@@ -1812,3 +1812,146 @@ textarea.adm-input {
   margin: 0;
   font-style: italic;
 }
+
+/* ---------- languages ---------- */
+
+.adm-langs,
+.adm-tr-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.adm-lang {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--a-line);
+  border-radius: 6px;
+}
+.adm-lang.is-open {
+  border-color: var(--a-accent);
+}
+.adm-lang-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.adm-lang-name {
+  font-weight: 600;
+}
+.adm-lang-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--a-line);
+  overflow: hidden;
+}
+.adm-lang-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--a-accent);
+}
+.adm-tr-group {
+  display: grid;
+  gap: 14px;
+}
+.adm-tr-group > h3 {
+  margin: 8px 0 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--a-line);
+  font-size: 13px;
+}
+.adm-tr {
+  display: grid;
+  gap: 4px;
+}
+.adm-tr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.adm-tr-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 9em;
+  overflow-y: auto;
+}
+.adm-tr-suggest {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 4px 4px 8px;
+  border-left: 2px solid var(--a-accent);
+  overflow-wrap: anywhere;
+}
+.adm-tr-suggest .adm-btn {
+  flex-shrink: 0;
+}
+.adm-tr-keep {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  font-size: 12.5px;
+  color: var(--a-muted);
+  cursor: pointer;
+}
+.adm-tr-check {
+  font-size: 12.5px;
+  color: var(--a-draft);
+}
+.adm-tr-stale {
+  font-size: 12.5px;
+  color: var(--a-muted);
+}
+.adm-tr-stale ul {
+  padding-left: 18px;
+  overflow-wrap: anywhere;
+}
+.adm-tr-files li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.adm-row-button .adm-tag {
+  flex-shrink: 0;
+  align-self: center;
+}
+.adm-editor-notice {
+  margin: 0 14px 8px;
+}
+.adm-content-lang {
+  display: grid;
+  gap: 4px;
+}
+.adm-tr-files li > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.adm-tr-files .adm-link {
+  flex-shrink: 0;
+}
+.adm-preview-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.adm-preview-tools select {
+  width: auto;
+  padding-block: 4px;
+  font-size: 12.5px;
+}

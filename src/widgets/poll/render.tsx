@@ -9,7 +9,7 @@ interface Results {
   voted: string | null;
 }
 
-function Poll({ section }: { section: PollSection }) {
+function Poll({ section }: { section: PollSection & { optionsLabels?: string[] } }) {
   const [results, setResults] = useState<Results | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -76,7 +76,8 @@ function Poll({ section }: { section: PollSection }) {
               {showResults && <span className="absolute inset-y-0 left-0 bg-blue-500/20 transition-[width] duration-500" style={{ width: `${share}%` }} aria-hidden />}
               <span className="relative flex justify-between gap-3">
                 <span className="min-w-0 break-words">
-                  {option}
+                  {/* Votes are stored by the original text; a translation only shows its own (`translate: "labels"`). */}
+                  {section.optionsLabels?.[i] ?? option}
                   {mine && <span className="text-blue-600 dark:text-blue-400"> ✓</span>}
                 </span>
                 {showResults && <span className="tabular-nums text-gray-500 dark:text-gray-400">{share}%</span>}

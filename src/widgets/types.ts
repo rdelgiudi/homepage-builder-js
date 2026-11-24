@@ -39,6 +39,8 @@ export interface WidgetContext {
   widgetFrameWidth: number;
   /** The site's default blog post author (`postAuthor`); a post's own `author` wins. */
   postAuthor: string;
+  /** The translation being shown; unset = the original. For data the server has per language (markdown, posts). */
+  lang?: string;
   /**
    * Rendered inside the admin panel's preview: `TabSections` then marks tabs and widgets
    * (`data-tab-id`, `data-section-id`) so the panel can drop widgets onto the page.

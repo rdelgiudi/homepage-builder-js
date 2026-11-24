@@ -3,6 +3,7 @@
  * Types are inferred from these schemas; defaults live here and nowhere else.
  */
 import { z } from "zod";
+import { LANGUAGE_CODE } from "@/lib/i18n/languages";
 import { MAX_PAGE_DEPTH, PAGE_SLUG, isReservedSlug } from "./page-address";
 import { SectionSchema } from "@/widgets/meta";
 
@@ -177,6 +178,21 @@ const bannerFields = {
     .enum(["floating", "banner"])
     .default("floating")
     .meta({ title: "Light/dark switch", labels: { floating: "Floating", banner: "In the banner" }, description: "Floating = fixed at the bottom right of the window" }),
+  languagePicker: z
+    .enum(["banner", "bottom-right", "bottom-left", "top-right", "top-left", "footer"])
+    .default("banner")
+    .meta({
+      title: "Language picker",
+      labels: {
+        banner: "In the banner",
+        "bottom-right": "Floating, bottom right",
+        "bottom-left": "Floating, bottom left",
+        "top-right": "Floating, top right",
+        "top-left": "Floating, top left",
+        footer: "End of the page",
+      },
+      description: "Shown only while the site is in more than one language",
+    }),
 };
 /** One set of banner settings (the site's, or the phones' own). */
 export const BannerOptionsSchema = z.object(bannerFields);
@@ -193,7 +209,7 @@ export const CountersSchema = z.object({
 
 export const TabSchema = z.object({
   id: z.string().min(1),
-  label: z.string().min(1).meta({ title: "Label" }),
+  label: z.string().min(1).meta({ translate: true, title: "Label" }),
   icon: z.string().optional().meta({ title: "Icon", ui: "icon", description: "Emoji or image URL" }),
   invertDark: z.boolean().optional().meta({ title: "Invert icon in dark mode" }),
   /** `stack` — one widget per row. `grid` — 12 columns; each widget's `span` sets its width. */
@@ -205,8 +221,8 @@ export const TabSchema = z.object({
 
 /** Name and tagline: the site's (top level) or one page's own (`settings.header`). */
 const headerFields = {
-  name: z.string().default("Homepage").meta({ title: "Site name" }),
-  tagline: z.string().default("Welcome").meta({ title: "Tagline" }),
+  name: z.string().default("Homepage").meta({ translate: "name", title: "Site name" }),
+  tagline: z.string().default("Welcome").meta({ translate: true, title: "Tagline" }),
 };
 /** Title colors: the site's (top level) or one page's own (`settings.titleColors`). */
 const titleColorFields = {
@@ -247,11 +263,43 @@ export const PageSchema = z.object({
     .regex(PAGE_SLUG, `Use lowercase letters, numbers and dashes, starting with a letter or number; at most ${MAX_PAGE_DEPTH} levels ("about/colophon")`)
     .refine((s) => !isReservedSlug(s), "This address is taken by the site itself (anything starting with admin or api, and posts, overlay, ws)")
     .meta({ title: "Address", description: "The page is at /<address>, e.g. about or about/colophon (under another page). Lowercase letters, numbers and dashes" }),
-  title: z.string().min(1).meta({ title: "Title", description: "Shown in the browser tab and in the editor's site map" }),
-  description: z.string().optional().meta({ title: "Description", ui: "textarea", description: "For search engines and link previews. Empty = the site's tagline" }),
+  title: z.string().min(1).meta({ translate: true, title: "Title", description: "Shown in the browser tab and in the editor's site map" }),
+  description: z.string().optional().meta({ translate: true, title: "Description", ui: "textarea", description: "For search engines and link previews. Empty = the site's tagline" }),
   tabs: z.array(TabSchema).default([]),
   /** This page's own settings groups (see PageSettingsSchema). */
   settings: PageSettingsSchema.optional(),
+});
+
+/** What was decided for one text in one place. */
+export const TextEntrySchema = z.object({
+  /** The translation. */
+  to: z.string().optional(),
+  /** "Doesn't translate": it stays as it is. */
+  same: z.boolean().optional(),
+  /** The original was edited since: still shown, but should be looked at. */
+  check: z.boolean().optional(),
+});
+
+/** One translated language. */
+export const TranslationSchema = z.object({
+  code: z.string().regex(LANGUAGE_CODE, "Use a language code like it or pt-BR"),
+  /** Offered to visitors. Off = only in the admin preview. */
+  enabled: z.boolean().default(true),
+  /**
+   * Place → original text → what it is in this language. See lib/i18n/texts.ts for why the text is
+   * part of the key, and what a place is. Shorthand for hand-written files: `"Home": "Inizio"`
+   * directly in here = every place that has this text now (expanded when the file is read).
+   */
+  texts: z.record(z.string(), z.record(z.string(), TextEntrySchema)).default({}),
+});
+
+export const LanguagesSchema = z.object({
+  original: z.string().regex(LANGUAGE_CODE, "Use a language code like en or pt-BR").default("en").meta({ title: "Original language" }),
+  detect: z
+    .boolean()
+    .default(true)
+    .meta({ title: "Start in the visitor's language", description: "If their browser asks for a language the site has. Off = always start in the original" }),
+  translations: z.array(TranslationSchema).default([]),
 });
 
 export const ConfigSchema = z.object({
@@ -261,13 +309,15 @@ export const ConfigSchema = z.object({
   postAuthor: z
     .string()
     .default("")
-    .meta({ title: "Default author", description: "Shown on blog posts that don't name their own `author` in their front matter. Empty = no author" }),
+    .meta({ translate: "name", title: "Default author", description: "Shown on blog posts that don't name their own `author` in their front matter. Empty = no author" }),
   ...titleColorFields,
   banner: BannerSchema.prefault({}),
   layout: LayoutSchema.prefault({}),
   background: BackgroundSchema.prefault({}),
   effects: EffectsSchema.prefault({}),
   counters: CountersSchema.prefault({}),
+  /** The original language and the translations (the same on every page). */
+  languages: LanguagesSchema.prefault({}),
   /** The homepage's tabs. */
   tabs: z.array(TabSchema).default([]),
   /** More pages, each at `/<slug>` (see PageSchema). */
@@ -284,6 +334,10 @@ export type LayoutConfig = z.infer<typeof LayoutSchema>;
 export type BannerConfig = z.infer<typeof BannerSchema>;
 export type BannerOptions = z.infer<typeof BannerOptionsSchema>;
 export type CountersConfig = z.infer<typeof CountersSchema>;
-export type Tab = z.infer<typeof TabSchema>;
+/** `sourceLabel`: the original label of a tab `localize()` translated (its address stays the same). */
+export type Tab = z.infer<typeof TabSchema> & { sourceLabel?: string };
+export type LanguagesConfig = z.infer<typeof LanguagesSchema>;
+export type Translation = z.infer<typeof TranslationSchema>;
+export type TextEntry = z.infer<typeof TextEntrySchema>;
 export type Page = z.infer<typeof PageSchema>;
 export type PageSettings = z.infer<typeof PageSettingsSchema>;

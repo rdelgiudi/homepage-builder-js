@@ -49,6 +49,104 @@
     "faviconAnimation": true,
     "reactionFlyer": true
   },
+  "languages": {
+    "original": "en",
+    "detect": false,
+    "translations": [
+      {
+        "code": "it",
+        "enabled": true,
+        "texts": {
+          "site.tagline": {
+            "Widget showcase: every widget type with placeholder content": {
+              "to": "Vetrina dei widget: ogni tipo di widget con contenuti di esempio"
+            }
+          },
+          "tab:start.label": {
+            "Start": {
+              "to": "Inizio"
+            }
+          },
+          "section:start-notice.title": {
+            "Widget showcase": {
+              "to": "Vetrina dei widget"
+            }
+          },
+          "section:start-stats.text": {
+            "By the numbers": {
+              "to": "In cifre"
+            }
+          },
+          "tab:content.label": {
+            "Content": {
+              "to": "Contenuti"
+            }
+          },
+          "tab:live.label": {
+            "Live data": {
+              "to": "Dati in tempo reale"
+            }
+          },
+          "tab:gaming.label": {
+            "Gaming": {
+              "to": "Giochi"
+            }
+          },
+          "tab:community.label": {
+            "Community": {
+              "to": "Comunità"
+            }
+          }
+        }
+      },
+      {
+        "code": "pl",
+        "enabled": true,
+        "texts": {
+          "site.tagline": {
+            "Widget showcase: every widget type with placeholder content": {
+              "to": "Prezentacja widżetów: każdy rodzaj widżetu z przykładową treścią"
+            }
+          },
+          "tab:start.label": {
+            "Start": {
+              "same": true
+            }
+          },
+          "section:start-notice.title": {
+            "Widget showcase": {
+              "to": "Prezentacja widżetów"
+            }
+          },
+          "section:start-stats.text": {
+            "By the numbers": {
+              "to": "W liczbach"
+            }
+          },
+          "tab:content.label": {
+            "Content": {
+              "to": "Treści"
+            }
+          },
+          "tab:live.label": {
+            "Live data": {
+              "to": "Dane na żywo"
+            }
+          },
+          "tab:gaming.label": {
+            "Gaming": {
+              "to": "Gry"
+            }
+          },
+          "tab:community.label": {
+            "Community": {
+              "to": "Społeczność"
+            }
+          }
+        }
+      }
+    ]
+  },
   "tabs": [
     {
       "id": "start",

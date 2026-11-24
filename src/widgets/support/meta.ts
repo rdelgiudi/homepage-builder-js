@@ -6,7 +6,7 @@ import { SUPPORT_PLATFORMS } from "./platforms";
 export const supportItemSchema = z.object({
   platform: z.enum(SUPPORT_PLATFORMS).meta({ title: "Platform" }),
   username: z.string().meta({ title: "Username", description: "Your name on that platform (a link to your page works too)" }),
-  label: z.string().optional().meta({ title: "Button text", description: "Empty = the platform's usual wording" }),
+  label: z.string().optional().meta({ translate: true, title: "Button text", description: "Empty = the platform's usual wording" }),
 });
 
 export const schema = z.object({

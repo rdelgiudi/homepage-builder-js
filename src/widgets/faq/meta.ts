@@ -3,8 +3,8 @@ import { base, titleFields, frameField } from "../fields";
 import type { WidgetMeta } from "../types";
 
 export const faqItemSchema = z.object({
-  question: z.string().meta({ title: "Question" }),
-  answer: z.string().default("").meta({ title: "Answer", ui: "textarea" }),
+  question: z.string().meta({ translate: true, title: "Question" }),
+  answer: z.string().default("").meta({ translate: true, title: "Answer", ui: "textarea" }),
 });
 
 export const schema = z.object({

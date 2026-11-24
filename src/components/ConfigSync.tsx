@@ -80,7 +80,7 @@ export default function ConfigSync({ preview }: { preview: boolean }) {
     return () => window.removeEventListener("message", onMessage);
   }, [preview, router]);
 
-  // Preview: a link to another page of the site stays in the preview (the live page would show
+  // Preview: a link to another page or a blog post stays in the preview (the live page would show
   // the published version, and in the two-container setup it isn't the admin container at all).
   useEffect(() => {
     if (!preview) return;
@@ -88,11 +88,21 @@ export default function ConfigSync({ preview }: { preview: boolean }) {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!a || (a.target && a.target !== "_self")) return;
-      const slug = linkTarget(a.getAttribute("href") ?? "", previewPage(window.location.pathname), [window.location.host]);
-      if (slug === null) return;
-      e.preventDefault();
+      const href = a.getAttribute("href") ?? "";
+      const here = previewPage(window.location.pathname);
+      const slug = linkTarget(href, here, [window.location.host]);
       const url = new URL(a.href);
-      router.push(`${PREVIEW_ROOT}${slug ? pagePath(slug) : ""}${url.search}${url.hash}`);
+      if (slug !== null) {
+        e.preventDefault();
+        router.push(`${PREVIEW_ROOT}${slug ? pagePath(slug) : ""}${url.search}${url.hash}`);
+        return;
+      }
+      // A post (/admin/preview/posts/…), resolved like the live site would from this page's address.
+      if (href.startsWith("#")) return;
+      const live = new URL(href, `${window.location.origin}${pagePath(here)}`);
+      if (live.origin !== window.location.origin || !live.pathname.startsWith("/posts/")) return;
+      e.preventDefault();
+      router.push(`${PREVIEW_ROOT}${live.pathname}${live.search}${live.hash}`);
     };
     // Capture phase: runs before next/link's own handler, which then sees defaultPrevented.
     document.addEventListener("click", onClick, true);

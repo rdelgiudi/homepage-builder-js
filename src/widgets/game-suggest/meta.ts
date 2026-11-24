@@ -6,10 +6,10 @@ export const schema = z.object({
   ...base("game-suggest"),
   ...titleFields,
   ...frameField,
-  intro: z.string().optional().meta({ title: "Intro text", ui: "textarea", description: "Shown above the search box" }),
+  intro: z.string().optional().meta({ translate: true, title: "Intro text", ui: "textarea", description: "Shown above the search box" }),
   askName: z.boolean().default(true).meta({ title: "Ask for a name", description: "Optional for the visitor" }),
-  buttonText: z.string().default("Suggest").meta({ title: "Button text" }),
-  successText: z.string().default("Thanks! I'll take a look.").meta({ title: "After sending" }),
+  buttonText: z.string().default("Suggest").meta({ translate: true, title: "Button text" }),
+  successText: z.string().default("Thanks! I'll take a look.").meta({ translate: true, title: "After sending" }),
   showList: z
     .boolean()
     .default(false)

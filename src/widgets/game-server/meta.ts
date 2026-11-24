@@ -3,7 +3,7 @@ import { base, titleFields, frameField, iconField } from "../fields";
 import type { WidgetMeta } from "../types";
 
 export const serverSchema = z.object({
-  label: z.string().meta({ title: "Name" }),
+  label: z.string().meta({ translate: "name", title: "Name" }),
   protocol: z
     .enum(["minecraft", "bedrock", "source"])
     .default("minecraft")

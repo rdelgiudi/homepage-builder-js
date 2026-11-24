@@ -25,9 +25,10 @@ function Info({ post, section, defaultAuthor }: { post: PostSummary; section: Po
   );
 }
 
-function Posts({ section, gradientBorders, defaultAuthor }: { section: PostsSection; gradientBorders: boolean; defaultAuthor: string }) {
+function Posts({ section, gradientBorders, defaultAuthor, lang }: { section: PostsSection; gradientBorders: boolean; defaultAuthor: string; lang?: string }) {
   const tag = section.tag?.trim();
-  const state = useWidgetData<{ posts: PostSummary[] }>(`/api/widgets/posts${tag ? `?tag=${encodeURIComponent(tag)}` : ""}`);
+  const query = new URLSearchParams({ ...(tag && { tag }), ...(lang && { lang }) }).toString();
+  const state = useWidgetData<{ posts: PostSummary[] }>(`/api/widgets/posts${query && `?${query}`}`);
   return (
     <DataCard state={state} lines={4}>
       {({ posts: all }) => {
@@ -72,5 +73,5 @@ function Posts({ section, gradientBorders, defaultAuthor }: { section: PostsSect
 export const view: WidgetView<PostsSection> = {
   titled: true,
   frame: "wrap",
-  render: (section, ctx) => <Posts section={section} gradientBorders={ctx.gradientBorders} defaultAuthor={ctx.postAuthor} />,
+  render: (section, ctx) => <Posts section={section} gradientBorders={ctx.gradientBorders} defaultAuthor={ctx.postAuthor} lang={ctx.lang} />,
 };

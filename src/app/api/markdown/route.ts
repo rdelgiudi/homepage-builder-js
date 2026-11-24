@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import matter from "gray-matter";
 import { renderMarkdownToHtml } from "@/lib/markdown";
-import { resolveContentFile } from "@/lib/content";
+import { getConfig } from "@/lib/config";
+import { findContentFile } from "@/lib/content";
+import { contentLanguages } from "@/lib/i18n/languages";
 
 export const revalidate = 300;
 
@@ -16,7 +18,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "No file specified" }, { status: 400 });
   }
 
-  const filePath = resolveContentFile(file);
+  // `lang`: the file's translation ("it/about.md") where there is one, else the original.
+  const filePath = findContentFile(file, contentLanguages(getConfig().languages), searchParams.get("lang"))?.path;
   if (!filePath) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }

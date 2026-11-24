@@ -10,7 +10,7 @@ export const schema = z.object({
     .enum(["auto", "open", "busy"])
     .default("auto")
     .meta({ title: "Availability", description: "Auto = from your Discord and Steam status. Open / Busy = always say so" }),
-  note: z.string().optional().meta({ title: "Note", ui: "textarea", description: "e.g. \"Up for co-op most evenings, message me on Discord\"" }),
+  note: z.string().optional().meta({ translate: true, title: "Note", ui: "textarea", description: "e.g. \"Up for co-op most evenings, message me on Discord\"" }),
   games: z.array(z.string()).default([]).meta({ title: "Games I play with others" }),
   showSteam: z.boolean().default(true).meta({ title: "\"Add on Steam\" button", description: "Needs STEAM_ID" }),
   showDiscord: z.boolean().default(true).meta({ title: "\"Message on Discord\" button", description: "Needs DISCORD_USER_ID" }),

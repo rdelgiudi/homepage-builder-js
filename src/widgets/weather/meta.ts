@@ -6,7 +6,7 @@ export const schema = z.object({
   ...base("weather"),
   ...titleFields,
   ...frameField,
-  place: z.string().default("").meta({ title: "Place name", description: "Only a label; the coordinates below decide the weather" }),
+  place: z.string().default("").meta({ translate: "name", title: "Place name", description: "Only a label; the coordinates below decide the weather" }),
   latitude: z.number().min(-90).max(90).optional().meta({ title: "Latitude", description: "For example 41.9 for Rome. Right-click a spot in most map apps to copy its coordinates" }),
   longitude: z.number().min(-180).max(180).optional().meta({ title: "Longitude", description: "For example 12.5 for Rome" }),
   units: z.enum(["celsius", "fahrenheit"]).default("celsius").meta({ title: "Units" }),

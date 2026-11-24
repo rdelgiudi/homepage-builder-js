@@ -4,20 +4,24 @@ import { useState, useEffect, useMemo } from "react";
 
 interface MarkdownWidgetProps {
   file: string;
+  /** Show the file's translation, if it has one. */
+  lang?: string;
+  /** In the admin preview: skip the browser's cache (5 minutes), so saved files show at once. */
+  fresh?: boolean;
 }
 
-export default function MarkdownWidget({ file }: MarkdownWidgetProps) {
+export default function MarkdownWidget({ file, lang, fresh = false }: MarkdownWidgetProps) {
   const [html, setHtml] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const url = useMemo(() => `/api/markdown?file=${encodeURIComponent(file)}`, [file]);
+  const url = useMemo(() => `/api/markdown?file=${encodeURIComponent(file)}${lang ? `&lang=${lang}` : ""}`, [file, lang]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(url)
+    fetch(url, fresh ? { cache: "no-store" } : undefined)
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
@@ -36,7 +40,7 @@ export default function MarkdownWidget({ file }: MarkdownWidgetProps) {
     return () => {
       cancelled = true;
     };
-  }, [url]);
+  }, [url, fresh]);
 
   if (loading) {
     return (

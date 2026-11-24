@@ -3,15 +3,15 @@ import { base, titleFields, frameField } from "../fields";
 import type { WidgetMeta } from "../types";
 
 export const projectItemSchema = z.object({
-  title: z.string().meta({ title: "Title" }),
-  description: z.string().optional().meta({ title: "Description", ui: "textarea" }),
+  title: z.string().meta({ translate: "name", title: "Title" }),
+  description: z.string().optional().meta({ translate: true, title: "Description", ui: "textarea" }),
   image: z.string().optional().meta({ title: "Image", ui: "image", description: "Upload or http(s) URL. Shown 16:9" }),
   url: z.string().optional().meta({ title: "Link", description: "Where the card leads (http(s))" }),
-  linkLabel: z.string().optional().meta({ title: "Link text", description: "Empty = the link's site name" }),
+  linkLabel: z.string().optional().meta({ translate: true, title: "Link text", description: "Empty = the link's site name" }),
   source: z.string().optional().meta({ title: "Source code link", description: "Optional second link, shown as “Source”" }),
-  tags: z.array(z.string()).default([]).meta({ title: "Tags", description: "Tools, engine, language…" }),
+  tags: z.array(z.string()).default([]).meta({ translate: "name", title: "Tags", description: "Tools, engine, language…" }),
   status: z.enum(["active", "finished", "paused", "archived"]).optional().meta({ title: "Status" }),
-  year: z.string().optional().meta({ title: "Year", description: "Or a range, e.g. 2022–2024" }),
+  year: z.string().optional().meta({ translate: "name", title: "Year", description: "Or a range, e.g. 2022–2024" }),
 });
 
 export const schema = z.object({
