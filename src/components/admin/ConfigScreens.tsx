@@ -7,6 +7,7 @@ import SchemaForm, { TabChoices } from "./SchemaForm";
 import { formSchemas, type JsonSchema } from "./schemas";
 import { useAdmin } from "./store";
 import { api } from "./api";
+import { ignoredBannerSettings } from "@/lib/banner";
 import { LayoutPicker } from "./LayoutControls";
 
 type Obj = Record<string, unknown>;
@@ -40,6 +41,7 @@ function Block({ title, badge, tone, children }: { title: string; badge?: ReactN
 const NAMES: Record<PageSettingGroup, string> = {
   header: "name and tagline",
   titleColors: "title colors",
+  banner: "banner",
   layout: "layout",
   counters: "counters",
   background: "background",
@@ -185,7 +187,7 @@ export function ScopeBar({ scope, shown, onScope }: ScreenProps) {
   );
 }
 
-/** Header & layout: name, tagline, title colors, favicon, blog post author, layout, counters (the site's or one page's own). */
+/** Header & layout: name, tagline, title colors, banner, favicon, blog post author, layout, counters (the site's or one page's own). */
 export function HeaderLayoutScreen(props: ScreenProps) {
   const { config } = useAdmin();
   return (
@@ -195,6 +197,28 @@ export function HeaderLayoutScreen(props: ScreenProps) {
       </Group>
       <Group group="titleColors" title="Title colors" {...props}>
         {(value, onChange) => <SchemaForm schema={formSchemas.gradients} value={value as unknown as Obj} onChange={(v) => onChange(v as unknown as typeof value)} />}
+      </Group>
+      <Group group="banner" title="Banner" {...props}>
+        {(value, onChange, pageId) => {
+          // The same fields mean less in some layouts: the page's own layout decides (the site's in site scope).
+          const { layout } = props.scope.kind === "site" ? config : pageView(config, pageId);
+          const ignored = ignoredBannerSettings(layout, value);
+          return (
+            <>
+              <SchemaForm
+                schema={formSchemas.banner}
+                value={value as unknown as Obj}
+                hide={ignored.flatMap((i) => i.keys)}
+                onChange={(v) => onChange(v as unknown as typeof value)}
+              />
+              {ignored.map((i) => (
+                <p key={i.note} className="adm-hint">
+                  {i.note}
+                </p>
+              ))}
+            </>
+          );
+        }}
       </Group>
       <SiteOnly title="Favicon" scope={props.scope} onScope={props.onScope}>
         <RootForm schema={formSchemas.favicon} />

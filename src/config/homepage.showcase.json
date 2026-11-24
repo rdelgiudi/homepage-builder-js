@@ -1128,6 +1128,13 @@
             "#a7f3d0"
           ]
         },
+        "banner": {
+          "arrangement": "inline",
+          "titlePosition": "left",
+          "tabsPosition": "right",
+          "scroll": "all",
+          "themeSwitch": "banner"
+        },
         "layout": {
           "site": "bento",
           "bentoColumns": 2

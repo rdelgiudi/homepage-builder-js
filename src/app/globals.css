@@ -723,13 +723,71 @@ html.dark.custom-scrollbar * {
   }
 }
 
+/* ===== Banner (src/components/Banner.tsx) ===== */
+/* A fixed height at any image size, so nothing moves when the logo has loaded. */
+.site-logo {
+  height: var(--logo-h);
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  object-fit: contain;
+}
+.site-logo.is-bar {
+  height: min(var(--logo-h), 40px);
+}
+@media (min-width: 768px) {
+  .site-logo.is-bar {
+    height: min(var(--logo-h), 64px);
+  }
+}
+
+/* Title and tabs in one row, "keep the tabs" while scrolling: the title makes room. Only its
+   width goes (a 1fr grid column to 0fr), never its height: a sticky bar that changes height
+   moves the page under it. On phones the open tab's name takes its place instead. */
+.banner-brand,
+.banner-current {
+  transition: opacity 250ms ease, visibility 250ms;
+}
+.banner-current {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+}
+.banner-row[data-away] .banner-brand {
+  opacity: 0;
+  visibility: hidden;
+}
+.banner-row[data-away] .banner-current {
+  opacity: 1;
+  visibility: visible;
+}
+@media (min-width: 768px) {
+  .banner-brand {
+    display: grid;
+    grid-template-columns: 1fr;
+    transition: grid-template-columns 350ms ease, margin 350ms ease, opacity 250ms ease, visibility 250ms;
+  }
+  .banner-row[data-away] .banner-brand {
+    grid-template-columns: 0fr;
+    margin-inline: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .banner-brand,
+  .banner-current {
+    transition: none;
+  }
+}
+
 /* ===== Scrolling button rows (one-page jump bar, tab bar in a narrow layout) =====
    Scroll sideways when wider than their box; a fade at an end means more buttons beyond it
    (useScrollStrip sets --fade-l / --fade-r from the scroll position). No scrollbar: it would
    cover the underline. overflow-y hidden: a hover-scaled button mustn't add a vertical scroll. */
 .scroll-strip {
   overflow-y: hidden;
-  scrollbar-width: none;
+  /* Important: the custom scrollbar's `html.custom-scrollbar *` is more specific and brought it back. */
+  scrollbar-width: none !important;
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade-r, 0px)), transparent 100%);
   mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade-r, 0px)), transparent 100%);
 }
@@ -738,6 +796,10 @@ html.dark.custom-scrollbar * {
 .scroll-strip.is-centered {
   justify-content: center;
   justify-content: safe center;
+}
+.scroll-strip.is-right {
+  justify-content: flex-end;
+  justify-content: safe flex-end;
 }
 .scroll-strip::-webkit-scrollbar {
   display: none;

@@ -175,6 +175,18 @@ describe("pages: own settings", () => {
     assert.ok(strictParseConfig(withPageSetting(config, "p-page-3", "effects", config.effects)).config, "valid for saving");
   });
 
+  it("every settings group a page has of its own reaches that page's view", async () => {
+    const { PAGE_SETTING_GROUPS } = await import("@/lib/schema/config");
+    const { groupValue, withPageSetting } = await import("@/lib/pages");
+    for (const group of PAGE_SETTING_GROUPS) {
+      // A marker key, so this doesn't depend on what each group holds.
+      const own = { ...groupValue(site({}), group), marker: group } as never;
+      const view = pageView(withPageSetting(site({}), "p-page-2", group, own), "p-page-2") as unknown as Record<string, { marker?: string } | string>;
+      const marker = group === "header" || group === "titleColors" ? view.marker : (view[group] as { marker?: string }).marker;
+      assert.equal(marker, group);
+    }
+  });
+
   it("an invalid group falls back to the site's instead of dropping the page", () => {
     const res = parseConfig({
       version: 2,

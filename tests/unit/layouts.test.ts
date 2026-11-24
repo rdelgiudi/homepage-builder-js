@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { LAYOUT_FEATURES, arrangeOf, bottomNav, gridOptions, ignoredTabSettings, isGridTab, pinnedTabId } from "@/lib/layouts";
-import { LayoutSchema, SITE_LAYOUTS, type HomepageConfig } from "@/lib/schema/config";
+import { bannerOptions, ignoredBannerSettings, splitTabs } from "@/lib/banner";
+import { BannerSchema, LayoutSchema, SITE_LAYOUTS, type HomepageConfig } from "@/lib/schema/config";
 
 type Site = (typeof SITE_LAYOUTS)[number];
 const layout = (site: Site, extra: Partial<HomepageConfig["layout"]> = {}) => LayoutSchema.parse({ site, ...extra });
@@ -83,5 +84,45 @@ describe("bottom tab bar on phones", () => {
     assert.equal(bottomNav(layout("onepage", { mobileNav: "bottom" }), 3), false, "one page has its own jump bar");
     assert.equal(bottomNav(layout("masonry", { mobileNav: "bottom" }), 2), true);
     assert.equal(bottomNav(layout("linkinbio", { mobileNav: "bottom" }), 3), false, "link in bio looks the same on every screen: its tab row everywhere");
+  });
+});
+
+describe("banner settings per layout", () => {
+  const inline = BannerSchema.parse({ arrangement: "inline" });
+  const keys = (site: Site, banner = inline) => ignoredBannerSettings(layout(site), banner).flatMap((i) => i.keys);
+
+  it("the defaults are the banner as it was before it had settings", () => {
+    assert.deepEqual(BannerSchema.parse({}), {
+      title: "name",
+      logoHeight: 64,
+      showTagline: true,
+      arrangement: "stacked",
+      titlePosition: "center",
+      tabsPosition: "center",
+      fullWidth: false,
+      scroll: "tabs",
+      themeSwitch: "floating",
+    });
+  });
+
+  it("one row applies everywhere but in link in bio, and only there the panel hides it", () => {
+    for (const site of SITE_LAYOUTS) {
+      const stacked = site === "linkinbio";
+      assert.equal(bannerOptions(layout(site), inline).arrangement, stacked ? "stacked" : "inline", site);
+      assert.equal(keys(site).includes("arrangement"), stacked, site);
+    }
+  });
+
+  it("the tabs' position is hidden where nothing follows it", () => {
+    assert.deepEqual(keys("tabs"), ["tabsPosition"], "centered title in one row: the tabs are split around it");
+    assert.deepEqual(keys("tabs", { ...inline, titlePosition: "left" }), []);
+    assert.deepEqual(keys("tabs", { ...inline, arrangement: "stacked" }), []);
+    assert.deepEqual(keys("sidebar"), ["tabsPosition", "fullWidth"]);
+  });
+
+  it("a centered title splits the tabs, the first half being the larger", () => {
+    assert.deepEqual(splitTabs([1, 2, 3, 4, 5]), [[1, 2, 3], [4, 5]]);
+    assert.deepEqual(splitTabs([1]), [[1], []]);
+    assert.deepEqual(splitTabs([]), [[], []]);
   });
 });

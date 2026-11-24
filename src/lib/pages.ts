@@ -52,7 +52,7 @@ export function groupValue<G extends PageSettingGroup>(config: HomepageConfig, g
       ? { name: config.name, tagline: config.tagline }
       : group === "titleColors"
         ? { titleGradient: config.titleGradient, taglineGradient: config.taglineGradient }
-        : config[group as "layout" | "counters" | "background" | "effects"];
+        : config[group as Exclude<PageSettingGroup, "header" | "titleColors">];
   return v as NonNullable<PageSettings[G]>;
 }
 
@@ -63,7 +63,7 @@ export function withSiteGroup<G extends PageSettingGroup>(config: HomepageConfig
 
 /**
  * The config as one page sees it: that page's tabs as `tabs`, and its own name / title colors /
- * layout / counters / background / effects where it has them (the site's otherwise). This is
+ * banner / layout / counters / background / effects where it has them (the site's otherwise). This is
  * what the site renders for a page and what the builder and preview use, so they always agree.
  */
 export function pageView(config: HomepageConfig, id: string): HomepageConfig {
@@ -75,6 +75,7 @@ export function pageView(config: HomepageConfig, id: string): HomepageConfig {
     ...own.header,
     ...own.titleColors,
     tabs,
+    banner: own.banner ?? config.banner,
     layout: own.layout ?? config.layout,
     counters: own.counters ?? config.counters,
     background: own.background ?? config.background,

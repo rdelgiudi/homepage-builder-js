@@ -29,16 +29,22 @@ export interface LayoutFeatures {
    * tab bar on desktop. So `mobileNav` doesn't apply.
    */
   uniformNav?: boolean;
+  /**
+   * What the layout leaves of the `banner` settings (lib/banner.ts): all of them, no "one row"
+   * (the page is too narrow for it), or `column`: from md up the title and tabs are the left
+   * column, so the banner is only shown on phones.
+   */
+  banner: "full" | "stacked" | "column";
 }
 
 export const LAYOUT_FEATURES: Record<SiteLayout, LayoutFeatures> = {
-  tabs: { arrange: "choice", tabBackground: true, tabNav: "always", tabBar: true, pinnedColumn: false },
-  sidebar: { arrange: "choice", tabBackground: true, tabNav: "always", tabBar: true, pinnedColumn: false },
-  onepage: { arrange: "choice", tabBackground: false, tabNav: "multiple", tabBar: false, pinnedColumn: false },
-  bento: { arrange: "grid", tabBackground: true, tabNav: "always", tabBar: true, pinnedColumn: false },
-  linkinbio: { arrange: "stack", tabBackground: true, tabNav: "multiple", tabBar: true, pinnedColumn: false, uniformNav: true },
-  masonry: { arrange: "masonry", tabBackground: true, tabNav: "always", tabBar: true, pinnedColumn: false },
-  profile: { arrange: "choice", tabBackground: true, tabNav: "always", tabBar: true, pinnedColumn: true },
+  tabs: { arrange: "choice", tabBackground: true, tabNav: "always", tabBar: true, pinnedColumn: false, banner: "full" },
+  sidebar: { arrange: "choice", tabBackground: true, tabNav: "always", tabBar: true, pinnedColumn: false, banner: "column" },
+  onepage: { arrange: "choice", tabBackground: false, tabNav: "multiple", tabBar: false, pinnedColumn: false, banner: "full" },
+  bento: { arrange: "grid", tabBackground: true, tabNav: "always", tabBar: true, pinnedColumn: false, banner: "full" },
+  linkinbio: { arrange: "stack", tabBackground: true, tabNav: "multiple", tabBar: true, pinnedColumn: false, uniformNav: true, banner: "stacked" },
+  masonry: { arrange: "masonry", tabBackground: true, tabNav: "always", tabBar: true, pinnedColumn: false, banner: "full" },
+  profile: { arrange: "choice", tabBackground: true, tabNav: "always", tabBar: true, pinnedColumn: true, banner: "full" },
 };
 
 /** How TabSections lays tabs out under a site layout. */

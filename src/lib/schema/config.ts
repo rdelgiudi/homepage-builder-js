@@ -137,6 +137,48 @@ export const LayoutSchema = z.object({
     .meta({ title: "Tab names as section headings", description: "Each section starts with its tab's icon and name. Off = only the jump bar names them", showIf: { site: ["onepage"] } }),
 });
 
+/**
+ * The banner at the top of every page: name (or logo), tagline and the tab bar. The defaults are
+ * the banner as it always was. What a site layout can't do with it: lib/banner.ts.
+ */
+export const BannerSchema = z.object({
+  title: z
+    .enum(["name", "logo", "both"])
+    .default("name")
+    .meta({ title: "Title", labels: { name: "Name", logo: "Logo", both: "Logo and name" } }),
+  logo: z.string().optional().meta({ title: "Logo", ui: "image", description: "A transparent background works best. Without one the name is shown", showIf: { title: ["logo", "both"] } }),
+  logoDark: z.string().optional().meta({ title: "Dark mode logo", ui: "image", description: "Empty = same logo in both modes", showIf: { title: ["logo", "both"] } }),
+  logoHeight: z
+    .number()
+    .int()
+    .min(16)
+    .max(240)
+    .default(64)
+    .meta({ title: "Logo height (px)", ui: "range", description: "In one row with the tabs it is at most 64 (40 on phones)", showIf: { title: ["logo", "both"] } }),
+  showTagline: z.boolean().default(true).meta({ title: "Show the tagline", description: "Off = only search engines and link previews see it. In one row it is hidden on phones and takes room from the tabs" }),
+  /** `stacked` title, tagline, then the tabs · `inline` title and tabs in one row. */
+  arrangement: z
+    .enum(["stacked", "inline"])
+    .default("stacked")
+    .meta({ title: "Arrangement", labels: { stacked: "Title above tabs", inline: "One row" } }),
+  titlePosition: z.enum(["left", "center", "right"]).default("center").meta({ title: "Title position" }),
+  tabsPosition: z.enum(["left", "center", "right"]).default("center").meta({ title: "Tabs position" }),
+  fullWidth: z.boolean().default(false).meta({ title: "Use the full screen width", description: "Off = as wide as the page's content" }),
+  /** `tabs` the title scrolls away, the tabs stay · `hide` all of it hides scrolling down, returns scrolling up · `all` all of it stays. */
+  scroll: z
+    .enum(["tabs", "hide", "all"])
+    .default("tabs")
+    .meta({
+      title: "While scrolling",
+      labels: { tabs: "Keep tabs", hide: "Hide all", all: "Keep all" },
+      description: "Keep tabs = only the title scrolls away. Hide all = the banner leaves when scrolling down and comes back when scrolling up",
+    }),
+  themeSwitch: z
+    .enum(["floating", "banner"])
+    .default("floating")
+    .meta({ title: "Light/dark switch", labels: { floating: "Floating", banner: "In the banner" }, description: "Floating = fixed at the bottom right of the window" }),
+});
+
 export const CountersSchema = z.object({
   viewers: z.boolean().default(true).meta({ title: "Show live viewer count" }),
   visitors: z.boolean().default(true).meta({ title: "Show total visitor count" }),
@@ -174,13 +216,14 @@ const titleColorFields = {
 export const PageSettingsSchema = z.object({
   header: z.object(headerFields).optional(),
   titleColors: z.object(titleColorFields).optional(),
+  banner: BannerSchema.optional(),
   layout: LayoutSchema.optional(),
   counters: CountersSchema.optional(),
   background: BackgroundSchema.optional(),
   effects: EffectsSchema.optional(),
 });
 /** The setting groups a page can have of its own, in the order the panel shows them. */
-export const PAGE_SETTING_GROUPS = ["header", "titleColors", "layout", "counters", "background", "effects"] as const;
+export const PAGE_SETTING_GROUPS = ["header", "titleColors", "banner", "layout", "counters", "background", "effects"] as const;
 export type PageSettingGroup = (typeof PAGE_SETTING_GROUPS)[number];
 
 // Page address rules live in a zod-free module: lib/pages.ts (in the site's client bundle) uses them too.
@@ -200,7 +243,7 @@ export const PageSchema = z.object({
   title: z.string().min(1).meta({ title: "Title", description: "Shown in the browser tab and in the editor's site map" }),
   description: z.string().optional().meta({ title: "Description", ui: "textarea", description: "For search engines and link previews. Empty = the site's tagline" }),
   tabs: z.array(TabSchema).default([]),
-  /** This page's own layout / counters / background / effects (see PageSettingsSchema). */
+  /** This page's own settings groups (see PageSettingsSchema). */
   settings: PageSettingsSchema.optional(),
 });
 
@@ -213,6 +256,7 @@ export const ConfigSchema = z.object({
     .default("")
     .meta({ title: "Default author", description: "Shown on blog posts that don't name their own `author` in their front matter. Empty = no author" }),
   ...titleColorFields,
+  banner: BannerSchema.prefault({}),
   layout: LayoutSchema.prefault({}),
   background: BackgroundSchema.prefault({}),
   effects: EffectsSchema.prefault({}),
@@ -230,6 +274,7 @@ export type EffectsConfig = z.infer<typeof EffectsSchema>;
 export type BackgroundConfig = z.infer<typeof BackgroundSchema>;
 export type BackgroundBase = z.infer<typeof BackgroundBaseSchema>;
 export type LayoutConfig = z.infer<typeof LayoutSchema>;
+export type BannerConfig = z.infer<typeof BannerSchema>;
 export type CountersConfig = z.infer<typeof CountersSchema>;
 export type Tab = z.infer<typeof TabSchema>;
 export type Page = z.infer<typeof PageSchema>;

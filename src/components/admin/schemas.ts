@@ -40,6 +40,7 @@ export const formSchemas = {
   favicon: pick("favicon"),
   postAuthor: pick("postAuthor"),
   gradients: pick("titleGradient", "taglineGradient"),
+  banner: config.properties!.banner,
   layout: config.properties!.layout,
   counters: config.properties!.counters,
   background: config.properties!.background,

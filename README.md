@@ -140,6 +140,27 @@ The tests need Node 26, the version the Dockerfile uses. The integration tests s
 - `taglineGradient` — Color stops for the tagline gradient. Leave empty or omit to inherit `titleGradient` colors.
 - `background` — see [Background](#background) below.
 
+### Banner
+
+```json
+"banner": { "title": "both", "logo": "/api/uploads/….webp", "arrangement": "inline", "titlePosition": "left", "tabsPosition": "right", "scroll": "all", "themeSwitch": "banner" }
+```
+
+The top of every page: name or logo, tagline and tab bar. In the admin panel it is Header & layout → Banner, for the whole site or one page.
+
+| Option | Values |
+|---|---|
+| `title` | `name` (default), `logo`, `both` |
+| `logo` / `logoDark` / `logoHeight` | Image URL or upload, an optional one for dark mode, height in px (16–240, default 64; at most 64 in one row, 40 on phones). Without a logo the name is shown. |
+| `showTagline` | `false` hides it on the page; it is still the description for search engines. In one row it is never shown on phones. |
+| `arrangement` | `stacked` (default): title, tagline, then the tabs. `inline`: title and tabs in one row (not in the link-in-bio layout). |
+| `titlePosition` / `tabsPosition` | `left`, `center` (default), `right`. A centered title in one row splits the tabs to both sides. |
+| `fullWidth` | `true` = the banner uses the whole screen width instead of the page column |
+| `scroll` | `tabs` (default): the title goes away, the tabs stay. `hide`: all of it goes when scrolling down and returns when scrolling up. `all`: all of it stays. |
+| `themeSwitch` | Light/dark switch: `floating` (default, bottom right) or `banner` |
+
+In the sidebar layout the title, tabs and switch are in the left column on wide screens; the banner is for phones.
+
 ### Background
 
 ```json

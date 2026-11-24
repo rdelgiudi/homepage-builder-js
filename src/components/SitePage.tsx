@@ -6,6 +6,8 @@ import ThemeSwitcher from "@/components/ThemeSwitcher";
 import FaviconAnimation from "@/components/FaviconAnimation";
 import ConfigSync from "@/components/ConfigSync";
 import type { HomepageConfig, SiteLayout } from "@/lib/schema/config";
+import { bannerOptions } from "@/lib/banner";
+import Banner, { type BannerSetup } from "@/components/Banner";
 import SiteHeader from "@/components/SiteHeader";
 import BackgroundLayer from "@/components/BackgroundLayer";
 import { slugify } from "@/lib/schema/migrate";
@@ -38,16 +40,27 @@ export const PAGE_WIDTH: Record<SiteLayout, string> = {
 /** `layout.fullWidth` (bento, masonry): no cap, the page uses the whole screen. */
 const FULL_WIDTH = "max-w-none";
 
+function headerProps(config: HomepageConfig, homeHref?: string) {
+  const { name, tagline, titleGradient, taglineGradient } = config;
+  return { name, tagline, titleGradient, taglineGradient: taglineGradient.length ? taglineGradient : titleGradient, homeHref, banner: bannerOptions(config.layout, config.banner) };
+}
+
+/** The banner of a page with this config: its settings as the layout applies them, and its title. */
+function bannerSetup(config: HomepageConfig, homeHref?: string): BannerSetup {
+  const header = headerProps(config, homeHref);
+  return { options: header.banner, brand: <SiteHeader {...header} variant={header.banner.arrangement === "inline" ? "bar" : "top"} /> };
+}
+
 /**
- * Everything around the content: page colour, background layer, effects, the name/tagline
- * header, counters, live config refresh and the theme switch. Shared by the site (`SitePage`)
+ * Everything around the content: page colour, background layer, effects, the banner (unless
+ * the content draws it, with its tab bar), counters, live config refresh and the theme switch. Shared by the site (`SitePage`)
  * and the blog post pages.
  */
 export function SiteShell({
   config,
   preview,
   width,
-  hideHeaderFromMd = false,
+  ownBanner = false,
   tabBackgrounds = false,
   bottomNav = false,
   homeHref,
@@ -56,8 +69,8 @@ export function SiteShell({
   config: HomepageConfig;
   preview: boolean;
   width: string;
-  /** The sidebar layout shows the name in its own left column from md up. */
-  hideHeaderFromMd?: boolean;
+  /** `children` draw the banner themselves (Tabs and OnePage: the tab bar is part of it). */
+  ownBanner?: boolean;
   /** Follow per-tab backgrounds (`?tab=`). Off for pages without tabs. */
   tabBackgrounds?: boolean;
   /** Phones show the tab bar at the bottom: lift the counters, theme switch and page end above it. */
@@ -66,8 +79,7 @@ export function SiteShell({
   homeHref?: string;
   children: React.ReactNode;
 }) {
-  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, background, effects, counters, tabs } = config;
-  const taglineGradient = rawTaglineGradient.length ? rawTaglineGradient : titleGradient;
+  const { titleGradient, background, effects, counters, tabs } = config;
 
   const { surface } = background;
   const pageVars = {
@@ -94,20 +106,17 @@ export function SiteShell({
         />
       </Suspense>
       <EffectsController particles={background.effect} palette={titleGradient} customScrollbar={effects.customScrollbar} mouseTrail={effects.mouseTrail} mouseTrailColors={effects.mouseTrailColors} reactionFlyer={effects.reactionFlyer} />
-      <div className={`bg-header pt-6 md:pt-8 pb-3 md:pb-4${hideHeaderFromMd ? " md:hidden" : ""}`}>
-        <div className={`w-full ${width} mx-auto px-4 md:px-8`}>
-          <SiteHeader name={name} tagline={tagline} titleGradient={titleGradient} taglineGradient={taglineGradient} homeHref={homeHref} />
-        </div>
+      <div className={`w-full ${width} mx-auto px-4 md:px-8 pb-8`}>
+        {!ownBanner && <Banner {...bannerSetup(config, homeHref)} widthClass={width} />}
+        {children}
       </div>
-
-      <div className={`w-full ${width} mx-auto px-4 md:px-8 pb-8`}>{children}</div>
 
       <div className="site-fixed-bottom fixed bottom-4 left-4 z-30">
         <VisitorCounter showViewers={counters.viewers} showVisitors={counters.visitors} />
       </div>
       <ConfigSync preview={preview} />
       {effects.faviconAnimation && !preview && <FaviconAnimation gradient={titleGradient} />}
-      <ThemeSwitcher />
+      {config.banner.themeSwitch === "floating" && <ThemeSwitcher />}
     </main>
   );
 }
@@ -119,9 +128,9 @@ export function SiteShell({
  * `onPage` is set, which makes the site name link back to the homepage.
  */
 export default function SitePage({ config, preview, onPage = false }: { config: HomepageConfig; preview: boolean; onPage?: boolean }) {
-  const { name, tagline, titleGradient, taglineGradient: rawTaglineGradient, effects, tabs } = config;
-  const taglineGradient = rawTaglineGradient.length ? rawTaglineGradient : titleGradient;
-  const header = { name, tagline, titleGradient, taglineGradient, homeHref: onPage ? "/" : undefined };
+  const { effects, tabs } = config;
+  const homeHref = onPage ? "/" : undefined;
+  const banner = bannerSetup(config, homeHref);
 
   const site = config.layout.site;
   const width = config.layout.fullWidth && (site === "bento" || site === "masonry") ? FULL_WIDTH : PAGE_WIDTH[site];
@@ -138,18 +147,19 @@ export default function SitePage({ config, preview, onPage = false }: { config: 
 
   return (
     // The one-page layout shows every tab at once, so there is no "open tab" background to follow.
-    <SiteShell config={config} preview={preview} width={width} hideHeaderFromMd={site === "sidebar"} tabBackgrounds={features.tabBackground} bottomNav={phoneBottomNav} homeHref={header.homeHref}>
+    <SiteShell config={config} preview={preview} width={width} ownBanner={tabs.length > 0} tabBackgrounds={features.tabBackground} bottomNav={phoneBottomNav} homeHref={homeHref}>
       <Suspense fallback={<TabsFallback />}>
         {site === "onepage" ? (
-          <OnePage tabs={tabs} widgetContext={widgetContext} widthClass={width} grid={grid} headings={config.layout.sectionHeadings} />
+          <OnePage tabs={tabs} banner={banner} widgetContext={widgetContext} widthClass={width} grid={grid} headings={config.layout.sectionHeadings} />
         ) : (
           <Tabs
             tabs={barTabs}
+            banner={banner}
             enableTransitions={effects.tabTransitions}
             widgetContext={widgetContext}
             widthClass={width}
             nav={site === "sidebar" ? "side" : "top"}
-            sideHeader={site === "sidebar" ? <SiteHeader {...header} variant="side" /> : undefined}
+            sideHeader={site === "sidebar" ? <SiteHeader {...headerProps(config, homeHref)} variant="side" /> : undefined}
             hideNavIfSingle={features.tabNav === "multiple"}
             grid={grid}
             mobileNav={phoneBottomNav ? "bottom" : "menu"}
