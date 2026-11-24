@@ -57,11 +57,24 @@ function MoveHandle({ id, label, box, onSelect }: { id: string; label: string; b
   );
 }
 
+export type PreviewDevice = "desktop" | "phone";
+
 /** The real site, rendered from the draft, in an iframe that follows every saved edit. */
-export default function PreviewPane({ target, drop, editable }: { target: { page: string; tab: string }; drop: PreviewDropState; editable: boolean }) {
+export default function PreviewPane({
+  target,
+  drop,
+  editable,
+  device,
+  onDevice,
+}: {
+  target: { page: string; tab: string };
+  drop: PreviewDropState;
+  editable: boolean;
+  device: PreviewDevice;
+  onDevice: (device: PreviewDevice) => void;
+}) {
   const { savedTick, hasDraft, config } = useAdmin();
   const { frameRef: frame, shownSlug } = drop;
-  const [device, setDevice] = useState<"desktop" | "phone">("desktop");
   // The src is fixed at mount; later tab changes are sent as messages so the page never reloads.
   const [src] = useState(() => `/admin/preview${target.page ? `/${target.page}` : ""}${target.tab ? `?tab=${encodeURIComponent(target.tab)}` : ""}`);
   const { setNodeRef, isOver } = useDroppable({ id: PREVIEW_DROP });
@@ -206,10 +219,10 @@ export default function PreviewPane({ target, drop, editable }: { target: { page
       <div className="adm-preview-bar">
         <span className="adm-muted">{hasDraft ? "Preview of your draft" : "Preview — same as the live site"}</span>
         <div className="adm-seg" role="group" aria-label="Preview size">
-          <button type="button" aria-pressed={device === "desktop"} onClick={() => setDevice("desktop")}>
+          <button type="button" aria-pressed={device === "desktop"} onClick={() => onDevice("desktop")}>
             Desktop
           </button>
-          <button type="button" aria-pressed={device === "phone"} onClick={() => setDevice("phone")}>
+          <button type="button" aria-pressed={device === "phone"} onClick={() => onDevice("phone")}>
             Phone
           </button>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { BannerConfig } from "@/lib/schema/config";
+import type { BannerOptions } from "@/lib/schema/config";
 
 /** Scrolled past this, a title that shares its row with the tabs makes room for them. */
 const AWAY_AFTER = 48;
@@ -19,15 +19,18 @@ const DIRECTION_STEP = 8;
  *
  * In one row with the tabs on their own line below (one page on phones), the part to keep is
  * marked `data-banner-keep`; with `scroll: "tabs"` the rest slides out above the window.
+ *
+ * `active`: false for a banner that is (or may be) the one not on screen, when phones have their
+ * own: only the visible one may publish its height.
  */
-export function useBannerScroll(scroll: BannerConfig["scroll"]) {
+export function useBannerScroll(scroll: BannerOptions["scroll"], active: boolean) {
   const [el, setElement] = useState<HTMLElement | null>(null);
   const [away, setAway] = useState(false);
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
     const main = el?.closest("main");
-    if (!el || !main) return;
+    if (!el || !main || !active) return;
     const measure = () => {
       const keep = el.querySelector<HTMLElement>("[data-banner-keep]");
       const top = scroll === "tabs" && keep?.offsetHeight ? keep.offsetHeight - el.offsetHeight : 0;
@@ -46,12 +49,12 @@ export function useBannerScroll(scroll: BannerConfig["scroll"]) {
       el.style.top = "";
       main.style.removeProperty("--banner-h");
     };
-  }, [el, scroll]);
+  }, [el, scroll, active]);
 
   useEffect(() => {
     setAway(false);
     setHidden(false);
-    if (!el || scroll === "all") return;
+    if (!el || !active || scroll === "all") return;
     let last = window.scrollY;
     const onScroll = () => {
       // Clamped: overscroll bounce must not read as scrolling up or down.
@@ -69,16 +72,16 @@ export function useBannerScroll(scroll: BannerConfig["scroll"]) {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [el, scroll]);
+  }, [el, scroll, active]);
 
   useEffect(() => {
     const main = el?.closest("main");
-    if (!main) return;
+    if (!main || !active) return;
     main.style.setProperty("--banner-shown", hidden ? "0px" : "var(--banner-h)");
     return () => {
       main.style.removeProperty("--banner-shown");
     };
-  }, [el, hidden]);
+  }, [el, hidden, active]);
 
   return { setElement, away, hidden };
 }

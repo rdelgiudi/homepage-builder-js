@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { AdminProvider, useAdmin } from "./store";
 import { useBuilder } from "./Builder";
-import PreviewPane from "./PreviewPane";
+import PreviewPane, { type PreviewDevice } from "./PreviewPane";
 import { BackgroundScreen, EffectsScreen, HeaderLayoutScreen, ScopeBar, type ScreenProps, type SettingsScope } from "./ConfigScreens";
 import ContentScreen from "./ContentScreen";
 import CommentsScreen from "./CommentsScreen";
@@ -132,7 +132,11 @@ function Shell() {
   // (and so the preview) shows. Choosing another page there opens it in the builder too.
   const [scopeKind, setScopeKind] = useState<"site" | "page">("site");
   const scope: SettingsScope = scopeKind === "page" ? { kind: "page", ...builder.page } : { kind: "site" };
+  // The preview's width, also which of the banner's two sets (wide screens / phones) is edited.
+  const [device, setDevice] = useState<PreviewDevice>("desktop");
   const screenProps: ScreenProps = {
+    device,
+    onDevice: setDevice,
     scope,
     shown: builder.page,
     onScope: (next) => {
@@ -297,7 +301,7 @@ function Shell() {
               <Resizer side="left" width={panels.widths.left} label="Resize the left panel" onResize={(w) => panels.set("left", w, screen === "builder")} />
               {/* Keep the preview at this position on every draft screen so the iframe is never remounted
                   (which is also why the drag-and-drop context wraps all four screens, not just the builder). */}
-              <PreviewPane target={builder.previewTarget} drop={builder.previewDrop} editable={screen === "builder"} />
+              <PreviewPane target={builder.previewTarget} drop={builder.previewDrop} editable={screen === "builder"} device={device} onDevice={setDevice} />
               {screen === "builder" && (
                 <>
                   <Resizer side="right" width={panels.widths.right} label="Resize the settings panel" onResize={(w) => panels.set("right", w, true)} />

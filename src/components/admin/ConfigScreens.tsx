@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import type { HomepageConfig, PageSettingGroup, PageSettings } from "@/lib/schema/config";
+import type { BannerConfig, BannerOptions, HomepageConfig, LayoutConfig, PageSettingGroup, PageSettings } from "@/lib/schema/config";
 import { HOME, groupValue, pagePath, pageSettings, pageView, sitePages, withPageSetting, withSiteGroup } from "@/lib/pages";
 import SchemaForm, { TabChoices } from "./SchemaForm";
 import { formSchemas, type JsonSchema } from "./schemas";
 import { useAdmin } from "./store";
 import { api } from "./api";
-import { ignoredBannerSettings } from "@/lib/banner";
+import { ignoredBannerSettings, withPhoneBanner, type BannerScreens } from "@/lib/banner";
+import type { PreviewDevice } from "./PreviewPane";
 import { LayoutPicker } from "./LayoutControls";
 
 type Obj = Record<string, unknown>;
@@ -19,6 +20,9 @@ type Obj = Record<string, unknown>;
 export type SettingsScope = { kind: "site" } | { kind: "page"; id: string; title: string; slug: string };
 
 export interface ScreenProps {
+  /** The preview's device: the banner form edits that one's settings when phones have their own. */
+  device: PreviewDevice;
+  onDevice: (device: PreviewDevice) => void;
   scope: SettingsScope;
   /** The page the preview shows (in site scope too: its own settings hide site changes there). */
   shown: { id: string; title: string; slug: string };
@@ -187,6 +191,57 @@ export function ScopeBar({ scope, shown, onScope }: ScreenProps) {
   );
 }
 
+/** The banner's settings: one set for every screen, or one for wide screens and one for phones (the preview shows the one being edited). */
+function BannerForm({ value, onChange, layout, device, onDevice }: { value: BannerConfig; onChange: (v: BannerConfig) => void; layout: LayoutConfig } & Pick<ScreenProps, "device" | "onDevice">) {
+  const { phone, ...wide } = value;
+  const screens: BannerScreens = phone ? device : "all";
+  const edited: BannerOptions = phone && device === "phone" ? phone : wide;
+  const set = (v: BannerOptions) => onChange(screens === "phone" ? { ...wide, phone: v } : { ...v, ...(phone && { phone }) });
+  const ignored = ignoredBannerSettings(layout, edited, screens);
+  return (
+    <>
+      <label className="adm-switch-row">
+        <span>
+          <span className="adm-label">Different on phones</span>
+          <span className="adm-hint">Off = the same settings on every screen</span>
+        </span>
+        <input
+          type="checkbox"
+          className="adm-switch"
+          checked={!!phone}
+          onChange={(e) => {
+            onChange(withPhoneBanner(value, e.target.checked));
+            onDevice(e.target.checked ? "phone" : "desktop");
+          }}
+        />
+      </label>
+      {phone && (
+        <div className="adm-field">
+          <span className="adm-label">Settings for</span>
+          <div className="adm-seg" role="group" aria-label="Banner settings for">
+            <button type="button" aria-pressed={device === "desktop"} onClick={() => onDevice("desktop")}>
+              Wide screens
+            </button>
+            <button type="button" aria-pressed={device === "phone"} onClick={() => onDevice("phone")}>
+              Phones
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Keyed: the two sets don't share half-typed input. */}
+      <SchemaForm key={screens} schema={formSchemas.banner} value={edited as unknown as Obj} hide={["phone", ...ignored.flatMap((i) => i.keys)]} onChange={(v) => set(v as unknown as BannerOptions)} />
+      {ignored.map(
+        (i) =>
+          i.note && (
+            <p key={i.note} className="adm-hint">
+              {i.note}
+            </p>
+          )
+      )}
+    </>
+  );
+}
+
 /** Header & layout: name, tagline, title colors, banner, favicon, blog post author, layout, counters (the site's or one page's own). */
 export function HeaderLayoutScreen(props: ScreenProps) {
   const { config } = useAdmin();
@@ -202,22 +257,7 @@ export function HeaderLayoutScreen(props: ScreenProps) {
         {(value, onChange, pageId) => {
           // The same fields mean less in some layouts: the page's own layout decides (the site's in site scope).
           const { layout } = props.scope.kind === "site" ? config : pageView(config, pageId);
-          const ignored = ignoredBannerSettings(layout, value);
-          return (
-            <>
-              <SchemaForm
-                schema={formSchemas.banner}
-                value={value as unknown as Obj}
-                hide={ignored.flatMap((i) => i.keys)}
-                onChange={(v) => onChange(v as unknown as typeof value)}
-              />
-              {ignored.map((i) => (
-                <p key={i.note} className="adm-hint">
-                  {i.note}
-                </p>
-              ))}
-            </>
-          );
+          return <BannerForm value={value} onChange={onChange} layout={layout} device={props.device} onDevice={props.onDevice} />;
         }}
       </Group>
       <SiteOnly title="Favicon" scope={props.scope} onScope={props.onScope}>

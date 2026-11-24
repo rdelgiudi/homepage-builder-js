@@ -141,7 +141,7 @@ export const LayoutSchema = z.object({
  * The banner at the top of every page: name (or logo), tagline and the tab bar. The defaults are
  * the banner as it always was. What a site layout can't do with it: lib/banner.ts.
  */
-export const BannerSchema = z.object({
+const bannerFields = {
   title: z
     .enum(["name", "logo", "both"])
     .default("name")
@@ -177,6 +177,13 @@ export const BannerSchema = z.object({
     .enum(["floating", "banner"])
     .default("floating")
     .meta({ title: "Light/dark switch", labels: { floating: "Floating", banner: "In the banner" }, description: "Floating = fixed at the bottom right of the window" }),
+};
+/** One set of banner settings (the site's, or the phones' own). */
+export const BannerOptionsSchema = z.object(bannerFields);
+export const BannerSchema = z.object({
+  ...bannerFields,
+  /** Phones' own settings (below `md`): the whole set, all or nothing. Missing = the same as everywhere. */
+  phone: BannerOptionsSchema.optional(),
 });
 
 export const CountersSchema = z.object({
@@ -275,6 +282,7 @@ export type BackgroundConfig = z.infer<typeof BackgroundSchema>;
 export type BackgroundBase = z.infer<typeof BackgroundBaseSchema>;
 export type LayoutConfig = z.infer<typeof LayoutSchema>;
 export type BannerConfig = z.infer<typeof BannerSchema>;
+export type BannerOptions = z.infer<typeof BannerOptionsSchema>;
 export type CountersConfig = z.infer<typeof CountersSchema>;
 export type Tab = z.infer<typeof TabSchema>;
 export type Page = z.infer<typeof PageSchema>;

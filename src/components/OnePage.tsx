@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PHONE_QUERY } from "@/lib/banner";
 import Banner, { type BannerSetup } from "./Banner";
 import { useSearchParams } from "next/navigation";
 import type { Tab } from "@/lib/schema/config";
@@ -81,7 +82,7 @@ export default function OnePage({ tabs, banner, widgetContext, widthClass, grid,
       window.removeEventListener("resize", observe);
       window.removeEventListener("scroll", onScroll);
     };
-  }, [tabs, banner.options]);
+  }, [tabs, banner]);
 
   const scrollTo = (tab: Tab, smooth: boolean) => {
     jumpUntil.current = Date.now() + (smooth ? 900 : 100);
@@ -90,7 +91,8 @@ export default function OnePage({ tabs, banner, widgetContext, widthClass, grid,
     if (!section) return;
     // A banner that hides on the way down needs no room above the section; on the way up it returns.
     const gap = parseFloat(getComputedStyle(section).scrollMarginTop) || 0;
-    const hides = banner.options.scroll === "hide" && section.getBoundingClientRect().top > gap + 16;
+    const set = banner.phone && window.matchMedia(PHONE_QUERY).matches ? banner.phone : banner;
+    const hides = set.options.scroll === "hide" && section.getBoundingClientRect().top > gap + 16;
     section.style.scrollMarginTop = hides ? "0px" : "";
     section.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
   };

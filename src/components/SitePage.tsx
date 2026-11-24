@@ -5,9 +5,9 @@ import { Suspense } from "react";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import FaviconAnimation from "@/components/FaviconAnimation";
 import ConfigSync from "@/components/ConfigSync";
-import type { HomepageConfig, SiteLayout } from "@/lib/schema/config";
+import type { BannerConfig, BannerOptions, HomepageConfig, SiteLayout } from "@/lib/schema/config";
 import { bannerOptions } from "@/lib/banner";
-import Banner, { type BannerSetup } from "@/components/Banner";
+import Banner, { type BannerSet, type BannerSetup } from "@/components/Banner";
 import SiteHeader from "@/components/SiteHeader";
 import BackgroundLayer from "@/components/BackgroundLayer";
 import { slugify } from "@/lib/schema/migrate";
@@ -42,13 +42,27 @@ const FULL_WIDTH = "max-w-none";
 
 function headerProps(config: HomepageConfig, homeHref?: string) {
   const { name, tagline, titleGradient, taglineGradient } = config;
-  return { name, tagline, titleGradient, taglineGradient: taglineGradient.length ? taglineGradient : titleGradient, homeHref, banner: bannerOptions(config.layout, config.banner) };
+  return { name, tagline, titleGradient, taglineGradient: taglineGradient.length ? taglineGradient : titleGradient, homeHref };
 }
 
 /** The banner of a page with this config: its settings as the layout applies them, and its title. */
 function bannerSetup(config: HomepageConfig, homeHref?: string): BannerSetup {
   const header = headerProps(config, homeHref);
-  return { options: header.banner, brand: <SiteHeader {...header} variant={header.banner.arrangement === "inline" ? "bar" : "top"} /> };
+  const { options, phone } = bannerOptions(config.layout, config.banner);
+  const set = (o: BannerOptions): BannerSet => ({ options: o, brand: <SiteHeader {...header} banner={o} variant={o.arrangement === "inline" ? "bar" : "top"} /> });
+  return { ...set(options), ...(phone && { phone: set(phone) }) };
+}
+
+/** The floating light/dark switch, on the screens whose banner doesn't have it. */
+function FloatingThemeSwitch({ banner }: { banner: BannerConfig }) {
+  const desktop = banner.themeSwitch === "floating";
+  const phone = (banner.phone ?? banner).themeSwitch === "floating";
+  if (!desktop && !phone) return null;
+  return (
+    <div className={!desktop ? "md:hidden" : !phone ? "max-md:hidden" : undefined}>
+      <ThemeSwitcher />
+    </div>
+  );
 }
 
 /**
@@ -116,7 +130,7 @@ export function SiteShell({
       </div>
       <ConfigSync preview={preview} />
       {effects.faviconAnimation && !preview && <FaviconAnimation gradient={titleGradient} />}
-      {config.banner.themeSwitch === "floating" && <ThemeSwitcher />}
+      <FloatingThemeSwitch banner={config.banner} />
     </main>
   );
 }
@@ -159,7 +173,7 @@ export default function SitePage({ config, preview, onPage = false }: { config: 
             widgetContext={widgetContext}
             widthClass={width}
             nav={site === "sidebar" ? "side" : "top"}
-            sideHeader={site === "sidebar" ? <SiteHeader {...headerProps(config, homeHref)} variant="side" /> : undefined}
+            sideHeader={site === "sidebar" ? <SiteHeader {...headerProps(config, homeHref)} banner={banner.options} variant="side" /> : undefined}
             hideNavIfSingle={features.tabNav === "multiple"}
             grid={grid}
             mobileNav={phoneBottomNav ? "bottom" : "menu"}

@@ -159,6 +159,12 @@ The top of every page: name or logo, tagline and tab bar. In the admin panel it 
 | `scroll` | `tabs` (default): the title goes away, the tabs stay. `hide`: all of it goes when scrolling down and returns when scrolling up. `all`: all of it stays. |
 | `themeSwitch` | Light/dark switch: `floating` (default, bottom right) or `banner` |
 
+Phones use the same settings unless `banner.phone` is set: an object with the same options, used instead of all of them below 768px (what it leaves out is that option's default). In the admin panel: **Different on phones**, then choose which set to edit.
+
+```json
+"banner": { "arrangement": "inline", "titlePosition": "left", "scroll": "all", "phone": { "arrangement": "stacked", "scroll": "hide" } }
+```
+
 In the sidebar layout the title, tabs and switch are in the left column on wide screens; the banner is for phones.
 
 ### Background

@@ -1,18 +1,22 @@
 "use client";
 
-import type { ReactNode, RefObject } from "react";
-import type { BannerConfig } from "@/lib/schema/config";
-import { splitTabs } from "@/lib/banner";
+import { useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import type { BannerOptions } from "@/lib/schema/config";
+import { PHONE_QUERY, splitTabs, type BannerScreens } from "@/lib/banner";
 import TabStrip, { type NavItem } from "./TabStrip";
 import ThemeSwitcher from "./ThemeSwitcher";
 import { useBannerScroll } from "./useBannerScroll";
 
-/** What SitePage prepares: the settings as the layout applies them, and the title drawn for them. */
-export interface BannerSetup {
-  /** From `bannerOptions()`. */
-  options: BannerConfig;
+/** One set of settings as the layout applies them (`bannerOptions()`), and the title drawn for them. */
+export interface BannerSet {
+  options: BannerOptions;
   /** <SiteHeader>, `bar` variant when the title shares a row with the tabs. */
   brand: ReactNode;
+}
+
+/** What SitePage prepares. `phone` = phones have their own set. */
+export interface BannerSetup extends BannerSet {
+  phone?: BannerSet;
 }
 
 export interface BannerNav {
@@ -28,7 +32,7 @@ export interface BannerNav {
   current?: ReactNode;
 }
 
-interface BannerProps extends BannerSetup {
+interface CommonProps {
   widthClass: string;
   /** Unset = a page without tabs (a blog post), or only one tab in a layout that then shows none. */
   nav?: BannerNav;
@@ -38,6 +42,14 @@ interface BannerProps extends BannerSetup {
   barRef?: RefObject<HTMLDivElement | null>;
 }
 
+function subscribePhone(listener: () => void) {
+  const query = window.matchMedia(PHONE_QUERY);
+  query.addEventListener("change", listener);
+  return () => query.removeEventListener("change", listener);
+}
+/** Whether the window is a phone's; null on the server and while hydrating (not known yet). */
+const usePhone = () => useSyncExternalStore<boolean | null>(subscribePhone, () => window.matchMedia(PHONE_QUERY).matches, () => null);
+
 // Out of the page column to the window's edges (main clips what the scrollbar adds).
 const BLEED = "w-screen ml-[calc(50%-50vw)]";
 const EDGE = "border-b border-gray-300 dark:border-gray-700";
@@ -45,20 +57,35 @@ const EDGE = "border-b border-gray-300 dark:border-gray-700";
 const AUTOHIDE = "transition-transform duration-300 ease-out motion-reduce:transition-none has-[:focus-visible]:translate-y-0";
 
 /**
+ * The banner of a page. With settings of their own for phones the server sends both and CSS shows
+ * the right one; once the width is known only that one stays mounted.
+ */
+export default function Banner({ options, brand, phone, phonesOnly = false, ...common }: BannerSetup & CommonProps) {
+  const onPhone = usePhone();
+  if (!phone) return <BannerBar {...common} options={options} brand={brand} screens={phonesOnly ? "phone" : "all"} active />;
+  return (
+    <>
+      {!phonesOnly && onPhone !== true && <BannerBar key="desktop" {...common} barRef={undefined} options={options} brand={brand} screens="desktop" active={onPhone === false} />}
+      {onPhone !== false && <BannerBar key="phone" {...common} {...phone} screens="phone" active={onPhone === true} />}
+    </>
+  );
+}
+
+/**
  * The top of every page: title (name or logo), tagline, tab bar and, if set, the light/dark
  * switch. Two arrangements (title above the tabs, or all in one row) × three ways to scroll
  * (`banner.scroll`); the same component with or without tabs. Nothing in here may depend on
  * `layout.site`: that is settled before, in lib/banner.ts.
  */
-export default function Banner({ options, brand, widthClass, nav, phonesOnly = false, barRef }: BannerProps) {
-  const { setElement, away, hidden } = useBannerScroll(options.scroll);
+function BannerBar({ options, brand, widthClass, nav, barRef, screens, active }: BannerSet & Omit<CommonProps, "phonesOnly"> & { screens: BannerScreens; active: boolean }) {
+  const { setElement, away, hidden } = useBannerScroll(options.scroll, active);
   const width = options.fullWidth ? "max-w-none" : widthClass;
   const keepTabs = options.scroll === "tabs";
   const inBanner = options.themeSwitch === "banner";
-  const scope = phonesOnly ? " md:hidden" : "";
+  const scope = screens === "phone" ? " md:hidden" : screens === "desktop" ? " max-md:hidden" : "";
   const autohide = options.scroll === "hide" ? ` ${AUTOHIDE}${hidden ? " -translate-y-full" : ""}` : "";
 
-  const strip = (items: NavItem[], align: BannerConfig["tabsPosition"], className: string, tight = false) =>
+  const strip = (items: NavItem[], align: BannerOptions["tabsPosition"], className: string, tight = false) =>
     nav && items.length > 0 && (
       <TabStrip items={items} activeId={nav.activeId} onSelect={nav.onSelect} variant={nav.variant} align={align} label={nav.label} tight={tight} className={className} />
     );
@@ -87,6 +114,8 @@ export default function Banner({ options, brand, widthClass, nav, phonesOnly = f
           className={`banner-row ${width} mx-auto px-4 md:px-8 flex items-center gap-3 md:gap-0 min-h-14 md:min-h-16 py-1.5 ${centered ? "md:grid md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]" : ""}`}
         >
           {nav?.phone === "menu" && <div className="md:hidden shrink-0">{nav.menuButton}</div>}
+          {/* Phones, centered title: an empty counterpart of whatever is only on one side of it. */}
+          {centered && inBanner && nav?.phone !== "menu" && <span className="md:hidden w-9 shrink-0" aria-hidden />}
           {(before || centered || position === "right") && <div className="hidden md:flex flex-1 min-w-0">{before}</div>}
           <div className="relative flex-1 min-w-0 md:contents">
             <div className={`banner-brand min-w-0 ${centered ? "md:max-w-[40vw]" : "md:max-w-[50%]"} ${gap}`}>
@@ -101,10 +130,11 @@ export default function Banner({ options, brand, widthClass, nav, phonesOnly = f
             </div>
           )}
           {inBanner && position === "right" && <ThemeSwitcher placement="banner" />}
+          {centered && !inBanner && nav?.phone === "menu" && <span className="md:hidden w-8 shrink-0" aria-hidden />}
         </div>
         {nav?.phone === "strip" && (
           <div data-banner-keep className="flex md:hidden px-2">
-            {strip(nav.items, "center", "", true)}
+            {strip(nav.items, centered ? "center" : options.tabsPosition, "", true)}
           </div>
         )}
       </div>

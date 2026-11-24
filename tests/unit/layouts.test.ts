@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { LAYOUT_FEATURES, arrangeOf, bottomNav, gridOptions, ignoredTabSettings, isGridTab, pinnedTabId } from "@/lib/layouts";
-import { bannerOptions, ignoredBannerSettings, splitTabs } from "@/lib/banner";
+import { bannerOptions, ignoredBannerSettings, splitTabs, withPhoneBanner, type BannerScreens } from "@/lib/banner";
 import { BannerSchema, LayoutSchema, SITE_LAYOUTS, type HomepageConfig } from "@/lib/schema/config";
 
 type Site = (typeof SITE_LAYOUTS)[number];
@@ -89,7 +89,7 @@ describe("bottom tab bar on phones", () => {
 
 describe("banner settings per layout", () => {
   const inline = BannerSchema.parse({ arrangement: "inline" });
-  const keys = (site: Site, banner = inline) => ignoredBannerSettings(layout(site), banner).flatMap((i) => i.keys);
+  const keys = (site: Site, banner = inline, screens: BannerScreens = "all") => ignoredBannerSettings(layout(site), banner, screens).flatMap((i) => i.keys);
 
   it("the defaults are the banner as it was before it had settings", () => {
     assert.deepEqual(BannerSchema.parse({}), {
@@ -108,7 +108,7 @@ describe("banner settings per layout", () => {
   it("one row applies everywhere but in link in bio, and only there the panel hides it", () => {
     for (const site of SITE_LAYOUTS) {
       const stacked = site === "linkinbio";
-      assert.equal(bannerOptions(layout(site), inline).arrangement, stacked ? "stacked" : "inline", site);
+      assert.equal(bannerOptions(layout(site), inline).options.arrangement, stacked ? "stacked" : "inline", site);
       assert.equal(keys(site).includes("arrangement"), stacked, site);
     }
   });
@@ -118,6 +118,30 @@ describe("banner settings per layout", () => {
     assert.deepEqual(keys("tabs", { ...inline, titlePosition: "left" }), []);
     assert.deepEqual(keys("tabs", { ...inline, arrangement: "stacked" }), []);
     assert.deepEqual(keys("sidebar"), ["tabsPosition", "fullWidth"]);
+  });
+
+  it("phones follow the same settings unless they have their own set", () => {
+    assert.equal(bannerOptions(layout("tabs"), inline).phone, undefined);
+    const own = withPhoneBanner(inline, true);
+    assert.deepEqual(own.phone, inline, "starts as a copy, so nothing changes yet");
+    const split = BannerSchema.parse({ ...own, phone: { scroll: "hide" } });
+    const { options, phone } = bannerOptions(layout("tabs"), split);
+    assert.equal("phone" in options, false);
+    assert.equal(options.scroll, "tabs");
+    assert.equal(phone?.scroll, "hide");
+    assert.equal(phone?.arrangement, "stacked", "the whole set is the phones' own: what it leaves out is the default, not the other set's");
+    assert.equal(bannerOptions(layout("linkinbio"), withPhoneBanner(inline, true)).phone?.arrangement, "stacked");
+    assert.deepEqual(withPhoneBanner(split, false), inline, "back to one set");
+  });
+
+  it("each set offers only what does something on its screens", () => {
+    const stacked = BannerSchema.parse({});
+    assert.deepEqual(keys("tabs", stacked, "phone"), ["fullWidth", "tabsPosition"]);
+    assert.deepEqual(keys("tabs", inline, "phone"), ["fullWidth", "tabsPosition", "showTagline"]);
+    assert.deepEqual(keys("onepage", stacked, "phone"), ["fullWidth"], "its jump links are a row on phones too");
+    assert.deepEqual(keys("linkinbio", stacked, "phone"), ["arrangement", "fullWidth"]);
+    assert.deepEqual(keys("sidebar", stacked, "desktop"), ["arrangement", "titlePosition", "tabsPosition", "fullWidth", "scroll"]);
+    assert.deepEqual(keys("tabs", stacked, "desktop"), []);
   });
 
   it("a centered title splits the tabs, the first half being the larger", () => {

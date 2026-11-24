@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { safeUrl } from "@/lib/background";
-import type { BannerConfig } from "@/lib/schema/config";
+import type { BannerOptions } from "@/lib/schema/config";
 
 interface SiteHeaderProps {
   name: string;
   tagline: string;
   titleGradient: string[];
   taglineGradient: string[];
-  banner: BannerConfig;
+  banner: BannerOptions;
   /**
    * `top` above the tabs · `bar` in one row with them (small) · `side` left-aligned, for the
    * sidebar layout's left column.

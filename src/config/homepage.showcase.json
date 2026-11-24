@@ -1133,7 +1133,12 @@
           "titlePosition": "left",
           "tabsPosition": "right",
           "scroll": "all",
-          "themeSwitch": "banner"
+          "themeSwitch": "banner",
+          "phone": {
+            "arrangement": "stacked",
+            "scroll": "tabs",
+            "themeSwitch": "banner"
+          }
         },
         "layout": {
           "site": "bento",
