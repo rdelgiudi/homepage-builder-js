@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/widgets/shared";
 import TabSections, { type GridOptions } from "@/components/TabSections";
@@ -60,6 +60,11 @@ interface TabsProps {
   uniformNav?: boolean;
 }
 
+/** The empty space above and below a tab's widgets (pt-4 here, pb-8 in SiteShell): out of view, it isn't missed. */
+const TAB_PADDING = 48;
+/** The visitor takes over the scroll position. */
+const USER_INPUT = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
+
 export default function Tabs({ tabs, banner, enableTransitions, widgetContext, widthClass, nav = "top", sideHeader, hideNavIfSingle, grid, mobileNav = "menu", column, uniformNav = false }: TabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,6 +74,7 @@ export default function Tabs({ tabs, banner, enableTransitions, widgetContext, w
   const [menuOpen, setMenuOpen] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   // Where the drawer starts (level with the menu button's row) and how tall that row is.
   const [drawer, setDrawer] = useState({ top: 0, bar: 48 });
   const transitioning = useRef(false);
@@ -134,6 +140,35 @@ export default function Tabs({ tabs, banner, enableTransitions, widgetContext, w
     if (!el || !button || el.scrollWidth <= el.clientWidth) return;
     el.scrollTo({ left: Math.max(0, button.offsetLeft - (el.clientWidth - button.offsetWidth) / 2), behavior: "smooth" });
   }, [activeTab]);
+
+  // A tab that fits the window once the title has scrolled away leaves the page scrolled past the
+  // title (the browser only moves as far as the new height forces it to): go back to the top, so
+  // the title shows. Again when widgets shrink as their data arrives: for a few seconds, or until the visitor does something.
+  const firstTab = useRef(mountedTab);
+  useLayoutEffect(() => {
+    const content = contentRef.current;
+    const main = content?.closest("main");
+    if (!content || !main || firstTab.current === mountedTab) return;
+    firstTab.current = -1;
+    const showTitle = () => {
+      const page = document.documentElement;
+      const banner = parseFloat(getComputedStyle(main).getPropertyValue("--banner-h")) || 0;
+      // How far the page scrolls before the tab itself starts to go under the stuck part of the banner.
+      const titleOnly = content.getBoundingClientRect().top + window.scrollY - banner;
+      if (window.scrollY > 0 && page.scrollHeight - window.innerHeight <= titleOnly + TAB_PADDING) window.scrollTo({ top: 0, behavior: "instant" });
+    };
+    const observer = new ResizeObserver(showTitle);
+    const timer = setTimeout(() => stop(), 5000);
+    const stop = () => {
+      clearTimeout(timer);
+      observer.disconnect();
+      for (const type of USER_INPUT) window.removeEventListener(type, stop);
+    };
+    showTitle();
+    observer.observe(main);
+    for (const type of USER_INPUT) window.addEventListener(type, stop, { passive: true });
+    return stop;
+  }, [mountedTab]);
 
   // Admin preview: the builder opens the tab chosen here. Not on mount: the first render is
   // always tab 0, before `?tab=` has been applied.
@@ -278,7 +313,7 @@ export default function Tabs({ tabs, banner, enableTransitions, widgetContext, w
         </nav>
       )}
 
-      <div className={column ? "md:grid md:grid-cols-[300px_minmax(0,1fr)] md:gap-8 md:items-start" : undefined}>
+      <div ref={contentRef} className={column ? "md:grid md:grid-cols-[300px_minmax(0,1fr)] md:gap-8 md:items-start" : undefined}>
         {column && (
           // Sticky beside the open tab; scrolls on its own when it is taller than the window.
           <aside className="pt-4 pb-6 md:pb-0 md:sticky md:top-[calc(var(--banner-shown,67px)+13px)] md:max-h-[calc(100dvh-var(--banner-shown,67px)-29px)] motion-safe:transition-[top] motion-safe:duration-300 md:overflow-y-auto md:pr-1 [scrollbar-width:thin]" aria-label="Profile">
