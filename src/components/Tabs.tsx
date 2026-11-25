@@ -271,7 +271,8 @@ export default function Tabs({ tabs, banner, enableTransitions, widgetContext, w
               }`}
             >
               {tab.icon ? <Icon icon={tab.icon} invertDark={tab.invertDark} width={22} height={22} /> : <span className="h-[22px]" aria-hidden />}
-              <span className="max-w-full truncate">{tab.label}</span>
+              {/* `truncate` clips at the line box: the button's tight one cut the tails off g, y, p. */}
+              <span className="max-w-full truncate leading-[18px]">{tab.label}</span>
             </button>
           ))}
         </nav>
